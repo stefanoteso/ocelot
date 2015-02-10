@@ -1,0 +1,65 @@
+
+- EXPERIMENT YIP REDUX:
+    - PROTEINS
+        - interactions              DONE        Given
+        - kernel: COG               DONE        Made obsolete by supfam kernel (Luca)
+        - kernel: subloc            SKIP
+        - kernel: gene expr         DONE
+        - kernel: complexes         DONE
+        + kernel: spectrum          DONE
+        + kernel: profiles          HALF        Against nr
+        + kernel: corrmut
+        + kernel: supfam            DONE        Luca
+        + kernel: interpro
+        + kernel: prodom
+    - DOMAINS
+        - sequences
+        - structures
+        - interactions              DONE        Given
+        - kernel: pfam alignments
+        - kernel: pfam prior
+        - kernel: excl pfam prior
+        - kernel: pfam parent prior
+        - kernel: pfam-pfam prior
+        - kernel: pfam-pfam prior
+    - RESIDUES
+        - sequences
+        - structures
+        - interactions              DONE        Given
+        - kernel: profile
+        - kernel: ss+sa (p)
+        + kernel: composition       DONE
+        + kernel: complexity (p)    DONE
+        + kernel: disorder (p)
+        + kernel: tmem (p)
+        + kernel: loc signals (p)
+        + kernel: interface (p)
+        + kernel: hotspots (p)
+        + kernel: functional (p)
+    - HIERARCHY                     DONE        Given
+    - FOLDS                         DONE        Given
+
+- EXPERIMENT YEAST:
+    - PROTEINS
+        - interactions              DONE        Taken from SGD, BioGRID, PSI-MI
+        - functions                 DONE        Taken from UniProt
+        - XXX
+    - DOMAINS
+        - interactions              DONE        Taken from iPfam/PDB
+        - XXX
+    - RESIDUES
+        - interactions              DONE        Taken from iPfam/PDB
+        - XXX
+    - HIERARCHY
+    - FOLDS
+
+- EXPERIMENT SPECIES-AGNOSTIC:
+    - XXX
+
+- COMPETITORS
+    - baseline: kNN homology-based annotation transfer
+    - baseline: CAFA
+    - baseline: GOstruct (open source on sourceforge)
+    - baseline: SVM
+    - baseline: Rost's own predictor
+
