@@ -60,15 +60,6 @@ class Converter(object):
             a_set.add(s)
             triples.append((s, p, o))
 
-    def pdb_id_to_uri(self, id, chain = None):
-        base_uri = id.lower()
-        if chain:
-            base_uri += "_" + chain.upper()
-        return U(NS.PDBR + base_uri)
-
-    def uniprot_id_to_uri(self, id):
-        return U(O.UNIPROT_ID_ROOT.value + id())
-
 def iterate_csv(path, skip_first = False, **kwargs):
     import csv
     with open(path, "rU") as fp:
