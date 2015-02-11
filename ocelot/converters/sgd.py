@@ -14,7 +14,7 @@ class SGDConverter(Converter):
     
       chromosome_length.tab         : not used
       dbxref.tab                    : DONE
-      domains.tab                   : not used
+      domains.tab                   : DONE
       gene_association.sgd          : not used
       go_protein_complex_slim.tab   : not used
       go_slim_mapping.tab           : DONE
@@ -36,6 +36,7 @@ class SGDConverter(Converter):
             ("xref",            self._siphon_xrefs),
             ("sequences",       self._siphon_sequences),
             ("go-slim",         self._siphon_goslims),
+            ("domains",         self._siphon_domains),
             ("pdb-homologues",  self._siphon_pdb_homologues),
             ("interactions",    self._siphon_interactions),
         )
@@ -168,6 +169,46 @@ class SGDConverter(Converter):
 
             sgd_id = O.uri(O.SGD_ID, self._sanitize(sgd_ids[0].split(":")[1].strip(",")))
             triples.append((sgd_id, O.SGD_ID_HAS_SEQUENCE, L(sequence)))
+
+    def _siphon_domains(self, triples):
+        """Converts the `domains.tab` file.
+
+        The data comes from an InterPro scan over the SGD entries.
+        """
+        FIELDS = (
+            "FEAT_NAME",        # S. cerevisiae systematic name (ID of the input sequence)
+            "CRC64",            # CRC of the proteic sequence
+            "LENGTH",           # Lenght of the sequence in AA
+            "METHOD",           # Analysis method
+            "DB_MEMBERS",       # DB members entry for this match
+            "DB_DESCRIPTION",   # DB member description for the entry
+            "START",            # start of the domain match
+            "STOP",             # end of the domain match
+            "EVALUE",           # E-value of the match (defined by DB)
+            "STATUS",           # Status of the match: T=true, ?=unknown
+            "DATE",             # Date of the run
+            "IPR_ID",           # InterPro ID
+            "IPR_DESCRIPTION",  # InterPro description
+            "IPR_GO",           # GO description of the InterPro entry
+        )
+        for row in iterate_csv(self._get_path("domains.tab"),
+                               delimiter = "\t", fieldnames = FIELDS):
+            feat_id = O.uri(O.SGD_FEATURE, self._sanitize(row["FEAT_NAME"]))
+            is_true = L({ "T":True, "?":False }[row["STATUS"]])
+
+            try:
+                evalue = L(float(row["EVALUE"]))
+            except ValueError:
+                evalue = L(-1.0)
+
+            _ = B()
+            triples.extend([
+                (_, O.RDF.type,                 O.SGD_IPR_HIT),
+                (_, O.SGD_IPR_HIT_STARTS_AT,    L(row["START"])),
+                (_, O.SGD_IPR_HIT_STOPS_AT,     L(row["STOP"])),
+                (_, O.SGD_IPR_HIT_HAS_EVALUE,   evalue),
+                (_, O.SGD_IPR_HIT_IS_TRUE,      is_true),
+            ])
 
     def _siphon_goslims(self, triples):
         """Converts the `go_slim_mapping.tab` file."""
