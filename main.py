@@ -41,19 +41,20 @@ def _make_rdf(args):
         "sifts"     : Target(ocelot.SIFTSConverter, {}),
         "pdb"       : Target(ocelot.PDBConverter, {}),
         "biogrid"   : Target(ocelot.PsiMiTabConverter, {
-                        "path" : "BioGRID/BIOGRID-ORGANISM-Saccharomyces_cerevisiae-3.2.112.mitab.txt"
+                        "path": "BioGRID/BIOGRID-ORGANISM-Saccharomyces_cerevisiae-3.2.112.mitab.txt"
                       }),
         "mint"      : Target(ocelot.PsiMiTabConverter, {
-                        "path" : "IMEx/IMEx-MINT-yeast.tab27"
+                        "path": "IMEx/IMEx-MINT-yeast.tab27"
                       }),
         "intact"    : Target(ocelot.PsiMiTabConverter, {
-                        "path" : "IMEx/IMEx-IntAct-yeast.tab27"
+                        "path": "IMEx/IMEx-IntAct-yeast.tab27"
                       }),
 
         # DATASETS
         "yip09"     : Target(ocelot.Yip09Converter, {}),
     }
     for id_, target in _filter_targets(ALL_TARGETS, args.targets):
+        target.kwargs["basename"] = id_
         converter = target.Converter(args.src, args.dst,
                                      force_update = args.force_update,
                                      **target.kwargs)

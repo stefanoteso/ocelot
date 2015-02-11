@@ -32,7 +32,7 @@ class Yip09Converter(Converter):
             ("parentdr",    self._siphon_parentdr),
             ("aliases",     self._siphon_aliases),
         )
-        super(Yip09Converter, self).__init__("yip", SUBTARGETS, *args, **kwargs)
+        super(Yip09Converter, self).__init__(SUBTARGETS, *args, **kwargs)
 
     def _read(self, path):
         with open(os.path.join(self.src, "yip09", path)) as fp:

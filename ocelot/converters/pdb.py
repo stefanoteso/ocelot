@@ -23,7 +23,7 @@ class PDBConverter(Converter):
             ("info",    self._siphon_info),
             ("ps-ss",   self._siphon_ps_ss),
         )
-        super(PDBConverter, self).__init__("pdb", SUBTARGETS, *args, **kwargs)
+        super(PDBConverter, self).__init__(SUBTARGETS, *args, **kwargs)
         self.method = kwargs.get("method", "biopython")
 
     def _get_path(self, filename):

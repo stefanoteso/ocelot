@@ -11,10 +11,10 @@ import os
 class Converter(object):
     """Abstract class for database converters."""
 
-    def __init__(self, basename, all_subtargets, src, dst, **kwargs):
-        self.basename = basename
+    def __init__(self, all_subtargets, src, dst, **kwargs):
         self.src = src
         self.dst = dst
+        self.basename = kwargs["basename"]
         self.path = kwargs.get("path", None)
         self.force_update = kwargs.get("force_update", False)
 
@@ -24,7 +24,7 @@ class Converter(object):
         subtargets = []
         for subtarget, method in requested_subtargets:
             if not subtarget in known_subtarget_names:
-                print "ERROR: invalid subtarget '{}:{}', ignoring".format(basename, subtarget)
+                print "ERROR: invalid subtarget '{}:{}', ignoring".format(self.basename, subtarget)
             else:
                 subtargets.append((subtarget, method))
         self.subtargets = subtargets
@@ -67,9 +67,9 @@ class CSVConverter(Converter):
     :param basename: source basename, e.g. 'mint' or 'intact'.
     :param fields: list of CSV field names.
     """
-    def __init__(self, basename, fields, delimiter, *args, **kwargs):
+    def __init__(self, fields, delimiter, *args, **kwargs):
         SUBTARGETS = (("rows", self._siphon_rows),)
-        super(CSVConverter, self).__init__(basename, SUBTARGETS,
+        super(CSVConverter, self).__init__(SUBTARGETS,
                                            *args, **kwargs)
         self.fields = fields
         self.delimiter = delimiter

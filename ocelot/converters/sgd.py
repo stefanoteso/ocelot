@@ -40,7 +40,7 @@ class SGDConverter(Converter):
             ("pdb-homologues",  self._siphon_pdb_homologues),
             ("interactions",    self._siphon_interactions),
         )
-        super(SGDConverter, self).__init__("sgd", SUBTARGETS, *args, **kwargs)
+        super(SGDConverter, self).__init__(SUBTARGETS, *args, **kwargs)
 
     def _get_path(self, basename):
         import os

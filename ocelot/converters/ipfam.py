@@ -38,7 +38,7 @@ class IPfamConverter(Converter):
             ("residues",                self._siphon_residues),
             ("residue-interactions",    self._siphon_residue_interactions),
         )
-        super(IPfamConverter, self).__init__("ipfam", SUBTARGETS,
+        super(IPfamConverter, self).__init__(SUBTARGETS,
                                              *args, **kwargs)
 
     def _get_path(self, filename, is_db = True):

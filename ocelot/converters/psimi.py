@@ -67,8 +67,8 @@ class PsiMiTabConverter(CSVConverter):
     .. [mitab26] https://code.google.com/p/psicquic/wiki/MITAB26Format
     .. [mitab27] https://code.google.com/p/psicquic/wiki/MITAB27Format
     """
-    def __init__(self, basename, *args, **kwargs):
-        super(PsiMiTabConverter, self).__init__(basename, _FIELDS, "\t",
+    def __init__(self, *args, **kwargs):
+        super(PsiMiTabConverter, self).__init__(_FIELDS, "\t",
                                                 *args, **kwargs)
 
     @staticmethod

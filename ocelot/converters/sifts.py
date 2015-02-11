@@ -21,7 +21,7 @@ class SIFTSConverter(Converter):
             #("pdb-pfam",   self._siphon_pdb_pfam)
             #("pdb-taxon",  self._siphon_pdb_taxon)
         )
-        super(SIFTSConverter, self).__init__("sifts", SUBTARGETS,
+        super(SIFTSConverter, self).__init__(SUBTARGETS,
                                              *args, **kwargs)
 
     def _get_path(self, basename):
