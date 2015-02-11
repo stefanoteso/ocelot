@@ -85,12 +85,9 @@ class CSVConverter(Converter):
     def _siphon_rows(self, triples):
         import csv
         path = os.path.join(self.src, self.path)
-        with open(path, "rt") as fp:
-            reader = csv.DictReader(fp, fieldnames = self.fields,
-                                    restkey = "UNKNOWN",
-                                    delimiter = self.delimiter)
-            for row in reader:
-                self._siphon_row(triples, row)
+        for row in iterate_csv(path, delimiter = self.delimiter,
+                               fieldnames = self.fields):
+            self._siphon_row(triples, row)
     def _siphon_row(self, triples, row):
         raise NotImplementedError
 
