@@ -40,7 +40,7 @@ def _make_rdf(args):
         "ipfam"     : Target(ocelot.IPfamConverter, {}),
         "sifts"     : Target(ocelot.SIFTSConverter, {}),
         "pdb"       : Target(ocelot.PDBConverter, {}),
-        "biogrid"   : Target(ocelot.BioGRIDConverter, {
+        "biogrid"   : Target(ocelot.PsiMiTabConverter, {
                         "path" : "BioGRID/BIOGRID-ORGANISM-Saccharomyces_cerevisiae-3.2.112.mitab.txt"
                       }),
         "mint"      : Target(ocelot.PsiMiTabConverter, {
