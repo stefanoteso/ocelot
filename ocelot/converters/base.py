@@ -72,34 +72,6 @@ class Converter(object):
             a_set.add(s)
             triples.append((s, p, o))
 
-    def tlc_to_olc(self, tlc):
-        MAP = {
-            "ALA" : "A",
-            "ARG" : "R",
-            "ASN" : "N",
-            "ASP" : "D",
-            "CYS" : "C",
-            "GLU" : "E",
-            "GLN" : "Q",
-            "GLY" : "G",
-            "HIS" : "H",
-            "ILE" : "I",
-            "LEU" : "L",
-            "LYS" : "K",
-            "MET" : "M",
-            "PHE" : "F",
-            "PRO" : "P",
-            "SER" : "S",
-            "THR" : "T",
-            "TRP" : "W",
-            "TYR" : "Y",
-            "VAL" : "V"
-        }
-        tlc = tlc.upper()
-        if not tlc in MAP:
-            return 
-        return MAP[tlc]
-
     def pdb_id_to_uri(self, id, chain = None):
         base_uri = id.lower()
         if chain:
