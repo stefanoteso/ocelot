@@ -97,6 +97,11 @@ class PsiMiTabConverter(CSVConverter):
             ("rcsb pdb", O.PDBR),
             ("wwpdb", O.PDBR),
             ("taxid", O.TAXON),
+            ("chebi", O.UNKNOWN), # XXX
+            ("ddbj/embl/genbank", O.UNKNOWN), # XXX
+            ("emdb", O.UNKNOWN), # XXX
+            ("ensembl", O.UNKNOWN), # XXX
+            ("ensemblgenomes", O.UNKNOWN), # XXX
         )
         for prefix, uri in PREFIXES:
             if not string.startswith(prefix + ":"):
@@ -128,7 +133,10 @@ class PsiMiTabConverter(CSVConverter):
         """
         parts = self._get_parts(string)
         if unique:
-            assert len(parts) == 1
+            assert len(parts) <= 1, "entropic disorder, '{}'".format(parts)
+        if not len(parts):
+            print "Warning: invalid interaction, the faulty string is '{}'".format(string)
+            return
         triples.extend(map(lambda o: (s, p, self._prefix_to_uri(o)),
                            parts))
 

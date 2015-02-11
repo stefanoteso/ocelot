@@ -7,6 +7,7 @@ from rdflib import Namespace as NS, URIRef as U
 #
 
 OCELOT  = NS("http://ocelot.disi.unitn.it/term#")
+UNKNOWN = NS("http://ocelot.disi.unitn.it/unknown-term#")
 RDF     = NS("http://www.w3.org/1999/02/22-rdf-syntax-ns#")
 RDFS    = NS("http://www.w3.org/2000/01/rdf-schema#")
 OWL     = NS("http://www.w3.org/2002/07/owl#")
