@@ -54,18 +54,6 @@ class Converter(object):
             del triples
             del graph
 
-    def sanitize(self, s):
-        REPS = (
-            (" ", "_"),
-            ("'", "_SQUOTE_"),
-            ('"', "_DQUOTE_"),
-            ("(", "_"),
-            (")", "_")
-        )
-        for f, t in REPS:
-            s = s.replace(f, t)
-        return s
-
     @staticmethod
     def _add_if_new(triples, a_set, s, p, o):
         if not s in a_set:
