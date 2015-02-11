@@ -113,19 +113,31 @@ class CorrelationKernel(_Kernel):
 class SetKernel(_Kernel):
     """A generic set kernel.
 
-    :param entities: list of dictionaries.
+    :param entities: list of sets.
     """
     def _compute_all(self):
+        # XXX duck duck typing
+        if isinstance(self._entities[0], set):
+            is_weighted = False
+        elif isinstance(self._entities[0], dict):
+            is_weighted = True
+        else:
+            raise ValueError("SetKernel only supports set or dict entities.")
         num = len(self)
         matrix = np.zeros((num, num), dtype=np.float64)
         for i in xrange(num):
-            set_i = self._entities[i]
+            entity_i = self._entities[i]
             for j in xrange(i + 1):
-                set_j = self._entities[j]
-                if i == j and len(set_i) == 0 and len(set_j) == 0:
+                entity_j = self._entities[j]
+                if i == j and len(entity_i) == 0 and len(entity_j) == 0:
                     dp = 1.0
+                elif is_weighted: # XXX this should really be moved outside
+                    common_keys = set(entity_i.keys()) & set(entity_j.keys())
+                    dp = 0.0
+                    for key in common_keys:
+                        dp += entity_i[key] * entity_j[key]
                 else:
-                    dp = float(len(set_i & set_j))
+                    dp = float(len(entity_i & entity_j))
                 matrix[i,j] = matrix[j,i] = dp
         return matrix
 

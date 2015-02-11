@@ -262,7 +262,7 @@ class YipExperiment(_Experiment):
                     except KeyError, key:
                         num_missing += 1
                 if num_missing:
-                    print "Warning: no expression level for '{}' proteins".format(num_missing)
+                    print "Warning: no expression level for '{}/{}' proteins".format(num_missing, len(p_to_i))
                 matrix_sum += CorrelationKernel(levels).compute()
         return DummyKernel(matrix_sum)
 
@@ -322,29 +322,60 @@ class YipExperiment(_Experiment):
 
     @staticmethod
     def _read_interpro(path, allowed_sources = None):
+        """Reads an InterPro tabular-separated values file.
+
+        :param path: path to the InterPro TSV file.
+        :param allowed_sources: list of allowed domain sources (default: all).
+
+        :returns: a list of ``(domain_id, evalue)`` pairs. ``evalue`` can be
+                  None.
+        """
+        # XXX move to ocelot.services
         # XXX integrate iprscan5-urllib.py here; plumb `sequences` here
-        # XXX handle E-value
         FIELDS = ("QUERY_ID", "?2", "?3", "SOURCE_DB", "SOURCE_FAMILY",
                   "DESCRIPTION", "START", "STOP", "EVALUE", "?10", "DATE",
                   "IPR_FAMILY", "SHORT_DESCRIPTION", "GO_TERMS", "PATHWAYS")
-        hits = []
+        hits = {}
         for row in iterate_csv(path, delimiter="\t", fieldnames = FIELDS):
             if allowed_sources and not row["SOURCE_DB"] in allowed_sources:
                 continue
-            hits.append(row["SOURCE_DB"] + ":" + row["SOURCE_FAMILY"])
-        return set(hits)
+            try:
+                evalue = float(row["EVALUE"])
+            except ValueError:
+                evalue = None
+            hits[row["SOURCE_DB"] + ":" + row["SOURCE_FAMILY"]] = evalue
+        return hits
 
-    def _get_interpro_kernel(self, p_to_i, allowed_sources = None):
+    def _get_interpro_kernel(self, p_to_i, allowed_sources = None,
+                             use_evalue = False, default_score = 1.0):
         """Computes a set kernel over InterPro domain family hits.
+
+        The InterPro files are read from:
+
+        .. ``self.src/yip09/raw/interpro/${p}.iprscan5.tsv.txt``
+
+        where ``${p}`` is the name of the protein.
 
         :param p_to_i: map protein names -> index in the kernel.
         :param allowed_sources: allowed InterPro sources, e.g. "Pfam"
+        :param use_evalue: use negative logarithm of the hit e-value as
+                           detection score.
         """
+        import numpy as np
         hits = [ None for _ in xrange(len(p_to_i)) ]
         for p, i in p_to_i.items():
             path = os.path.join(self.src, "yip09", "raw", "interpro",
                                 "{}.iprscan5.tsv.txt".format(p))
-            hits[i] = self._read_interpro(path, allowed_sources)
+            hit = self._read_interpro(path, allowed_sources)
+            if not use_evalue:
+                hit = set(hit.keys())
+            else:
+                for k, v in hit.items():
+                    if v == None or v <= 0.0:
+                        hit[k] = default_score
+                    else:
+                        hit[k] = -np.log(v)
+            hits[i] = hit
         return SetKernel(hits)
 
     def _compute_y_ppi(self, pos_ppi, neg_ppi, pps):
