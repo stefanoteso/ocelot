@@ -1,15 +1,20 @@
 # -*- coding: utf8 -*-
 
-from rdflib import Namespace as NS, URIRef as U, BNode as B, Literal as L, Graph
-from pprint import pprint
-
 import ocelot.ontology as O
 from ocelot.services import iterate_csv
+from rdflib import Namespace as NS, URIRef as U, BNode as B, Literal as L, Graph
 
 import os
 
 class Converter(object):
-    """Abstract class for database converters."""
+    """Abstract class for database converters.
+
+    :param src: path to the source databases.
+    :param dst: path to the destination folder.
+    :param basename: name of this target.
+    :param path: base path of this target data within ``src``.
+    :param force_update: convert data even if the target RDF file exists.
+    """
 
     def __init__(self, all_subtargets, src, dst, **kwargs):
         self.src = src
@@ -32,26 +37,19 @@ class Converter(object):
     def siphon(self):
         for name, method in self.subtargets:
             rdf_path = os.path.join(self.dst, "{}-{}.ttl".format(self.basename, name))
-
-            print "Converting {}:{} into '{}'".format(self.basename, name, rdf_path)
-
-            graph = Graph()
-
-            for shortcut, namespace in O.BINDINGS:
-                graph.bind(shortcut, namespace)
-
             if os.path.isfile(rdf_path) and not self.force_update:
-                print "RDF file '{}' exists, skipping".format(rdf_path)
+                print "Target '{}' exists, skipping".format(rdf_path)
                 continue
 
+            print "Converting {}:{} into '{}'".format(self.basename, name, rdf_path)
+            graph = Graph()
+            for shortcut, namespace in O.BINDINGS:
+                graph.bind(shortcut, namespace)
             triples = []
-
             method(triples)
             for triple in triples:
                 graph.add(triple)
-
             graph.serialize(destination = rdf_path, format = "turtle")
-
             del triples
             del graph
 
@@ -64,8 +62,8 @@ class Converter(object):
 class CSVConverter(Converter):
     """Base class to convert a CSV file into RDF triples.
 
-    :param basename: source basename, e.g. 'mint' or 'intact'.
     :param fields: list of CSV field names.
+    :param delimiter: CSV delimiter.
     """
     def __init__(self, fields, delimiter, *args, **kwargs):
         SUBTARGETS = (("rows", self._siphon_rows),)
