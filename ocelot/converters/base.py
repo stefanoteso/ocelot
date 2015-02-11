@@ -4,6 +4,7 @@ from rdflib import Namespace as NS, URIRef as U, BNode as B, Literal as L, Graph
 from pprint import pprint
 
 import ocelot.ontology as O
+from ocelot.services import iterate_csv
 
 import os
 
@@ -59,16 +60,6 @@ class Converter(object):
         if not s in a_set:
             a_set.add(s)
             triples.append((s, p, o))
-
-def iterate_csv(path, skip_first = False, **kwargs):
-    import csv
-    with open(path, "rU") as fp:
-        reader = csv.DictReader(fp, **kwargs)
-        for row_as_dict in reader:
-            if skip_first:
-                skip_first = False
-                continue
-            yield row_as_dict
 
 class CSVConverter(Converter):
     """Base class to convert a CSV file into RDF triples.

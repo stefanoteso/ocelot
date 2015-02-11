@@ -5,6 +5,16 @@ import subprocess
 def _cls(obj):
     return type(obj).__name__
 
+def iterate_csv(path, skip_first = False, **kwargs):
+    import csv
+    with open(path, "rU") as fp:
+        reader = csv.DictReader(fp, **kwargs)
+        for row_as_dict in reader:
+            if skip_first:
+                skip_first = False
+                continue
+            yield row_as_dict
+
 class Binary(object):
     def __init__(self, path):
         self.path = path
