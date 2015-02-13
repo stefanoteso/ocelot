@@ -2,13 +2,10 @@
 
 import sys
 import ocelot.ontology as O
-from ocelot.services import iterate_csv
+from ocelot.services import _cls, iterate_csv
 from ocelot.features import *
 from ocelot.kernels import *
 from ocelot.converters.yip09 import *
-
-def _cls(obj):
-    return type(obj).__name__
 
 def draw_matrix(path, matrix):
     import matplotlib.pyplot as plt
