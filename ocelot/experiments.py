@@ -153,47 +153,6 @@ class YipExperiment(_Experiment):
         assert len(pos_ppi & neg_ppi) == 0
         return pos_ppi, neg_ppi
 
-    # XXX move to `services`
-    def _read_pcl(self, path):
-        """Reads a Stanford PCL gene expression file.
-
-        The file is simply a TSV where the first three columns are fixed,
-        followed by a variable number of columns (one per condition).
-
-        :param path: path to the PCL file.
-
-        XXX we use the NAME column rather than the YORF column, as the NAME's
-        are unique in our files while the YORFs are not. No idea why, really.
-
-        XXX we also ignore the GWEIGHT, its value seems rather arbitrary
-        anyway.
-
-        *References*
-
-        .. [PCL] http://smd.princeton.edu/help/formats.shtml#pcl
-        """
-        FIELDS = ("ORF", "NAME", "GWEIGHT")
-        orf_to_expression = {}
-        num_conditions = -1
-        ln = -1
-        for row in iterate_csv(os.path.join(path), delimiter = "\t",
-                               fieldnames = FIELDS):
-            ln += 1
-            if ln < 2:
-                continue
-
-            orf = row["NAME"]
-            assert not orf in orf_to_expression, orf
-
-            expression_levels = map(float, row[None])
-            if num_conditions < 0:
-                num_conditions = len(expression_levels)
-            else:
-                assert num_conditions == len(expression_levels)
-
-            orf_to_expression[orf] = np.array(expression_levels)
-        return orf_to_expression, num_conditions
-
     def _get_microarray_kernel(self, p_to_i):
         """Returns a kernel for gene expression."""
         parts = {
@@ -225,6 +184,7 @@ class YipExperiment(_Experiment):
                 "2010.Spellman98_cdc15.flt.knn.avg.pcl",
             ),
         }
+        pcl = PCL()
         num = len(p_to_i)
         for dirname in parts:
             matrix_sum = np.zeros((num, num))
@@ -232,7 +192,7 @@ class YipExperiment(_Experiment):
                 path = os.path.join(self.src, "yip09", "raw", "microarray",
                                     dirname, filename)
                 print _cls(self), ": reading '{}'".format(path)
-                orf_to_expression, num_conditions = self._read_pcl(path)
+                orf_to_expression, num_conditions = PCL.read(path)
                 levels = [ [0.0]*num_conditions for _ in xrange(len(p_to_i)) ]
                 num_missing = 0
                 for orf, index in p_to_i.items():

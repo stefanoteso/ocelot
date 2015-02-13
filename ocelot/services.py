@@ -87,6 +87,49 @@ class PSSM(object):
         else:
             raise TypeError, "invalid key type '{}'".format(type(key))
 
+class PCL(object):
+    """Reads a Stanford PCL gene expression file.
+
+    The file is simply a TSV where the first three columns are fixed,
+    followed by a variable number of columns (one per condition).
+
+    :param path: path to the PCL file.
+
+    XXX we use the NAME column rather than the YORF column, as the NAME's
+    are unique in our files while the YORFs are not. No idea why, really.
+
+    XXX we also ignore the GWEIGHT, its value seems rather arbitrary
+    anyway.
+
+    *References*
+
+    .. [PCL] http://smd.princeton.edu/help/formats.shtml#pcl
+    """
+    def read(self, path):
+        import numpy as np
+
+        FIELDS = ("ORF", "NAME", "GWEIGHT")
+        orf_to_expression = {}
+        num_conditions = -1
+        ln = -1
+        for row in iterate_csv(path, delimiter = "\t",
+                               fieldnames = FIELDS):
+            ln += 1
+            if ln < 2:
+                continue
+
+            orf = row["NAME"]
+            assert not orf in orf_to_expression, orf
+
+            expression_levels = map(float, row[None])
+            if num_conditions < 0:
+                num_conditions = len(expression_levels)
+            else:
+                assert num_conditions == len(expression_levels)
+
+            orf_to_expression[orf] = np.array(expression_levels)
+        return orf_to_expression, num_conditions
+
 class PsiBlast(object):
     """A simple wrapper around NCBI PSI-Blast.
 
