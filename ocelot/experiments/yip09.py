@@ -251,16 +251,20 @@ class YipExperiment(_Experiment):
             path = os.path.join(self.src, "yip09", "raw", "interpro",
                                 "{}.iprscan5.tsv.txt".format(p))
             hit = self._read_interpro(path, allowed_sources)
-            if not use_evalue:
-                hit = set(hit.keys())
-            else:
+            if use_evalue:
+                # weight each hit by the negative log of its e-value
                 for k, v in hit.items():
                     if v == None or v <= 0.0:
                         hit[k] = default_score
                     else:
                         hit[k] = -np.log(v)
+            else:
+                hit = set(hit.keys())
             hits[i] = hit
-        return SetKernel(hits)
+        if use_evalue:
+            return SparseLinearKernel(hits)
+        else:
+            return SetKernel(hits)
 
     def _compute_y_ppi(self, pos_ppi, neg_ppi, pps):
         print _cls(self), "computing protein-protein y"

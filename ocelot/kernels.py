@@ -110,19 +110,13 @@ class CorrelationKernel(_Kernel):
                 matrix[i,j] = matrix[j,i] = np.dot(phi_i.T, phi_j)
         return matrix
 
-class SetKernel(_Kernel):
-    """A generic set kernel.
+class SparseLinearKernel(_Kernel):
+    """A sparse linear kernel.
 
-    :param entities: list of sets.
+    :param entities: list of dictionaries whose keys are the indices and the
+        corresponding values are the weights associated to the indices.
     """
     def _compute_all(self):
-        # XXX duck duck typing
-        if isinstance(self._entities[0], set):
-            is_weighted = False
-        elif isinstance(self._entities[0], dict):
-            is_weighted = True
-        else:
-            raise ValueError("SetKernel only supports set or dict entities.")
         num = len(self)
         matrix = np.zeros((num, num), dtype=np.float64)
         for i in xrange(num):
@@ -131,11 +125,26 @@ class SetKernel(_Kernel):
                 entity_j = self._entities[j]
                 if i == j and len(entity_i) == 0 and len(entity_j) == 0:
                     dp = 1.0
-                elif is_weighted: # XXX this should really be moved outside
+                else:
                     common_keys = set(entity_i.keys()) & set(entity_j.keys())
-                    dp = 0.0
-                    for key in common_keys:
-                        dp += entity_i[key] * entity_j[key]
+                    dp = sum([entity_i[k]*entity_j[k] for k in common_keys])
+                matrix[i,j] = matrix[j,i] = dp
+        return matrix
+
+class SetKernel(_Kernel):
+    """A generic set kernel.
+
+    :param entities: list of sets.
+    """
+    def _compute_all(self):
+        num = len(self)
+        matrix = np.zeros((num, num), dtype=np.float64)
+        for i in xrange(num):
+            entity_i = self._entities[i]
+            for j in xrange(i + 1):
+                entity_j = self._entities[j]
+                if i == j and len(entity_i) == 0 and len(entity_j) == 0:
+                    dp = 1.0
                 else:
                     dp = float(len(entity_i & entity_j))
                 matrix[i,j] = matrix[j,i] = dp
