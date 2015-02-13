@@ -157,6 +157,7 @@ SIFTS_SAME_AS           = OCELOT.sifts_same_as
 YIP_PROTEIN             = OCELOT.yip_protein
 YIP_DOMAIN              = OCELOT.yip_domain
 YIP_RESIDUE             = OCELOT.yip_residue
+YIP_RESIDUE_HAS_POSITION= OCELOT.yip_residue_has_position
 YIP_INTERACTS_WITH      = OCELOT.yip_interacts_with
 YIP_NOT_INTERACTS_WITH  = OCELOT.yip_not_interacts_with
 YIP_PARENT_OF           = OCELOT.yip_parent_of

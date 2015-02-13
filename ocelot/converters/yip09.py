@@ -3,7 +3,7 @@
 import ocelot.ontology as O
 from ocelot.converters.base import Converter
 
-from rdflib import URIRef as U, BNode as B, Literal as L
+from rdflib import URIRef as U, Literal as L
 
 import os
 
@@ -97,6 +97,7 @@ class Yip09Converter(Converter):
             assert len(words) == 3
             triples.extend([
                 (self._r_uri(*words[0:3]), O.RDF.type, O.YIP_RESIDUE),
+                (self._r_uri(*words[0:3]), O.YIP_RESIDUE_HAS_POSITION, L(int(words[2])))
             ])
         for words in self._read(os.path.join("rri", "ready", "goldPosResiduePairs.txt")):
             assert len(words) == 7
