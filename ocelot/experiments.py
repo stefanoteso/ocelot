@@ -7,14 +7,6 @@ from ocelot.features import *
 from ocelot.kernels import *
 from ocelot.converters.yip09 import *
 
-def draw_matrix(path, matrix):
-    import matplotlib.pyplot as plt
-    import matplotlib.cm as cm
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.matshow(matrix, interpolation = "nearest", cmap = cm.OrRd)
-    fig.savefig(path)
-
 class _Experiment(object):
     """Base class for all experiments.
 
