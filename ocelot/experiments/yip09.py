@@ -1,67 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import sys
+from .base import _Experiment
+
 import ocelot.ontology as O
 from ocelot.services import _cls, iterate_csv
 from ocelot.features import *
 from ocelot.kernels import *
 from ocelot.converters.yip09 import *
-
-class _Experiment(object):
-    """Base class for all experiments.
-
-    :param src: source directory of all databases.
-    :param dst: destination directory for the results.
-    :param subtargets: prediction targets.
-    :param endpoint: URI of the SPARQL endpoint.
-    :param default_graph: URI of the default graph.
-    """
-    def __init__(self, src, dst, subtargets,
-                 endpoint = u"http://127.0.0.1:8890/sparql",
-                 default_graph = u"http://ocelot.disi.unitn.it/graph"):
-        from SPARQLWrapper import SPARQLWrapper
-        import os
-        try:
-            os.mkdir(dst)
-        except:
-            # something will fail later on if dst does not exist
-            pass
-        if not (src and os.path.isdir(src)):
-            raise ValueError("'{}' is not a valid directory".format(src))
-        if not (dst and os.path.isdir(dst)):
-            raise ValueError("'{}' is not a valid directory".format(dst))
-        self.src = src
-        self.dst = dst
-        self.subtargets = subtargets
-        if not endpoint:
-            raise ValueError("no endpoint given.")
-        if not default_graph:
-            raise ValueError("no default graph given.")
-        self.ep = SPARQLWrapper(endpoint)
-        self.default_graph = default_graph
-        if not self._check_graph(default_graph):
-            raise ValueError("no graph '{}' at endpoint '{}'".format(default_graph, endpoint))
-    def _check_graph(self, graph):
-        """Checks whether a graph exists."""
-        ans = self.query(u"ASK WHERE {{ GRAPH <{default_graph}> {{ ?s ?p ?o }} }}")
-        return ans[u"boolean"] == True
-    def query(self, query):
-        """Performs a query at the given endpoint."""
-        from SPARQLWrapper import JSON
-        prefixes = ""
-        for shortcut, namespace in O.BINDINGS:
-            prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
-        query = prefixes + query.format(default_graph=self.default_graph)
-        self.ep.setQuery(query)
-        self.ep.setReturnFormat(JSON)
-        return self.ep.query().convert()
-    @staticmethod
-    def cast(d):
-        if d[u"type"] == u"uri":
-            return d[u"value"]
-        elif d[u"type"] == u"literal":
-            return d[u"value"]
-        raise NotImplementedError("can not cast '{}'".format(d.items()))
 
 class YipExperiment(_Experiment):
     """Reproduce the experiment in [Yip09]_.
@@ -330,8 +275,6 @@ class YipExperiment(_Experiment):
         return np.array(ys)
 
     def run(self):
-        import ocelot.ontology as O
-
         print _cls(self), ": retrieving entities"
         ps, ds, rs = Yip09Converter(self.src, None).get_entities()
         print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))
@@ -422,67 +365,3 @@ class YipExperiment(_Experiment):
         print _cls(self), ": computing labels for ppi"
         ys = self._compute_y_ppi(pos_ppi, neg_ppi, pps)
         np.savetxt(os.path.join(self.dst, "ppi-y.txt"), ys)
-
-    def _crossvalidate_svm(self, ys, k, folds = None):
-        """NOTE: y must be {-1,+1}. """
-        from modshogun import RealFeatures, BinaryLabels, CustomKernel, LibSVM
-
-        kernel = CustomKernel()
-        kernel.set_full_kernel_matrix_from_full(k._matrix)
-
-        labels = BinaryLabels(ys)
-        svm = LibSVM(1, kernel, labels)
-        svm.train()
-        pred_ys = svm.apply().get_labels()
-
-    def _crossvalidate_mkl(self, ys, ks, folds = None):
-        from modshogun import CombinedKernel, CustomKernel
-        from modshogun import MKLClassification
-
-        combined_kernel = CombinedKernel()
-        for pairwise_kernel in pairwise_kernels:
-            combined_kernel.append_kernel(CustomKernel(pairwise_kernel))
-
-        model = MKLClassification()
-        model.set_mkl_norm(1) # 2, 3
-        model.set_C(1, 1) # positive, negative cost
-        model.set_kernel(combined_kernel)
-        model.set_labels(BinaryLabels(ys))
-
-        model.train()
-        subkernel_weights = combined_kernel.get_subkernel_weights()
-        predictions = mkl.apply()
-
-class YeastExperiment(_Experiment):
-    """New experiment based on SGD and iPfam."""
-    def __init__(self, *args, **kwargs):
-        super(YeastExperiment, self).__init__(*args, **kwargs)
-    def run(self):
-        raise NotImplementedError()
-    # figure out the PPI, GO, SEQ
-    # figure out the DDI-RRI (only use instance information)
-    # match the PPI and DDI-RRI
-    # compute composition features
-    # **compute complexity features
-    # **compute conservation (profile) features
-    # **compute secondary features
-    # compute subloc features (binary vec)
-    # compute COG features (binary vec)
-    # compute cell-cycle gene expression features (correlations)
-    # compute environment-response gene expression features (correlations)
-    # read in the Y2H raw data
-    # read in the TAP-MS raw data
-    # read in the Yip folds
-    # write the SBR output (individuals, kernels, predicates, rules)
-    # TODO: filter away short proteins
-    # TODO: redundancy-reduce the protein dataset, map proteins to their
-    #       representatives
-    # TODO: form the CV folds
-    # TODO: put all duplicates back into the training set
-
-class AllSpeciesExperiment(_Experiment):
-    """New experiment based of species-agnostic BioGRID and iPfam."""
-    def __init__(self, *args, **kwargs):
-        super(AllSpeciesExperiment, self).__init__(*args, **kwargs)
-    def run(self):
-        raise NotImplementedError()
