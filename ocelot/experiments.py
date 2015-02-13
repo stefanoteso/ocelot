@@ -2,23 +2,13 @@
 
 import sys
 import ocelot.ontology as O
+from ocelot.services import iterate_csv
 from ocelot.features import *
 from ocelot.kernels import *
 from ocelot.converters.yip09 import *
 
 def _cls(obj):
     return type(obj).__name__
-
-# XXX remove this copy; move this function to some say services.py
-def iterate_csv(path, skip_first = False, **kwargs):
-    import csv
-    with open(path, "rU") as fp:
-        reader = csv.DictReader(fp, **kwargs)
-        for row_as_dict in reader:
-            if skip_first:
-                skip_first = False
-                continue
-            yield row_as_dict
 
 def draw_matrix(path, matrix):
     import matplotlib.pyplot as plt
