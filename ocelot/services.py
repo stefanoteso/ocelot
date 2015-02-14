@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import subprocess
-
 def _cls(obj):
     return type(obj).__name__
 
