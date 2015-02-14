@@ -168,16 +168,12 @@ def main():
                         help="[make-rdf] where to put the RDF files")
     parser.add_argument("-f", "--force-update", action="store_true",
                         help="[make-rdf] force update the RDF files")
-    parser.add_argument("-g", "--default-graph", type=str,
-                        default=None, help="[upload-rdf] destination graph IRI")
     parser.add_argument("-e", "--endpoint", type=str,
                         help="[upload-rdf,benchmark] set the SPARQL endpoint")
-    parser.add_argument("-p", "--predict", type=str, default=[
-                        "ppi", "ddi", "rri", "pf"], help="[benchmark] what to predict")
-    parser.add_argument("-n", "--num-folds", type=str, default=10,
-                        help="[benchmark] number of cross-validation folds")
-    parser.add_argument(
-        "--debug", action="store_true", help="[all] enable debugging output")
+    parser.add_argument("-g", "--default-graph", type=str, default=None,
+                        help="[upload-rdf] destination graph IRI")
+    parser.add_argument("--debug", action="store_true",
+                        help="[all] enable debugging output")
     args = parser.parse_args()
 
     command = COMMANDS.get(args.command)
