@@ -59,6 +59,13 @@ class _Experiment(object):
             return d[u"value"]
         elif d[u"type"] == u"literal":
             return d[u"value"]
+        elif d[u"type"] == u"typed-literal":
+            if d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+                return int(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+                return float(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+                return d[u"value"]
         raise NotImplementedError("can not cast '{}'".format(d.items()))
 
     def _crossvalidate_svm(self, ys, k, folds = None):
