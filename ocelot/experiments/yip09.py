@@ -2,6 +2,7 @@
 
 from .base import _Experiment
 
+import os
 import ocelot.ontology as O
 from ocelot.services import _cls, iterate_csv
 from ocelot.features import *
@@ -137,7 +138,7 @@ class YipExperiment(_Experiment):
                 path = os.path.join(self.src, "yip09", "raw", "microarray",
                                     dirname, filename)
                 print _cls(self), ": reading '{}'".format(path)
-                orf_to_expression, num_conditions = PCL.read(path)
+                orf_to_expression, num_conditions = pcl.read(path)
                 levels = [ [0.0]*num_conditions for _ in xrange(len(p_to_i)) ]
                 num_missing = 0
                 for orf, index in p_to_i.items():
@@ -279,20 +280,24 @@ class YipExperiment(_Experiment):
         return np.array(ys)
 
     def run(self):
-        print _cls(self), ": retrieving entities"
-        ps, ds, rs = Yip09Converter(self.src, None).get_entities()
-        print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))
+        """Run the Yip et al. experiment replica."""
 
-        print _cls(self), ": retrieving entity pairs"
-        pps, dds, rrs = Yip09Converter(self.src, None).get_pairs()
-        print " #pps={}, #dds={} #rrs={}".format(len(pps), len(dds), len(rrs))
+        # Not everything is converted to RDF; namely, the *order* in which
+        # proteins, domains, residues (and their interactions) should appear
+        # is not. Here we read those from the original dataset itself.
+        converter = Yip09Converter(self.src, None, basename = "yip09")
 
-        # This makes sure that proteins and protein pairs are sorted as in
-        # the original Yip dataset.
+        print _cls(self), ": retrieving entities and entity pairs"
+        ps, ds, rs = converter.get_entities()
+        pps, dds, rrs = converter.get_pairs()
         p_to_i = { p: i for i, p in enumerate(ps) }
         pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
+        print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))
+        print " #pps={}, #dds={} #rrs={}".format(len(pps), len(dds), len(rrs))
 
-        print _cls(self), ": retrieving protein sequences"
+        # Compute the protein kernels
+        print _cls(self), ": computing protein kernels"
+
         p_to_seq = self._get_sequences()
         sequences = [p_to_seq[p] for p in ps]
 
@@ -302,12 +307,11 @@ class YipExperiment(_Experiment):
         def set_kernel_of(Features, sequences):
             return None
 
-        print _cls(self), ": computing kernels"
         KERNEL_INFO = (
-            ("p-kernel-spectrum-k=2",
-                lambda _: SpectrumKernel(_, kmin=2)),
-            ("p-kernel-spectrum-k=3",
-                lambda _: SpectrumKernel(_, kmin=3)),
+        #    ("p-kernel-spectrum-k=2",
+        #        lambda _: SpectrumKernel(_, kmin=2)),
+        #    ("p-kernel-spectrum-k=3",
+        #        lambda _: SpectrumKernel(_, kmin=3)),
             ("p-kernel-microarray",
                 lambda _: self._get_microarray_kernel(p_to_i)),
             ("p-kernel-complex",
