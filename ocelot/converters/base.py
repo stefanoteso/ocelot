@@ -65,17 +65,19 @@ class CSVConverter(Converter):
     :param fields: list of CSV field names.
     :param delimiter: CSV delimiter.
     """
-    def __init__(self, fields, delimiter, *args, **kwargs):
+    def __init__(self, fields, delimiter, num_skip = 0, *args, **kwargs):
         SUBTARGETS = (("rows", self._siphon_rows),)
         super(CSVConverter, self).__init__(SUBTARGETS,
                                            *args, **kwargs)
         self.fields = fields
         self.delimiter = delimiter
+        self.num_skip = num_skip
     def _siphon_rows(self, triples):
         import csv
         path = os.path.join(self.src, self.path)
         for row in iterate_csv(path, delimiter = self.delimiter,
-                               fieldnames = self.fields):
+                               fieldnames = self.fields,
+                               num_skip = self.num_skip):
             self._siphon_row(triples, row)
     def _siphon_row(self, triples, row):
         raise NotImplementedError
