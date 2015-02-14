@@ -204,8 +204,8 @@ class SGDConverter(Converter):
             _ = B()
             triples.extend([
                 (_, O.RDF.type,                 O.SGD_IPR_HIT),
-                (_, O.SGD_IPR_HIT_STARTS_AT,    L(row["START"])),
-                (_, O.SGD_IPR_HIT_STOPS_AT,     L(row["STOP"])),
+                (_, O.SGD_IPR_HIT_STARTS_AT,    L(int(row["START"]))),
+                (_, O.SGD_IPR_HIT_STOPS_AT,     L(int(row["STOP"]))),
                 (_, O.SGD_IPR_HIT_HAS_EVALUE,   evalue),
                 (_, O.SGD_IPR_HIT_IS_TRUE,      is_true),
             ])
