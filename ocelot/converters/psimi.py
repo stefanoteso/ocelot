@@ -131,6 +131,8 @@ class PsiMiTabConverter(CSVConverter):
         :param string: the PSI-MI string list object(s).
         :param unique: checks that the string list has length 1.
         """
+        if string == None:
+            return
         parts = self._get_parts(string)
         if unique:
             assert len(parts) <= 1, "entropic disorder, '{}'".format(parts)
@@ -155,6 +157,8 @@ class PsiMiTabConverter(CSVConverter):
 
     def _siphon_bool(self, triples, s, p, string,
                      skip_true = False, skip_false = False):
+        if string == None:
+            return
         o = { "true" : True, "false" : False }[string]
         if o == True and skip_true:
             return
@@ -169,6 +173,8 @@ class PsiMiTabConverter(CSVConverter):
         Each interaction is reified by a blank node."""
         interaction = B()
         triples.append((interaction, O.RDF.type, O.OBO.MI_0000))
+
+        print row
 
         OPS = {
             # PSI-MI TAB 2.5
@@ -217,4 +223,9 @@ class PsiMiTabConverter(CSVConverter):
         }
         for field, func in OPS.items():
             func(row[field])
+
+class BioGRIDConverter(PsiMiTabConverter):
+    def __init__(self, *args, **kwargs):
+        kwargs["num_skip"] = 1
+        super(BioGRIDConverter, self).__init__(*args, **kwargs)
 
