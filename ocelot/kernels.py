@@ -150,54 +150,6 @@ class SetKernel(_Kernel):
                 matrix[i,j] = matrix[j,i] = dp
         return matrix
 
-class ProfileKernel(_Kernel):
-    """Profile-based string kernel.
-
-    It acts as a wrapper around ``fastprofkernel``.
-
-    *References*
-
-    .. [Kuang04] Kuang et al., "Profile-based string kernels for remote
-        homology detection and motif extraction", J. Bioinform. Comput. Biol.,
-        2004.
-    .. [Hamp13] Hamp et al., "Accelerating the Original Profile Kernel", PLoS
-        One, 2013.
-    .. [FPK] https://rostlab.org/owiki/index.php/Fastprofkernel 
-    """
-    def _compute_all(self, sequences):
-        with open("sequences.fasta", "wt") as fp:
-            for i, sequence in enumerate(sequences):
-                fp.write(">{}\n{}\n".format(i, sequence))
-        with open("identifiers.txt", "wt") as fp:
-            for i in xrange(len(sequences)):
-                fp.write(">{}\n".format(i))
-        # XXX run fastprofkernel here
-        profkernel = Binary("profkernel-core")
-        args = [ "-i /usr/share/fastprofkernel/data/Amino.txt",
-                 "-g /usr/share/fastprofkernel/data/Globals.txt",
-                 "-o identifiers.txt",
-                 "-L 4", "-Y 6.0", "-K",
-                 "sequences.ascii-pssm" ]
-        ret, out, err = profkernel.run(args)
-        assert ret == 0
-
-        return None
-
-class EmpiricalKernelMap(_Kernel):
-    """Empirical kernel map over an underlying kernel[1].
-
-    *References*
-
-    [1] Scholkopf et al., "Input Space Versus Feature Space in Kernel-Based
-        Methods", 1999.
-    """
-    def __init__(self, *args, **kwargs):
-        import ocelot.features
-        super(EmpiricalKernelMap, self).__init__(*args, **kwargs)
-        self.features = features.EmpiricalFeatures(args[0], range(len(self)))
-    def _compute_all(self):
-        LinearKernel(self.features, range(len(self)))
-
 class SpectrumKernel(_Kernel):
     """The spectrum kernel.
 
@@ -258,6 +210,47 @@ class SpectrumKernel(_Kernel):
                     matrix[i,j] = matrix[j,i] = dp
         return matrix
 
+class MismatchKernel(_Kernel):
+    """Mismatch string kernel."""
+    def __init__(self, strings, k = 3, m = 2, **kwargs):
+        super(MismatchKernel, self).__init__(strings, **kwargs)
+    def _compute_all(self):
+        all_counts = []
+        for string in self._entities:
+            counts = {}
+            for i in xrange(len(string) - k + 1):
+                kmer = string[i:i+k]
+                for mmer in self._get_neighborhood(kmer):
+                    counts[mmer] += 1
+            all_counts.append(counts)
+        return SparseLinearKernel(all_counts).compute()
+
+class ProfileKernel(_Kernel):
+    """Profile-based string kernel.
+
+    It acts as a wrapper around ``fastprofkernel``.
+
+    *References*
+
+    .. [Kuang04] Kuang et al., "Profile-based string kernels for remote
+        homology detection and motif extraction", J. Bioinform. Comput. Biol.,
+        2004.
+    """ 
+    def __init__(self, pssms, k = 3, m = 2, threshold = 4.0, **kwargs):
+        super(ProfileKernel, self).__init__(pssms, **kwargs)
+        self.k, self.m = k, m
+        self.threshold = threshold
+    def _compute_all(self):
+        all_counts = []
+        for string in self._entities:
+            counts = {}
+            for i in xrange(len(string) - k + 1):
+                kmer = string[i:i+k]
+                for mmer in self._get_neighborhood(kmer):
+                    counts[mmer] += 1
+            all_counts.append(counts)
+        return SparseLinearKernel(all_counts).compute()
+
 class DiffusionKernel(_Kernel):
     """The diffusion kernel between graph nodes.
 
@@ -286,6 +279,21 @@ class DiffusionKernel(_Kernel):
             assert asymmetry < 1e-10, "the gods are playful today"
             e = 0.5 * (e.T + e)
         return e
+
+class EmpiricalKernelMap(_Kernel):
+    """Empirical kernel map over an underlying kernel[1].
+
+    *References*
+
+    [1] Scholkopf et al., "Input Space Versus Feature Space in Kernel-Based
+        Methods", 1999.
+    """
+    def __init__(self, *args, **kwargs):
+        import ocelot.features
+        super(EmpiricalKernelMap, self).__init__(*args, **kwargs)
+        self.features = features.EmpiricalFeatures(args[0], range(len(self)))
+    def _compute_all(self):
+        LinearKernel(self.features, range(len(self)))
 
 class PairwiseKernel(_Kernel):
     """The pairwise kernel.
