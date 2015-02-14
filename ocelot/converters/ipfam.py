@@ -107,7 +107,7 @@ class IPfamConverter(Converter):
 
         pfam_types = set()
         for row in iterate_csv(self._get_path("protein_family.txt"),
-                               skip_first = True,
+                               num_skip = 1,
                                delimiter = "\t", fieldnames = FIELDS):
             assert len(row["FAMILY_ACC"]) > 0
 
@@ -130,11 +130,11 @@ class IPfamConverter(Converter):
         ints = []
         FIELDS = ("FAM", "ID", "INT_TYPE")
         for row in iterate_csv(self._get_path("homodomain_interaction.csv", is_db = False),
-                               skip_first = True, delimiter = "\t", fieldnames = FIELDS):
+                               num_skip = 1, delimiter = "\t", fieldnames = FIELDS):
             ints.append((row["FAM"], row["FAM"], row["INT_TYPE"]))
         FIELDS = ("FAM1", "ID1", "FAM2", "ID2", "INT_TYPE")
         for row in iterate_csv(self._get_path("heterodomain_interaction.csv", is_db = False),
-                               skip_first = True, delimiter = "\t", fieldnames = FIELDS):
+                               num_skip = 1, delimiter = "\t", fieldnames = FIELDS):
             ints.append((row["FAM1"], row["FAM2"], row["INT_TYPE"]))
         int_types = set()
         for fam1, fam2, int_type in ints:

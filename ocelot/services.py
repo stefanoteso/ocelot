@@ -5,13 +5,13 @@ import subprocess
 def _cls(obj):
     return type(obj).__name__
 
-def iterate_csv(path, skip_first = False, **kwargs):
+def iterate_csv(path, num_skip = 0, **kwargs):
     import csv
     with open(path, "rU") as fp:
         reader = csv.DictReader(fp, **kwargs)
         for row_as_dict in reader:
-            if skip_first:
-                skip_first = False
+            if num_skip > 0:
+                num_skip -= 1
                 continue
             yield row_as_dict
 
