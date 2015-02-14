@@ -91,8 +91,8 @@ def _upload_rdf(args):
     with open("ocelot.isql", "wt") as fp:
         fp.write(isql_command)
 
-    isql = ocelot.services.Binary("/opt/virtuoso/bin/isql")
-    ret, out, err = isql.run("-U dba -P dba < ocelot.isql")
+    isql = ocelot.services.Binary("isql")
+    ret, out, err = isql.run([ "-U dba -P dba < ocelot.isql" ])
     if ret != 0:
         raise RuntimeError("upload-rdf failed, isql exited with '{}':\n{}\n{}\n".format(ret, out, err))
 
