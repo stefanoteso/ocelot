@@ -107,8 +107,8 @@ def _clear_rdf(args):
     with open("ocelot.isql", "wt") as fp:
         fp.write("SPARQL CLEAR GRAPH <{}>;".format(args.default_graph))
 
-    isql = ocelot.services.Binary("/opt/virtuoso/bin/isql")
-    ret, out, err = isql.run("-U dba -P dba < ocelot.isql")
+    isql = ocelot.services.Binary("isql")
+    ret, out, err = isql.run([ "-U dba -P dba < ocelot.isql" ])
     if ret != 0:
         raise RuntimeError("clear-rdf failed, isql exited with '{}':\n{}\n{}\n".format(ret, out, err))
 
