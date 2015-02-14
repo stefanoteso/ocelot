@@ -109,13 +109,8 @@ class PCL(object):
         FIELDS = ("ORF", "NAME", "GWEIGHT")
         orf_to_expression = {}
         num_conditions = -1
-        ln = -1
-        for row in iterate_csv(path, delimiter = "\t",
-                               fieldnames = FIELDS):
-            ln += 1
-            if ln < 2:
-                continue
-
+        for row in iterate_csv(path, delimiter = "\t", fieldnames = FIELDS,
+                               num_skip = 2):
             orf = row["NAME"]
             assert not orf in orf_to_expression, orf
 
