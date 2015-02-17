@@ -2,7 +2,7 @@
 - EXPERIMENT YIP REDUX:
     - PROTEINS
         - interactions              DONE        Given
-        - kernel: COG               DONE        Made obsolete by supfam kernel (Luca)
+        - kernel: COG               SKIP        Made obsolete by supfam kernel (Luca)
         - kernel: subloc            SKIP
         - kernel: gene expr         DONE
         - kernel: complexes         DONE
@@ -10,8 +10,7 @@
         + kernel: profiles          HALF        Against nr
         + kernel: corrmut
         + kernel: supfam            DONE        Luca
-        + kernel: interpro
-        + kernel: prodom
+        + kernel: interpro          DONE
     - DOMAINS
         - sequences
         - structures
