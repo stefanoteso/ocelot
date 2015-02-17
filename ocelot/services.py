@@ -59,31 +59,22 @@ class FASTA(object):
 
 class PSSM(object):
     """A container for PSI-Blast PSSM profiles."""
-    def __init__(self, path):
+    def read(self, path):
         pos_to_info = {}
         with open(path, "rt") as fp:
             for line in fp:
-                print line.rstrip()
                 words = line.rstrip().split()
                 if len(words) != 44:
                     continue
                 position = int(words[0]) - 1
                 pos_to_info[position] = {
                     "res"   : words[1],
-                    "data"  : words[2:2+20],
-                    "info"  : words[2+20:2+40],
+                    "data"  : map(float, words[2:2+20]),
+                    "info"  : map(float, words[2+20:2+40]),
                     "unk1"  : float(words[2+40]),
                     "unk2"  : float(words[2+41]),
                 }
-        self.pos_to_info = pos_to_info
-    def __getitem__(self, key):
-        if isinstance(key, int):
-            self._pos_to_info[key]
-        elif isinstance(key, slice):
-            for i in xrange(key.start, key.stop, key.step):
-                self._pos_to_info[key]
-        else:
-            raise TypeError, "invalid key type '{}'".format(type(key))
+        return pos_to_info
 
 class PCL(object):
     """Reads a Stanford PCL gene expression file.

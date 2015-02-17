@@ -270,6 +270,18 @@ class YipExperiment(_Experiment):
         else:
             return SetKernel(hits)
 
+    def _get_profile_kernel(self, p_to_i):
+        import numpy as np
+        reader = PSSM()
+        pssms = []
+        for p, i in p_to_i.items():
+            path = os.path.join(self.src, "yip09", "raw", "profiles",
+                                "{}.ascii-pssm".format(p))
+            info = reader.read(path)
+            pssm = np.array([ info[key]["data"] for key in sorted(info.keys()) ])
+            pssms.append(pssm)
+        return ProfileKernel(pssms)
+
     def _compute_p_kernels(self, ps, pps, p_to_i):
 
         print _cls(self), ": computing protein kernels"
@@ -287,8 +299,12 @@ class YipExperiment(_Experiment):
                 lambda _: self._get_microarray_kernel(p_to_i)),
             ("p-kernel-complex",
                 lambda _: self._get_complex_kernel(p_to_i)),
-            ("p-kernel-interpro-all",
+            ("p-kernel-interpro-match-all",
+                lambda _: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+            ("p-kernel-interpro-weighted-all",
                 lambda _: self._get_interpro_kernel(p_to_i)),
+#            ("p-kernel-profile",
+#                lambda _: self._get_profile_kernel(p_to_i)),
         )
 
         full_matrix = np.zeros((len(ps), len(ps)))

@@ -214,29 +214,62 @@ class MismatchKernel(_Kernel):
     """Mismatch string kernel."""
     def __init__(self, strings, k = 3, m = 2, **kwargs):
         super(MismatchKernel, self).__init__(strings, **kwargs)
+    def _get_neighborhood(self, alpha):
+        raise NotImplementedError 
     def _compute_all(self):
         all_counts = []
         for string in self._entities:
             counts = {}
             for i in xrange(len(string) - k + 1):
-                kmer = string[i:i+k]
-                for mmer in self._get_neighborhood(kmer):
-                    counts[mmer] += 1
+                alpha = string[i:i+k]
+                for beta in self._get_neighborhood(alpha):
+                    counts[beta] += 1
             all_counts.append(counts)
         return SparseLinearKernel(all_counts).compute()
 
-class ProfileKernel(_Kernel):
-    """Profile-based string kernel.
+# Taken from fastprofkernel
+_BACKGROUND_FREQ = {
+    "A": 0.0799912015849807,
+    "C": 0.0171846021407367,
+    "D": 0.0578891399707563,
+    "E": 0.0638169929675978,
+    "F": 0.0396348024787477,
+    "G": 0.0760659374742852,
+    "H": 0.0223465499452473,
+    "I": 0.0550905793661343,
+    "K": 0.060458245507428,
+    "L": 0.0866897071203864,
+    "M": 0.0215379186368154,
+    "N": 0.044293531582512,
+    "P": 0.0465746314476874,
+    "Q": 0.0380578923048682,
+    "R": 0.0484482507611578,
+    "S": 0.0630028230885602,
+    "T": 0.0580394726014824,
+    "V": 0.0700241481678408,
+    "W": 0.0144991866213453,
+    "Y": 0.03635438623143,
+}
 
-    It acts as a wrapper around ``fastprofkernel``.
+class ProfileKernel(_Kernel):
+    """Profile-based string kernel [Kuang04]_.
+
+    Please note that there are faster implementations around, namely the
+    ``fastprofkernel`` package [fastprofkernel]_ by RostLab.
+
+    :param pssms: list of PSSM matrices.
+    :param k: length of the k-mers.
+    :param threshold: threshold mutation probability to count as a hit.
 
     *References*
 
     .. [Kuang04] Kuang et al., "Profile-based string kernels for remote
         homology detection and motif extraction", J. Bioinform. Comput. Biol.,
         2004.
+
+    .. [fastprofkernel] `https://rostlab.org/owiki/index.php/Fastprofkernel`_
     """ 
-    def __init__(self, pssms, k = 3, m = 2, threshold = 4.0, **kwargs):
+    def __init__(self, pssms, k = 4, threshold = 6.0, **kwargs):
         super(ProfileKernel, self).__init__(pssms, **kwargs)
         self.k, self.m = k, m
         self.threshold = threshold
