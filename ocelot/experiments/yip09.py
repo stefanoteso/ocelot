@@ -233,32 +233,6 @@ class YipExperiment(_Experiment):
                     adj_matrix[i,j] = 1
         return DiffusionKernel(adj_matrix)
 
-    @staticmethod
-    def _read_interpro(path, allowed_sources = None):
-        """Reads an InterPro tabular-separated values file.
-
-        :param path: path to the InterPro TSV file.
-        :param allowed_sources: list of allowed domain sources (default: all).
-
-        :returns: a list of ``(domain_id, evalue)`` pairs. ``evalue`` can be
-                  None.
-        """
-        # XXX move to ocelot.services
-        # XXX integrate iprscan5-urllib.py here; plumb `sequences` here
-        FIELDS = ("QUERY_ID", "?2", "?3", "SOURCE_DB", "SOURCE_FAMILY",
-                  "DESCRIPTION", "START", "STOP", "EVALUE", "?10", "DATE",
-                  "IPR_FAMILY", "SHORT_DESCRIPTION", "GO_TERMS", "PATHWAYS")
-        hits = {}
-        for row in iterate_csv(path, delimiter="\t", fieldnames = FIELDS):
-            if allowed_sources and not row["SOURCE_DB"] in allowed_sources:
-                continue
-            try:
-                evalue = float(row["EVALUE"])
-            except ValueError:
-                evalue = None
-            hits[row["SOURCE_DB"] + ":" + row["SOURCE_FAMILY"]] = evalue
-        return hits
-
     def _get_interpro_kernel(self, p_to_i, allowed_sources = None,
                              use_evalue = False, default_score = 1.0):
         """Computes a set kernel over InterPro domain family hits.
@@ -275,11 +249,12 @@ class YipExperiment(_Experiment):
                            detection score.
         """
         import numpy as np
+        interpro = InterProTSV()
         hits = [ None for _ in xrange(len(p_to_i)) ]
         for p, i in p_to_i.items():
             path = os.path.join(self.src, "yip09", "raw", "interpro",
                                 "{}.iprscan5.tsv.txt".format(p))
-            hit = self._read_interpro(path, allowed_sources)
+            hit = interpro.read(path, allowed_sources)
             if use_evalue:
                 # weight each hit by the negative log of its e-value
                 for k, v in hit.items():
