@@ -99,6 +99,34 @@ class YipExperiment(_Experiment):
         assert len(pos_ppi & neg_ppi) == 0
         return pos_ppi, neg_ppi
 
+    def _compute_ppi_y(self, pps):
+        """Compute the y vector for protein-protein interactions.
+
+        :param pps: sorted list of proteins.
+        """
+        print _cls(self), "retrieving protein-protein interactions"
+        pos_ppi, neg_ppi = self._get_ppis()
+        print " #ppi+={} #ppi-={}".format(len(pos_ppi), len(neg_ppi))
+
+        path = os.path.join(self.dst, "ppi-y.txt")
+        try:
+            ys = np.loadtxt(path)
+            assert len(ys) == (len(pos_ppi) + len(neg_ppi)), "y vector length mismatch"
+        except Exception, e:
+            print _cls(self), ":", e
+            print _cls(self), "computing protein-protein y"
+            ys = []
+            for i, pp in enumerate(pps):
+                if pp in pos_ppi:
+                    ys.append(1.0)
+                elif pp in neg_ppi:
+                    ys.append(-1.0)
+                else:
+                    raise RuntimeError, "yip is angry with you '{}'".format(pp)
+            return np.array(ys)
+            np.savetxt(path, ys)
+        return ys
+
     def _get_microarray_kernel(self, p_to_i):
         """Returns a kernel for gene expression."""
         parts = {
@@ -267,37 +295,9 @@ class YipExperiment(_Experiment):
         else:
             return SetKernel(hits)
 
-    def _compute_y_ppi(self, pos_ppi, neg_ppi, pps):
-        print _cls(self), "computing protein-protein y"
-        ys = []
-        for i, pp in enumerate(pps):
-            if pp in pos_ppi:
-                ys.append(1.0)
-            elif pp in neg_ppi:
-                ys.append(-1.0)
-            else:
-                raise RuntimeError, "yip is angry with you '{}'".format(pp)
-        return np.array(ys)
+    def _compute_p_kernels(self, ps, pps, p_to_i):
 
-    def run(self):
-        """Run the Yip et al. experiment replica."""
-
-        # Not everything is converted to RDF; namely, the *order* in which
-        # proteins, domains, residues (and their interactions) should appear
-        # is not. Here we read those from the original dataset itself.
-        converter = Yip09Converter(self.src, None, basename = "yip09")
-
-        print _cls(self), ": retrieving entities and entity pairs"
-        ps, ds, rs = converter.get_entities()
-        pps, dds, rrs = converter.get_pairs()
-        p_to_i = { p: i for i, p in enumerate(ps) }
-        pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
-        print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))
-        print " #pps={}, #dds={} #rrs={}".format(len(pps), len(dds), len(rrs))
-
-        # Compute the protein kernels
         print _cls(self), ": computing protein kernels"
-
         p_to_seq = self._get_sequences()
         sequences = [p_to_seq[p] for p in ps]
 
@@ -308,24 +308,15 @@ class YipExperiment(_Experiment):
             return None
 
         KERNEL_INFO = (
-        #    ("p-kernel-spectrum-k=2",
-        #        lambda _: SpectrumKernel(_, kmin=2)),
-        #    ("p-kernel-spectrum-k=3",
-        #        lambda _: SpectrumKernel(_, kmin=3)),
             ("p-kernel-microarray",
                 lambda _: self._get_microarray_kernel(p_to_i)),
             ("p-kernel-complex",
                 lambda _: self._get_complex_kernel(p_to_i)),
-            ("p-kernel-interpro-superfamily",
-                lambda _: self._get_interpro_kernel(p_to_i,
-                                                    allowed_sources = ("SUPERFAMILY",))),
             ("p-kernel-interpro-all",
                 lambda _: self._get_interpro_kernel(p_to_i)),
-        #    ("p-kernel-profile-it=2",
-        #        lambda _: ProfileKernel(_, num_iterations=2)),
         )
 
-        kernels, pairwise_kernels = [], []
+        full_matrix = np.zeros((len(ps), len(ps)))
         for path, func in KERNEL_INFO:
             path = os.path.join(self.dst, path)
             try:
@@ -349,27 +340,46 @@ class YipExperiment(_Experiment):
                     print _cls(self), ": saving '{}'".format(path)
                     np.savetxt(path + ".txt", matrix)
                     kernel.draw(path + ".png")
-            if kernel:
-                del kernel
+            full_matrix += kernel.compute()
+            del kernel
 
-            #try:
-            #    print _cls(self), ": loading pairwise '{}'".format(path)
-            #    pairwise_kernel = DummyKernel(path + "-pairwise.txt")
-            #    pairwise_matrix = pairwise_kernel.compute()
-            #    assert pairwise_matrix.shape == (len(pps), len(pps))
-            #except:
-            #    print _cls(self), ": computing pairwise '{}'".format(path)
-            #    pairwise_kernel = PairwiseKernel(pp_indices, kernel)
-            #    pairwise_matrix = pairwise_kernel.compute()
-            #    np.savetxt(path + "-pairwise.txt", pairwise_matrix)
-            #    pairwise_kernel.draw(path + "-pairwise.png")
-            #if pairwise_kernel:
-            #    del pairwise_kernel
+        path = os.path.join(self.dst, "p-kernel-full")
+        full_kernel = DummyKernel(full_matrix)
+        full_kernel.draw(path + ".png")
+        np.savetxt(path + ".txt", full_kernel.compute())
 
-        print _cls(self), ": retrieving protein interactions"
-        pos_ppi, neg_ppi = self._get_ppis()
-        print " #ppi+={} #ppi-={}".format(len(pos_ppi), len(neg_ppi))
+        path = os.path.join(self.dst, "p-kernel-full-pairwise")
+        pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
+        pairwise_kernel = PairwiseKernel(pp_indices, full_kernel)
+        pairwise_kernel.draw(path + ".png")
+        np.savetxt(path + ".txt", pairwise_kernel.compute())
 
-        print _cls(self), ": computing labels for ppi"
-        ys = self._compute_y_ppi(pos_ppi, neg_ppi, pps)
-        np.savetxt(os.path.join(self.dst, "ppi-y.txt"), ys)
+        return full_kernel, pairwise_kernel
+
+    def run(self):
+        """Run the Yip et al. experiment replica."""
+
+        # Not everything is converted to RDF; namely, the *order* in which
+        # proteins, domains, residues (and their interactions) should appear
+        # is not. Here we read those from the original dataset itself.
+        # XXX this is only required because we may want to use our kernels
+        # as drop-in replacements in the existing SBR/yip experiment.
+        converter = Yip09Converter(self.src, None, basename = "yip09")
+
+        print _cls(self), ": retrieving entities and entity pairs"
+        ps, ds, rs = converter.get_entities()
+        pps, dds, rrs = converter.get_pairs()
+        p_to_i = { p: i for i, p in enumerate(ps) }
+        print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))
+        print " #pps={}, #dds={} #rrs={}".format(len(pps), len(dds), len(rrs))
+
+        # Compute the protein interactions
+        ys = self._compute_ppi_y(pps);
+
+        # Compute the protein kernels
+        p_kernel, pp_kernel = self._compute_p_kernels(ps, pps, p_to_i)
+
+        # Run the epxeriment
+        print _cls(self), ": running"
+        self._crossvalidate_svm(ys, pp_kernel)
+
