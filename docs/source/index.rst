@@ -62,8 +62,6 @@ Contents
 
 .. automodule:: ocelot.ontology
     :members:
-.. automodule:: ocelot.converters.biogrid
-    :members:
 .. automodule:: ocelot.converters.ipfam
     :members:
 .. automodule:: ocelot.converters.pdb
