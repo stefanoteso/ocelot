@@ -282,6 +282,15 @@ class YipExperiment(_Experiment):
             pssms.append(pssm)
         return ProfileKernel(pssms)
 
+    def _get_yip_kernels(self):
+        try:
+            return self.yip_p_kernel, self.yip_d_kernel, self.yip_r_kernel
+        except:
+            converter = Yip09Converter(self.src, None, basename = "yip09")
+            self.yip_p_kernel, self.yip_d_kernel, self.yip_r_kernel = \
+                converter.get_kernels()
+        return self.yip_p_kernel, self.yip_d_kernel, self.yip_r_kernel
+
     def _get_p_kernels(self, ps, pps, p_to_i):
         """Computes all the kernels and pairwise kernels for proteins.
 
@@ -305,6 +314,8 @@ class YipExperiment(_Experiment):
 #                lambda _: self._get_interpro_kernel(p_to_i)),
 #            ("p-kernel-profile",
 #                lambda _: self._get_profile_kernel(p_to_i)),
+            ("p-kernel-yip",
+                lambda _: self._get_yip_kernels()[0]),
         )
 
         kernels, pairwise_kernels = [], []
