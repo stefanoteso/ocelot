@@ -372,13 +372,9 @@ class PairwiseKernel(_Kernel):
     def _compute_all(self):
         submatrix = self.subkernel.compute()
         matrix = np.zeros((len(self), len(self)))
-        out_i = 0
-        for i, j in self._entities:
-            out_j = 0
-            for n, m in self._entities:
+        for out_i, (i, j) in enumerate(self._entities):
+            for out_j, (n, m) in enumerate(self._entities):
                 kin, kim = submatrix[i,n], submatrix[i,m]
                 kjn, kjm = submatrix[j,n], submatrix[j,m]
                 matrix[out_i, out_j] = self.op(kin, kjm, kim, kjn)
-                out_j += 1
-            out_i += 1
         return matrix
