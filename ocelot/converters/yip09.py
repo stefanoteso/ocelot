@@ -180,3 +180,19 @@ class Yip09Converter(Converter):
         dd_kernel = DummyKernel(os.path.join(path, "ddi", "ready", "domainKernel.txt"))
         rr_kernel = DummyKernel(os.path.join(path, "rri", "ready", "residueKernel.txt"))
         return pp_kernel, dd_kernel, rr_kernel
+
+    def get_folds(self):
+        p_folds, d_folds, r_folds = [], [], []
+        for i in xrange(10):
+            path = os.path.join(self.src, "yip09", "folds")
+            with open(os.path.join(path, "prot_fold{}.txt".format(i))) as fp:
+                fold = [ line.strip().split() for line in fp.readlines()[1:] ]
+            p_folds.append(fold)
+            with open(os.path.join(path, "dom_fold{}.txt".format(i))) as fp:
+                fold = [ line.strip().split() for line in fp.readlines()[1:] ]
+            d_folds.append(fold)
+            with open(os.path.join(path, "res_fold{}.txt".format(i))) as fp:
+                fold = [ line.strip().split() for line in fp.readlines()[1:] ]
+            r_folds.append(fold)
+        return p_folds, d_folds, r_folds 
+
