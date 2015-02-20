@@ -98,8 +98,8 @@ class _Experiment(object):
         subkernel_weights = combined_kernel.get_subkernel_weights()
         print subkernel_weights
 
-        predictions = model.apply()
-        print predictions
+        predictions = model.apply().get_labels()
+        print zip(ys, predictions)
 
     def _crossvalidate_sbr(self, ys, ks, folds = None):
         pass

@@ -123,7 +123,7 @@ class YipExperiment(_Experiment):
                     ys.append(-1.0)
                 else:
                     raise RuntimeError, "yip is angry with you '{}'".format(pp)
-            return np.array(ys)
+            ys = np.array(ys)
             np.savetxt(path, ys)
         return ys
 
@@ -282,7 +282,7 @@ class YipExperiment(_Experiment):
             pssms.append(pssm)
         return ProfileKernel(pssms)
 
-    def _compute_p_kernels(self, ps, pps, p_to_i):
+    def _get_p_kernels(self, ps, pps, p_to_i):
         """Computes all the kernels and pairwise kernels for proteins.
 
         XXX since all our kernel matrices are dense, this procedure is very
@@ -299,8 +299,8 @@ class YipExperiment(_Experiment):
                 lambda _: self._get_microarray_kernel(p_to_i)),
             ("p-kernel-complex",
                 lambda _: self._get_complex_kernel(p_to_i)),
-#            ("p-kernel-interpro-match-all",
-#                lambda _: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+            ("p-kernel-interpro-match-all",
+                lambda _: self._get_interpro_kernel(p_to_i, use_evalue = False)),
 #            ("p-kernel-interpro-weighted-all",
 #                lambda _: self._get_interpro_kernel(p_to_i)),
 #            ("p-kernel-profile",
@@ -354,15 +354,16 @@ class YipExperiment(_Experiment):
         print _cls(self), ": retrieving entities and entity pairs"
         ps, ds, rs = converter.get_entities()
         pps, dds, rrs = converter.get_pairs()
-        p_to_i = { p: i for i, p in enumerate(ps) }
         print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))
         print " #pps={}, #dds={} #rrs={}".format(len(pps), len(dds), len(rrs))
+
+        p_to_i = { p: i for i, p in enumerate(ps) }
 
         # Compute the protein interactions
         pp_ys = self._compute_ppi_y(pps);
 
         # Compute the protein kernels
-        p_kernels, pp_kernels = self._compute_p_kernels(ps, pps, p_to_i)
+        p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i)
 
         # Run the epxeriment
         print _cls(self), ": running"
