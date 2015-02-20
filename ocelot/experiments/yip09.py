@@ -127,42 +127,24 @@ class YipExperiment(_Experiment):
             np.savetxt(path, ys)
         return ys
 
-    def _get_microarray_kernel(self, p_to_i):
-        """Returns a kernel for gene expression."""
-        parts = {
-            "Gasch_2000_PMID_11102521": (
-                "2010.Gasch00_stationaryPhase(y12).flt.knn.avg.pcl",
-                "2010.Gasch00_DTT(y14).flt.knn.avg.pcl",
-                "2010.Gasch00_steadyState(y14).flt.knn.avg.pcl",
-                "2010.Gasch00_steadyState(y13).flt.knn.avg.pcl",
-                "2010.Gasch00_diamideTreatment.flt.knn.avg.pcl",
-                "2010.Gasch00_HSto37.flt.knn.avg.pcl",
-                "2010.Gasch00_HOtimeCourse.flt.knn.avg.pcl",
-                "2010.Gasch00_Ndepletion.flt.knn.avg.pcl",
-                "2010.Gasch00_menadione.flt.knn.avg.pcl",
-                "2010.Gasch00_HSmild.flt.knn.avg.pcl",
-                "2010.Gasch00_hypo-osmotic.flt.knn.avg.pcl",
-                "2010.Gasch00_DTT(y13).flt.knn.avg.pcl",
-                "2010.Gasch00_HS37-25.flt.knn.avg.pcl",
-                "2010.Gasch00_hyper-osmotic.flt.knn.avg.pcl",
-                "2010.Gasch00_HS25-37.flt.knn.avg.pcl",
-                "2010.Gasch00_HS30-37.flt.knn.avg.pcl",
-                "2010.Gasch00_adenineStarvation.flt.knn.avg.pcl",
-                "2010.Gasch00_HS29-33.flt.knn.avg.pcl",
-                "2010.Gasch00_carbonSources.flt.knn.avg.pcl",
-                "2010.Gasch00_stationaryPhase(y14).flt.knn.avg.pcl",
-            ),
-            "Spellman_1998_PMID_9843569": (
-                "2010.Spellman98_alphaFactor.flt.knn.avg.pcl",
-                "2010.Spellman98_elutriation.flt.knn.avg.pcl",
-                "2010.Spellman98_cdc15.flt.knn.avg.pcl",
-            ),
-        }
+    def _get_microarray_kernel(self, p_to_i, which = None):
+        """Returns a kernel for gene expression.
+
+        The data can be obtained `here`_.
+
+        .. _here: ftp://downloads.yeastgenome.org/expression/microarray/all_spell_exprconn_pcl.tar.gz
+
+        """
+        from glob import glob
         pcl = PCL()
         num = len(p_to_i)
-        for dirname in parts:
+        for dirname in glob(os.path.join(self.src, "yip09", "raw", "microarray", "*")):
+            if not os.path.isdir(dirname):
+                continue
+            if which != None and not os.path.basename(dirname) in which:
+                continue
             matrix_sum = np.zeros((num, num))
-            for filename in parts[dirname]:
+            for filename in glob(os.path.join(dirname, "*.pcl")):
                 path = os.path.join(self.src, "yip09", "raw", "microarray",
                                     dirname, filename)
                 print _cls(self), ": reading '{}'".format(path)
@@ -305,7 +287,9 @@ class YipExperiment(_Experiment):
 
         KERNEL_INFO = (
             ("p-kernel-microarray",
-                lambda _: self._get_microarray_kernel(p_to_i)),
+                lambda _: self._get_microarray_kernel(p_to_i,
+                            which = ["Gasch_2000_PMID_11102521",
+                                     "Spellman_1998_PMID_9843569"])),
             ("p-kernel-complex",
                 lambda _: self._get_complex_kernel(p_to_i)),
             ("p-kernel-interpro-match-all",
