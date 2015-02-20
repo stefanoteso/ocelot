@@ -181,7 +181,7 @@ class Yip09Converter(Converter):
         rr_kernel = DummyKernel(os.path.join(path, "rri", "ready", "residueKernel.txt"))
         return pp_kernel, dd_kernel, rr_kernel
 
-    def get_folds(self):
+    def get_test_sets(self):
         p_folds, d_folds, r_folds = [], [], []
         for i in xrange(10):
             path = os.path.join(self.src, "yip09", "folds")

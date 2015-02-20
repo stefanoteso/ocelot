@@ -247,36 +247,40 @@ class YipExperiment(_Experiment):
     def _get_p_kernels(self, ps, pps, p_to_i):
         """Computes all the kernels and pairwise kernels for proteins.
 
+        Note that the order in which objects are passed in is preserved when
+        computing the kernels.
+
         XXX since all our kernel matrices are dense, this procedure is very
             memory intensive; we should definitely do something about that
+
+        :param ps: list of protein identifiers
+        :param pps: list of pairs of protein identifiers
+        :param p_to_i: map between protein identifiers and indices
         """
         pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
 
-        print _cls(self), ": computing protein kernels"
-        p_to_seq = self._get_sequences()
-        sequences = [p_to_seq[p] for p in ps]
-
         KERNEL_INFO = (
-            ("p-kernel-microarray",
-                lambda _: self._get_microarray_kernel(p_to_i,
-                            which = ["Gasch_2000_PMID_11102521",
-                                     "Spellman_1998_PMID_9843569"])),
-            ("p-kernel-microarray-all",
-                lambda _: self._get_microarray_kerne(p_to_i)),
-            ("p-kernel-complex",
-                lambda _: self._get_complex_kernel(p_to_i)),
-            ("p-kernel-interpro-match-all",
-                lambda _: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+#            ("p-kernel-microarray",
+#                lambda: self._get_microarray_kernel(p_to_i,
+#                            which = ["Gasch_2000_PMID_11102521",
+#                                     "Spellman_1998_PMID_9843569"])),
+#            ("p-kernel-microarray-all",
+#                lambda: self._get_microarray_kerne(p_to_i)),
+#            ("p-kernel-complex",
+#                lambda: self._get_complex_kernel(p_to_i)),
+#            ("p-kernel-interpro-match-all",
+#                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
 #            ("p-kernel-interpro-weighted-all",
-#                lambda _: self._get_interpro_kernel(p_to_i)),
+#                lambda: self._get_interpro_kernel(p_to_i)),
 #            ("p-kernel-profile",
-#                lambda _: self._get_profile_kernel(p_to_i)),
+#                lambda: self._get_profile_kernel(p_to_i)),
             ("p-kernel-yip",
-                lambda _: self._get_yip_kernels()[0]),
+                lambda: self._get_yip_kernels()[0]),
         )
 
+        print _cls(self), ": computing protein kernels"
         kernels, pairwise_kernels = [], []
-        for path, func in KERNEL_INFO:
+        for path, compute_kernel in KERNEL_INFO:
             path = os.path.join(self.dst, path)
             try:
                 print _cls(self), ": loading '{}'".format(path)
@@ -285,7 +289,7 @@ class YipExperiment(_Experiment):
             except Exception, e:
                 print _cls(self), "|", e
                 print _cls(self), ": computing '{}'".format(path)
-                kernel = func(sequences)
+                kernel = compute_kernel()
                 kernel.check_and_fixup(1e-10) 
                 kernel.save(path + ".txt")
                 kernel.draw(path + ".png")
@@ -305,8 +309,6 @@ class YipExperiment(_Experiment):
                 pairwise_kernel.draw(path + ".png")
             pairwise_kernels.append(pairwise_kernel)
 
-            kernel = None # XXX hack
-
         return kernels, pairwise_kernels
 
     def run(self):
@@ -325,15 +327,34 @@ class YipExperiment(_Experiment):
         print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))
         print " #pps={}, #dds={} #rrs={}".format(len(pps), len(dds), len(rrs))
 
+        # The index of an ID is given by the order in which it appears within
+        # the `proteins.txt`, `domains.txt` or `residues.txt` files. This is
+        # the same order in which entities appear in the non-pairwise kernels.
         p_to_i = { p: i for i, p in enumerate(ps) }
 
-        # Compute the protein interactions
+        # The index of a pair of IDs is given by the order in which it appears
+        # within the `goldPosProteinPairs.txt` etc. files, where all positives
+        # are read first and all negatives follow. This is the same order in
+        # which pairs appear in the pairwise kernels (XXX please double check)
+        pp_to_i = { pp: i for i, pp in enumerate(pps) }
+
+        # Retrieve the protein interactions
         pp_ys = self._compute_ppi_y(pps);
 
         # Compute the protein kernels
         p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i)
 
-        # Run the epxeriment
+        # Get the original fold splits and convert them to indices
+        pp_ts_ids, dd_ts_ids, rr_ts_ids = converter.get_test_sets()
+
+        pp_folds = []
+        for ids in pp_ts_ids:
+            ts_indices = [pp_to_i[(p1, p2)] for p1, p2 in ids]
+            # XXX is this actually correct???
+            tr_indices = sorted(set(range(len(pps))) - set(ts_indices))
+            pp_folds.append((ts_indices, tr_indices))
+
+        # Run the experiment
         print _cls(self), ": running"
-        self._crossvalidate_mkl(pp_ys, pp_kernels)
+        self._run_mkl(pp_ys, pp_kernels, pp_folds)
 

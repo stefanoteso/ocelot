@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import numpy as np
+
 import ocelot.ontology as O
+from ocelot.services import _cls
 
 class _Experiment(object):
     """Base class for all experiments.
@@ -68,40 +71,88 @@ class _Experiment(object):
                 return d[u"value"]
         raise NotImplementedError("can not cast '{}'".format(d.items()))
 
-    def _crossvalidate_svm(self, ys, k, folds = None):
-        """NOTE: y must be {-1,+1}. """
-        from modshogun import RealFeatures, BinaryLabels, CustomKernel, LibSVM
+    @staticmethod
+    def _split_vector(ys, tr_indices, ts_indices):
+        return ys[np.ix_(tr_indices)], ys[np.ix_(ts_indices)]
 
-        kernel = CustomKernel()
-        kernel.set_full_kernel_matrix_from_full(k._matrix)
+    @staticmethod
+    def _split_matrix(k, tr_indices, ts_indices, mode = "shogun"):
+        k_tr = k[np.ix_(tr_indices, tr_indices)]
+        if mode == "shogun":
+            k_ts = k[np.ix_(tr_indices, ts_indices)]
+        elif mode == "sklearn":
+            k_ts = k[np.ix_(ts_indices, tr_indices)]
+        else:
+            raise ValueError("invalid mode '{}'".format(mode))
+        return k_tr, k_ts
 
-        labels = BinaryLabels(ys)
-        svm = LibSVM(1, kernel, labels)
-        svm.train()
-        pred_ys = svm.apply().get_labels()
+    @staticmethod
+    def _get_class_costs(ys):
+        num_pos = float(len(filter(lambda y: y >= 0, ys)))
+        return (len(ys) - num_pos) / len(ys), num_pos / len(ys)
 
-    def _crossvalidate_mkl(self, ys, ks, folds = None):
-        from modshogun import CombinedKernel, CustomKernel, BinaryLabels
-        from modshogun import MKLClassification
-
+    @staticmethod
+    def _combine_matrices(matrices):
+        from modshogun import CombinedKernel, CustomKernel
         combined_kernel = CombinedKernel()
-        for k in ks:
-            combined_kernel.append_kernel(CustomKernel(k.compute()))
+        for matrix in matrices:
+            combined_kernel.append_kernel(CustomKernel(matrix))
+        return combined_kernel
 
-        model = MKLClassification()
-        model.set_mkl_norm(1) # 2, 3
-        model.set_C(1, 1) # positive, negative cost
-        model.set_kernel(combined_kernel)
-        model.set_labels(BinaryLabels(ys))
+    def _crossvalidate_mkl(self, ys, kernels, folds, mkl_c = 1.0, mkl_norm = 1):
+        from modshogun import BinaryLabels, MKLClassification
+        from sklearn.metrics import precision_recall_fscore_support
 
-        model.train()
-        subkernel_weights = combined_kernel.get_subkernel_weights()
-        print subkernel_weights
+        results = []
+        for i, (ts_indices, tr_indices) in enumerate(folds):
+            print _cls(self), ": fold {}/{}, preparing; C={} norm={}".format(i, len(folds), mkl_c, mkl_norm)
 
-        predictions = model.apply().get_labels()
-        print zip(ys, predictions)
+            # Split the labels between training and test, and compute the
+            # per-class costs on the training labels
+            ys_tr, ys_ts = self._split_vector(ys, tr_indices, ts_indices)
+            cost_pos, cost_neg = self._get_class_costs(ys_tr)
 
-    def _crossvalidate_sbr(self, ys, ks, folds = None):
+            # Split the kernels between training and test
+            matrices_tr, matrices_ts = [], []
+            for kernel in kernels:
+                matrix = kernel.compute()
+                matrix_tr, matrix_ts = self._split_matrix(matrix, tr_indices, ts_indices)
+                matrices_tr.append(matrix_tr)
+                matrices_ts.append(matrix_ts)
+            combined_kernel_tr = self._combine_matrices(matrices_tr)
+            combined_kernel_ts = self._combine_matrices(matrices_ts)
+
+            # Create the model
+            model = MKLClassification()
+            model.set_C_mkl(mkl_c)
+            model.set_mkl_norm(mkl_norm)
+            model.set_C(cost_pos, cost_neg)
+
+            # Learn
+            print _cls(self), ": fold {}/{}, learning (class costs = +{} -{})".format(i, len(folds), cost_pos, cost_neg)
+            model.set_kernel(combined_kernel_tr)
+            model.set_labels(BinaryLabels(ys_tr))
+            model.train()
+            beta = combined_kernel_tr.get_subkernel_weights()
+
+            # Infer
+            print _cls(self), ": fold {}/{}, predicting".format(i, len(folds))
+            model.set_kernel(combined_kernel_ts)
+            combined_kernel_ts.set_subkernel_weights(beta)
+            ys_pr = model.apply().get_labels()
+
+            results.append(precision_recall_fscore_support(ys_ts, ys_pr))
+
+        return results
+
+    def _run_mkl(self, ys, kernels, folds):
+        c_to_results = {}
+        for c in (1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4):
+            c_to_results[c] = self._crossvalidate_mkl(ys, kernels, folds, mkl_c = c)
+        from pprint import pprint
+        pprint(c_to_results)
+
+    def _crossvalidate_sbr_with_mkl(self, ys, ks, folds):
         pass
 
     def run(self):
