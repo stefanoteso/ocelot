@@ -150,6 +150,7 @@ class YipExperiment(_Experiment):
                 print _cls(self), ": reading '{}'".format(path)
                 orf_to_expression, num_conditions = pcl.read(path)
                 levels = [ [0.0]*num_conditions for _ in xrange(len(p_to_i)) ]
+                # XXX add support for bad/SGD IDs
                 num_missing = 0
                 for orf, index in p_to_i.items():
                     try:
@@ -290,6 +291,8 @@ class YipExperiment(_Experiment):
                 lambda _: self._get_microarray_kernel(p_to_i,
                             which = ["Gasch_2000_PMID_11102521",
                                      "Spellman_1998_PMID_9843569"])),
+            ("p-kernel-microarray-all",
+                lambda _: self._get_microarray_kerne(p_to_i)),
             ("p-kernel-complex",
                 lambda _: self._get_complex_kernel(p_to_i)),
             ("p-kernel-interpro-match-all",
