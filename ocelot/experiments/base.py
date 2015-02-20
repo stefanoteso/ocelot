@@ -81,12 +81,12 @@ class _Experiment(object):
         pred_ys = svm.apply().get_labels()
 
     def _crossvalidate_mkl(self, ys, ks, folds = None):
-        from modshogun import CombinedKernel, CustomKernel
+        from modshogun import CombinedKernel, CustomKernel, BinaryLabels
         from modshogun import MKLClassification
 
         combined_kernel = CombinedKernel()
         for k in ks:
-            combined_kernel.append_kernel(CustomKernel(ks.compute()))
+            combined_kernel.append_kernel(CustomKernel(k.compute()))
 
         model = MKLClassification()
         model.set_mkl_norm(1) # 2, 3
@@ -98,7 +98,7 @@ class _Experiment(object):
         subkernel_weights = combined_kernel.get_subkernel_weights()
         print subkernel_weights
 
-        predictions = mkl.apply()
+        predictions = model.apply()
         print predictions
 
     def _crossvalidate_sbr(self, ys, ks, folds = None):
