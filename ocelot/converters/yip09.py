@@ -172,3 +172,11 @@ class Yip09Converter(Converter):
                in (self._read(os.path.join("rri", "ready", "goldPosResiduePairs.txt")) + \
                    self._read(os.path.join("rri", "ready", "goldNegResiduePairs.txt")))]
         return pps, dds, rrs
+
+    def get_kernels(self):
+        from ocelot.kernels import DummyKernel
+        path = os.path.join(self.src, "yip09")
+        pp_kernel = DummyKernel(os.path.join(path, "ppi", "ready", "proteinKernel.txt"))
+        dd_kernel = DummyKernel(os.path.join(path, "ddi", "ready", "domainKernel.txt"))
+        rr_kernel = DummyKernel(os.path.join(path, "rri", "ready", "residueKernel.txt"))
+        return pp_kernel, dd_kernel, rr_kernel
