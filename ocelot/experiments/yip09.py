@@ -20,12 +20,6 @@ class YipExperiment(_Experiment):
     :param subtargets: prediction targets.
     :param endpoint: URI of the SPARQL endpoint.
     :param default_graph: URI of the default graph.
-
-    *References*
-
-    .. [Yip09] Yip, Kim, McDermott, Gerstein, "Multi-level learning: improving
-        the prediction of protein, domain and residue interactions by allowing
-        information flow between levels", BMC Bioinformatics, 2009.
     """
     def __init__(self, *args, **kwargs):
         super(YipExperiment, self).__init__(*args, **kwargs)
@@ -165,37 +159,13 @@ class YipExperiment(_Experiment):
     def _get_complex_kernel(self, p_to_i):
         """Computes diffusion kernels for raw protein complex data.
 
-        The Yip et al. dataset relies on a variety of sources, namely [Y2Ha]_,
-        [Y2Hb]_, [TAPMSa]_, and [TAPMSb]_. However we ignore them and instead
-        use [Cyc]_, which should be more complete and up-to-date.
-
-        *References*
-
-        .. [Y2Ha] Ito et al. "Toward a Protein-Protein Interaction Map of the
-            Budding Yeast: A Comprehensive System to Examine Two-Hybrid
-            Interactions in All Possible Combinations between the Yeast
-            Proteins", PNAS, 2000.
-
-        .. [Y2Hb] Uetz et al., "A Comprehensive Analysis of Protein-Protein
-            Interactions in Saccharomyces cerevisiae", Nature, 2000.
-
-        .. [TAPMSa] Gavin et al., "Proteome Survey Reveals Modularity of the
-            Yeast Cell Machinery", Nature, 2006.
-
-        .. [TAPMSb] Krogan et al, "Global Landscape of Protein Complexes in the
-            Yeast Saccharomyces cerevisiae", Nature, 2006
-
-        .. [Cyc] Pu et al., "Up-to-date catalogues of yeast protein complexes",
-            NAR 2008
+        The original experiment relies of Y2H [Ito00]_, [Uetz00]_ and TAP-MS
+        [Gavin06]_, [Krogan06]_ datasets of protein complexes. Here we make
+        use of the dataset described in [Pu08], which is supposed to be more
+        complete and up-to-date.
         """
         import itertools as it
         # XXX use a weight matrix
-
-        # We ignore all of the following:
-        #  - pnas_97_3_1143__5101Table2rev.xls
-        #  - a wormhole
-        #  - suppl[1234].xsl
-        #  - 16554755id1088.tab.txt
 
         # Read the map between ORFs and complexes
         FIELDS = ("ORF", "_", "COMPLEX")
