@@ -85,8 +85,8 @@ class _Experiment(object):
         from modshogun import MKLClassification
 
         combined_kernel = CombinedKernel()
-        for pairwise_kernel in pairwise_kernels:
-            combined_kernel.append_kernel(CustomKernel(pairwise_kernel))
+        for k in ks:
+            combined_kernel.append_kernel(CustomKernel(ks.compute()))
 
         model = MKLClassification()
         model.set_mkl_norm(1) # 2, 3
@@ -96,7 +96,10 @@ class _Experiment(object):
 
         model.train()
         subkernel_weights = combined_kernel.get_subkernel_weights()
+        print subkernel_weights
+
         predictions = mkl.apply()
+        print predictions
 
     def _crossvalidate_sbr(self, ys, ks, folds = None):
         pass

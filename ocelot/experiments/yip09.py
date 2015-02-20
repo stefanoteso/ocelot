@@ -283,69 +283,63 @@ class YipExperiment(_Experiment):
         return ProfileKernel(pssms)
 
     def _compute_p_kernels(self, ps, pps, p_to_i):
+        """Computes all the kernels and pairwise kernels for proteins.
+
+        XXX since all our kernel matrices are dense, this procedure is very
+            memory intensive; we should definitely do something about that
+        """
+        pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
 
         print _cls(self), ": computing protein kernels"
         p_to_seq = self._get_sequences()
         sequences = [p_to_seq[p] for p in ps]
-
-        def linear_kernel_of(Features, sequences):
-            phis = SequenceFeatures(Features).compute(sequences)
-            return LinearKernel(phis)
-        def set_kernel_of(Features, sequences):
-            return None
 
         KERNEL_INFO = (
             ("p-kernel-microarray",
                 lambda _: self._get_microarray_kernel(p_to_i)),
             ("p-kernel-complex",
                 lambda _: self._get_complex_kernel(p_to_i)),
-            ("p-kernel-interpro-match-all",
-                lambda _: self._get_interpro_kernel(p_to_i, use_evalue = False)),
-            ("p-kernel-interpro-weighted-all",
-                lambda _: self._get_interpro_kernel(p_to_i)),
+#            ("p-kernel-interpro-match-all",
+#                lambda _: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+#            ("p-kernel-interpro-weighted-all",
+#                lambda _: self._get_interpro_kernel(p_to_i)),
 #            ("p-kernel-profile",
 #                lambda _: self._get_profile_kernel(p_to_i)),
         )
 
-        full_matrix = np.zeros((len(ps), len(ps)))
+        kernels, pairwise_kernels = [], []
         for path, func in KERNEL_INFO:
             path = os.path.join(self.dst, path)
             try:
                 print _cls(self), ": loading '{}'".format(path)
-                kernel = DummyKernel(path + ".txt")
-                matrix = kernel.compute()
-                assert matrix.shape == (len(ps), len(ps))
+                kernel = DummyKernel(path + ".txt", num = len(ps))
+                assert kernel.is_psd(), "non-PSD kernel!"
             except Exception, e:
-                print _cls(self), ":", e
+                print _cls(self), "|", e
                 print _cls(self), ": computing '{}'".format(path)
                 kernel = func(sequences)
-                if kernel != None:
-                    matrix = kernel.compute()
-                    assert (matrix.T == matrix).all(), "not symmetric!"
-                    ls = np.linalg.eigvalsh(matrix)
-                    if ls[0] < 0.0:
-                        assert ls[0] > -1e-10, "matrix is too non-PSD"
-                        print _cls(self), ": preconditioning by 10*(ls[0] = '{}')".format(ls[0])
-                        matrix += np.identity(matrix.shape[0]) * -10.0 * ls[0]
-                        assert np.linalg.eigvalsh(matrix)[0] >= 0, "the gods are playful today"
-                    print _cls(self), ": saving '{}'".format(path)
-                    np.savetxt(path + ".txt", matrix)
-                    kernel.draw(path + ".png")
-            full_matrix += kernel.compute()
-            del kernel
+                kernel.check_and_fixup(1e-10) 
+                kernel.save(path + ".txt")
+                kernel.draw(path + ".png")
+            kernels.append(kernel)
 
-        path = os.path.join(self.dst, "p-kernel-full")
-        full_kernel = DummyKernel(full_matrix)
-        full_kernel.draw(path + ".png")
-        np.savetxt(path + ".txt", full_kernel.compute())
+            path += "-pairwise"
+            try:
+                print _cls(self), ": loading '{}".format(path)
+                pairwise_kernel = DummyKernel(path + ".txt", num = len(pp_indices))
+                assert kernel.is_psd(), "non-PSD kernel!"
+            except Exception, e:
+                print _cls(self), "|", e
+                print _cls(self), ": computing '{}'".format(path)
+                pairwise_kernel = PairwiseKernel(pp_indices, kernel)
+                kernel.check_and_fixup(1e-10) 
+                pairwise_kernel.save(path + ".txt")
+                pairwise_kernel.draw(path + ".png")
+            pairwise_kernels.append(pairwise_kernel)
 
-        path = os.path.join(self.dst, "p-kernel-full-pairwise")
-        pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
-        pairwise_kernel = PairwiseKernel(pp_indices, full_kernel)
-        pairwise_kernel.draw(path + ".png")
-        np.savetxt(path + ".txt", pairwise_kernel.compute())
+            kernel = None # XXX hack
 
-        return full_kernel, pairwise_kernel
+        return kernels, pairwise_kernels
 
     def run(self):
         """Run the Yip et al. experiment replica."""
@@ -365,12 +359,12 @@ class YipExperiment(_Experiment):
         print " #pps={}, #dds={} #rrs={}".format(len(pps), len(dds), len(rrs))
 
         # Compute the protein interactions
-        ys = self._compute_ppi_y(pps);
+        pp_ys = self._compute_ppi_y(pps);
 
         # Compute the protein kernels
-        p_kernel, pp_kernel = self._compute_p_kernels(ps, pps, p_to_i)
+        p_kernels, pp_kernels = self._compute_p_kernels(ps, pps, p_to_i)
 
         # Run the epxeriment
         print _cls(self), ": running"
-        self._crossvalidate_svm(ys, pp_kernel)
+        self._crossvalidate_mkl(pp_ys, pp_kernels)
 

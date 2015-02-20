@@ -1,6 +1,7 @@
 # -*- coding: utf8 -*-
 
 import numpy as np
+from ocelot.services import _cls
 
 class _Kernel(object):
     """Base kernel class.
@@ -25,10 +26,6 @@ class _Kernel(object):
         ones = np.ones((1, matrix.shape[1]))
         invd = np.divide(ones, np.sqrt(matrix.diagonal()))
         return np.multiply(matrix, np.dot(invd.T, invd))
-    def is_psd(self, matrix):
-        is_symmetric = (matrix.T == matrix).all()
-        is_semi_psd = np.all(np.linalg.eigvalsh(matrix) >= 0)
-        return is_symmetric and is_semi_psd
     def compute(self):
         """Computes the kernel matrix.
 
@@ -54,14 +51,32 @@ class _Kernel(object):
         fig.savefig(path)
     def save(self, path):
         np.savetxt(path, self.compute())
+    def is_psd(self):
+        matrix = self.compute()
+        is_symmetric = (matrix.T == matrix).all()
+        is_semi_psd = np.all(np.linalg.eigvalsh(matrix) >= 0)
+        return is_symmetric and is_semi_psd
+    def check_and_fixup(self, threshold):
+        matrix = self.compute()
+        assert (matrix.T == matrix).all(), "not symmetric!"
+
+        ls = np.linalg.eigvalsh(matrix)
+        if ls[0] < 0.0:
+            assert ls[0] < threshold, "matrix is too non-PSD: minimum eigenvalue is '{}'".format(ls[0])
+            print _cls(self), ": preconditioning by 10*(ls[0] = '{}')".format(ls[0])
+            matrix += np.identity(matrix.shape[0]) * -10.0 * ls[0]
+            assert np.linalg.eigvalsh(matrix)[0] >= 0, "the gods are playful today"
 
 class DummyKernel(_Kernel):
     def __init__(self, arg, **kwargs):
+        num = kwargs.get("num")
         if isinstance(arg, str):
             matrix = np.loadtxt(arg)
         else:
             matrix = arg
         assert matrix.shape[0] == matrix.shape[1]
+        if num != None:
+            assert matrix.shape == (num, num)
         super(DummyKernel, self).__init__(range(matrix.shape[0]),
                                           **kwargs)
         self._matrix = matrix
