@@ -223,6 +223,54 @@ class YipExperiment(_Experiment):
         else:
             return SetKernel(hits)
 
+    def _get_genetic_colocalization_kernel(self, p_to_i, gamma = 1e-9):
+        """We use a simple Gaussian-of-differences kernel here.
+
+        The distance between two proteins (or, rather, genes) is taken to
+        be the distance between their centroids.
+
+        Please note that we do distinguish between same-strand and
+        different-strand proteins (i.e., their distances are computed the same
+        way), while this may have a rather serious biological implications.
+
+        The idea comes from [Lee03]_."""
+        ans = self.query("""
+        SELECT ?p ?chrom ?strand ?start ?stop
+        FROM <{default_graph}>
+        WHERE {{
+            ?p a ocelot:yip_protein ;
+                owl:sameAs ?feat .
+            ?feat a ocelot:sgd_feature .
+            ?id a ocelot:sgd_id ;
+                owl:sameAs ?feat .
+            ?id ocelot:sgd_id_in_chromosome ?chrom .
+            ?id ocelot:sgd_id_in_strand ?strand .
+            ?id ocelot:sgd_id_starts_at ?start .
+            ?id ocelot:sgd_id_stops_at ?stop .
+        }}
+        """)
+        assert ans and len(ans) and "results" in ans
+        context = {}
+        for bindings in ans["results"]["bindings"]:
+            bindings = { k: self.cast(v) for k, v in bindings.items() }
+            p       = bindings[u"p"].split(".")[-1]
+            chrom   = bindings[u"chrom"].split(".")[-1]
+            strand  = bindings[u"strand"]
+            start   = bindings[u"start"]
+            stop    = bindings[u"stop"]
+            assert strand in ("C", "W")
+            if strand == "C":
+                # XXX not really required, here just to not forget that 'W'
+                # means increasing coords and 'C' means reverse.
+                start, stop = stop, start
+            context[p] = (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
+        matrix = np.zeros((len(p_to_i), len(p_to_i)))
+        for p, i in p_to_i.items():
+            for q, j in p_to_i.items():
+                if context[p][0] == context[q][0]:
+                    matrix[i,j] = np.exp(-gamma * (context[p][1] - context[q][1])**2)
+        return DummyKernel(matrix)
+
     def _get_profile_kernel(self, p_to_i):
         import numpy as np
         reader = PSSM()
@@ -260,6 +308,8 @@ class YipExperiment(_Experiment):
         pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
 
         KERNEL_INFO = (
+            ("p-kernel-colocalization",
+                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
 #            ("p-kernel-microarray",
 #                lambda: self._get_microarray_kernel(p_to_i,
 #                            which = ["Gasch_2000_PMID_11102521",

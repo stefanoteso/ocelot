@@ -132,6 +132,9 @@ References
 .. [Pu08] Pu et al., *Up-to-date catalogues of yeast protein complexes*, NAR
     2008
 
+.. [Lee03] Lee and Sonnhammer, *Genomic gene clustering analysis of pathways in
+    eukaryotes*, 2003.
+
 
 Indices and tables
 ==================
