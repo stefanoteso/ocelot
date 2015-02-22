@@ -282,7 +282,7 @@ class ProfileKernel(_Kernel):
         homology detection and motif extraction", J. Bioinform. Comput. Biol.,
         2004.
 
-    .. [fastprofkernel] `https://rostlab.org/owiki/index.php/Fastprofkernel`_
+    .. [fastprofkernel] `<https://rostlab.org/owiki/index.php/Fastprofkernel>`
     """ 
     def __init__(self, pssms, k = 4, threshold = 6.0, **kwargs):
         super(ProfileKernel, self).__init__(pssms, **kwargs)
