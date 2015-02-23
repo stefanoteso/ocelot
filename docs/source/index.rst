@@ -36,13 +36,15 @@ have widely different licensing constraints.
 Requirements
 ------------
 
-* Virtuoso
-* rdflib
-* SPARQLWrapper
-* BioPython (optional)
-* mmLib (optional)
-* SBR
-* SHOGUN (optional)
+* `OpenLink Virtuoso open-source <https://github.com/openlink/virtuoso-opensource>`_
+* `rdflib <https://rdflib.readthedocs.org/en/latest/>`_
+* `SPARQLWrapper <https://pypi.python.org/pypi/SPARQLWrapper>`_
+* Optionally `BioPython <http://biopython.org>`_
+* Optionally `mmLib <http://pymmlib.sourceforge.net/>`_
+* `Semantic Based Regularization <https://sites.google.com/site/semanticbasedregularization/home/software>`_
+* `SHOGUN <http://www.shogun-toolbox.org/>`_
+* `scikit-learn <http://scikit-learn.org/stable/>`_
+* `Matplotlib <http://matplotlib.sourceforge.net/>`_
 
 Usage
 -----
