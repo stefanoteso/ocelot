@@ -44,11 +44,14 @@ class _Kernel(object):
         except:
             print "matplotlib is required; can not draw"
             return
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        matrix = self.compute()
-        ax.matshow(matrix, interpolation = "nearest", cmap = cm.OrRd)
-        fig.savefig(path)
+    try:
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+            matrix = self.compute()
+            ax.matshow(matrix, interpolation = "nearest", cmap = cm.OrRd)
+            fig.savefig(path)
+    except Except, e:
+        print "failed to draw kernel; skipping"
     def save(self, path):
         np.savetxt(path, self.compute())
     def is_psd(self):
