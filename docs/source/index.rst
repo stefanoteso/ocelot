@@ -85,7 +85,13 @@ Contents
     :members:
 .. automodule:: ocelot.features
     :members:
-.. automodule:: ocelot.kernels
+.. automodule:: ocelot.kernels.base
+    :members:
+.. automodule:: ocelot.kernels.vector
+    :members:
+.. automodule:: ocelot.kernels.string
+    :members:
+.. automodule:: ocelot.kernels.graph
     :members:
 .. automodule:: ocelot.experiments
     :members:
@@ -136,6 +142,20 @@ References
 
 .. [Lee03] Lee and Sonnhammer, *Genomic gene clustering analysis of pathways in
     eukaryotes*, 2003.
+
+**Kernels**
+
+.. [Leslie02a] Leslie et al., *The spectrum kernel: A string kernel for SVM
+    protein classification*, 2002.
+
+.. [Leslie02b] Leslie et al., *Mismatch String Kernels for SVM Protein
+    Classification*, 2002.
+
+.. [Kuang04] Kuang et al., *Profile-based string kernels for remote homology
+    detection and motif extraction*, 2004.
+
+.. [Kondor02] Kondor and Lafferty, *Diffusion Kernels on Graphs and Other
+    Discrete Input Spaces*, 2002.
 
 
 Indices and tables
