@@ -11,6 +11,7 @@
         + kernel: corrmut
         + kernel: supfam            DONE        Luca
         + kernel: interpro          DONE
+        + kernel: n/c-terminal loc
     - DOMAINS
         - sequences
         - structures
@@ -56,9 +57,10 @@
     - XXX
 
 - COMPETITORS
-    - baseline: kNN homology-based annotation transfer
-    - baseline: CAFA
-    - baseline: GOstruct (open source on sourceforge)
-    - baseline: SVM
-    - baseline: Rost's own predictor
+    - FUNCTION
+        - Argot2, entirely based on PFAM and HMMER hits
+        - GOstruct, entirely based on PSI-BLAST hits
+        - Metastudent, entirely based on PSI-BLAST hits
+    - INTERACTIONS
+        WRITEME
 
