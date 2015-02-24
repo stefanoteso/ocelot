@@ -85,23 +85,39 @@ class FASTA(object):
                 fp.write("{}\n{}\n".format(header, sequence))
 
 class PSSM(object):
-    """A container for PSI-Blast PSSM profiles."""
+    """A container for PSI-Blast PSSM profiles.
+
+    The ``data`` and ``obsperc`` values are ordered the same as ``AMINOACIDS``."""
+    _ALPHABET = ("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K",
+                 "M", "F", "P", "S", "T", "W", "Y", "V")
+
+    def _shuffle(self, elements):
+        assert len(elements) == 20
+        result = [ None for _ in xrange(20) ]
+        for i, symbol in PSSM._ALPHABET:
+            result[AMINOACIDS.index(symbol)] = elements[i]
+        return tuple(result)
+
     def read(self, path):
-        pos_to_info = {}
         with open(path, "rt") as fp:
-            for line in fp:
-                words = line.rstrip().split()
-                if len(words) != 44:
-                    continue
-                position = int(words[0]) - 1
-                pos_to_info[position] = {
-                    "res"   : words[1],
-                    "data"  : map(float, words[2:2+20]),
-                    "info"  : map(float, words[2+20:2+40]),
-                    "unk1"  : float(words[2+40]),
-                    "unk2"  : float(words[2+41]),
-                }
-        return pos_to_info
+            lines = fp.readlines()[3:-6]
+        info = []
+        old_position = None
+        for line in lines:
+            # Unfortunately, PSSM is one of those awful textual file formats
+            # where the fields can not be extracted with a simple split()...
+            position = int(line[0:5].strip()) - 1
+            if old_position:
+                assert position == (old_position + 1), "watch your PSSMs"
+            residue  = line[5:7].strip()
+            data = []
+            for i in xrange(20):
+                data.append(float(line[9+i*3:9+i*3+3].strip()))
+            obsperc = []
+            for i in xrange(20):
+                obsperc.append(float(line[70+i*4:70+i*4+4].strip()) / 100.0)
+            info.append((residue, self._shuffle(obsperc)))
+        return info
 
 class PCL(object):
     """Reads a Stanford PCL gene expression file.
