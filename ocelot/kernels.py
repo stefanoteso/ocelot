@@ -50,7 +50,7 @@ class _Kernel(object):
             matrix = self.compute()
             ax.matshow(matrix, interpolation = "nearest", cmap = cm.OrRd)
             fig.savefig(path)
-    except Except, e:
+    except Exception, e:
         print "failed to draw kernel; skipping"
     def save(self, path):
         np.savetxt(path, self.compute())
