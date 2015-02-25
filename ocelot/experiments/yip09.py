@@ -278,8 +278,8 @@ class YipExperiment(_Experiment):
         for p, i in p_to_i.items():
             path = os.path.join(self.src, "yip09", "raw", "profiles",
                                 "{}.ascii-pssm".format(p))
-            info = reader.read(path)
-            pssm = np.array([ info[key]["data"] for key in sorted(info.keys()) ])
+            print "loading {}".format(path)
+            pssm = reader.read(path)
             pssms.append(pssm)
         return ProfileKernel(pssms)
 
@@ -308,22 +308,22 @@ class YipExperiment(_Experiment):
         pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
 
         KERNEL_INFO = (
-            ("p-kernel-colocalization",
-                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
-#            ("p-kernel-microarray",
-#                lambda: self._get_microarray_kernel(p_to_i,
-#                            which = ["Gasch_2000_PMID_11102521",
-#                                     "Spellman_1998_PMID_9843569"])),
+#            ("p-kernel-colocalization",
+#                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
+            ("p-kernel-microarray",
+                lambda: self._get_microarray_kernel(p_to_i,
+                            which = ["Gasch_2000_PMID_11102521",
+                                     "Spellman_1998_PMID_9843569"])),
 #            ("p-kernel-microarray-all",
 #                lambda: self._get_microarray_kerne(p_to_i)),
-#            ("p-kernel-complex",
-#                lambda: self._get_complex_kernel(p_to_i)),
-#            ("p-kernel-interpro-match-all",
-#                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
-#            ("p-kernel-interpro-weighted-all",
-#                lambda: self._get_interpro_kernel(p_to_i)),
-#            ("p-kernel-profile",
-#                lambda: self._get_profile_kernel(p_to_i)),
+            ("p-kernel-complex",
+                lambda: self._get_complex_kernel(p_to_i)),
+            ("p-kernel-interpro-match-all",
+                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+            ("p-kernel-interpro-weighted-all",
+                lambda: self._get_interpro_kernel(p_to_i)),
+            ("p-kernel-profile",
+                lambda: self._get_profile_kernel(p_to_i)),
             ("p-kernel-yip",
                 lambda: self._get_yip_kernels()[0]),
         )
