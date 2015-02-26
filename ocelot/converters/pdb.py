@@ -8,14 +8,12 @@ from rdflib import URIRef as U, BNode as B, Literal as L
 from glob import glob
 
 class PDBConverter(Converter):
-    """Converter for PDB (Protein Data Bank) [1] to RDF.
+    """Converter for `Protein Data Bank <http://www.rcsb.org/pdb/>`_.
     
     Note that this converter does not actually convert the *structure* data,
     but only sequences and information about the database.
 
-    *References*
-    
-    [1] http://www.rcsb.org/pdb/
+    Note also that there is a more complete RDF dump available `here <http://pdbj.org/help/rdf>`_.
     """
     def __init__(self, *args, **kwargs):
         SUBTARGETS = (

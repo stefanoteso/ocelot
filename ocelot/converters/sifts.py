@@ -4,16 +4,12 @@ import ocelot.ontology as O
 from ocelot.converters.base import Converter, iterate_csv
 
 class SIFTSConverter(Converter):
-    """Converter for SIFTS[1].
+    """Converter for `SIFTS <http://www.ebi.ac.uk/pdbe/docs/sifts/>`_.
     
     SIFTS provides mappings between IDs of different biological databases,
     including PDB, Uniprot, GO, Pfam, InterPro, SCOP and CATH.
     
     Tested with SIFTS from 2014-07-08.
-
-    *References*
-    
-    [1] http://www.ebi.ac.uk/pdbe/docs/sifts/
     """
     def __init__(self, *args, **kwargs):
         SUBTARGETs = (

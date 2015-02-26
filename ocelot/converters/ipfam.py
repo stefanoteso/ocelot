@@ -6,10 +6,10 @@ from ocelot.converters.base import Converter, iterate_csv
 from rdflib import URIRef as U, BNode as B, Literal as L
 
 class IPfamConverter(Converter):
-    """Converter for iPfam [1] to RDF.
+    """Converter for `iPfam <http://www.ipfam.org/>`_.
 
-    The converter assumes that the `data` directory includes an `ipfam`
-    directory with a full iPfam dump.
+    The converter assumes that the data directory includes an ``ipfam``
+    directory with a full iPfam dump, laid out like this::
 
       homodomain_interactions.csv   : DONE
       heterodomain_interactions.csv : DONE
@@ -23,10 +23,6 @@ class IPfamConverter(Converter):
       pdb_protein_region_lig_int.txt: not used
       pdb_protein_res_lig_int.txt   : not used
       pdb_protein_lig_atom_int.txt  : not used
-
-    *References*
-
-    [1] http://www.ipfam.org/
     """
     def __init__(self, *args, **kwargs):
         SUBTARGETS = (

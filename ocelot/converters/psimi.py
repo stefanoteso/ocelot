@@ -57,15 +57,12 @@ _FIELDS = (
 class PsiMiTabConverter(CSVConverter):
     """PSI-MI TAB Converter
 
-    Supports the 2.5, 2.6 and 2.7 versions.
+    It supports versions `2.5 <https://code.google.com/p/psicquic/wiki/MITAB25Format>`_,
+    `2.6 <https://code.google.com/p/psicquic/wiki/MITAB26Format>`_ and
+    `2.7 <https://code.google.com/p/psicquic/wiki/MITAB27Format>`_ of the
+    PSI-MI TAB standard.
 
-    :param basename: source basename, e.g. 'mint' or 'intact'.
-
-    *References*
-
-    .. [mitab25] https://code.google.com/p/psicquic/wiki/MITAB25Format
-    .. [mitab26] https://code.google.com/p/psicquic/wiki/MITAB26Format
-    .. [mitab27] https://code.google.com/p/psicquic/wiki/MITAB27Format
+    :param basename: source basename, e.g. ``mint`` or ``intact``.
     """
     def __init__(self, *args, **kwargs):
         super(PsiMiTabConverter, self).__init__(_FIELDS, "\t",

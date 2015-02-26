@@ -7,10 +7,10 @@ from ocelot.services import FASTA
 from rdflib import URIRef as U, BNode as B, Literal as L
 
 class SGDConverter(Converter):
-    """Converter for the Saccharomyces Genome Database[1].
+    """Converter for the `Saccharomyces Genome Database <http://www.yeastgenome.org/>`_.
     
-    The converter assumes that the `data` directory includes an `SGD` directory
-    with the following tab-separated files taken directly from the SGD website:
+    The converter assumes that the data directory includes an ``SGD`` directory
+    with the following tab-separated files taken directly from the SGD website::
     
       chromosome_length.tab         : not used
       dbxref.tab                    : DONE
@@ -25,10 +25,6 @@ class SGDConverter(Converter):
       SGD_CDS_xref.txt              : not used
 
     Please note that the interactions annotated in SGD are taken from BioGRID.
-    
-    *References*
-
-    [1] http://www.yeastgenome.org/
     """
     def __init__(self, *args, **kwargs):
         SUBTARGETS = (

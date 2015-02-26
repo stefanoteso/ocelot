@@ -11,17 +11,10 @@ import os
 # TODO: check that the number of objects is correct
 
 class Yip09Converter(Converter):
-    """Converter for the Yip et al.[1] dataset.
+    """Converter for the Yip et al. [Yip09]_ dataset.
 
-    The converter assumes that the `data` directory includes the `ppi`, `ddi`
-    and `rri` directories from the dataset hosted at [2].
-
-    *References*
-
-    [1] Yip, Kim, McDermott, Gerstein, "Multi-level learning: improving the
-    prediction of protein, domain and residue interactions by allowing
-    information flow between levels", BMC Bioinformatics, 2009.
-    [2] http://networks.gersteinlab.org/mll
+    The converter assumes that the ``yip09`` directory includes the ``ppi``,
+    ``ddi`` and ``rri`` directories from `here <http://networks.gersteinlab.org/mll>`_.
     """
     def __init__(self, *args, **kwargs):
         SUBTARGETS = (
