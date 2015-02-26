@@ -6,11 +6,8 @@
 Ocelot
 ======
 
-Introduction
-------------
-
-Ocelot is a framework for building predictors of protein function and
-interaction. It provides some python infrastructure to:
+Ocelot is a collection of scripts for building predictors of protein function
+and interaction. It provides some Python infrastructure to:
 
 #. Convert some databases into RDF format (though currently it does not
    make use of a formal TBox), serialized in turtle notation.
@@ -30,8 +27,7 @@ The current experiments are all based on Semantic Based Regularization
 License
 -------
 
-Ocelot is released under the XXX License. Components being used by Ocelot may
-have widely different licensing constraints.
+WRITEME
 
 Requirements
 ------------
@@ -49,56 +45,41 @@ Requirements
 Usage
 -----
 
-* Make sure all the requirements (packages and data) are there.
-* Run ``main.py make-rdf -s $PATH_TO_DB_DIR -d $PATH_TO_RDF_DIR``
-* Run ``main.py upload-rdf -s $PATH_TO_RDF_DIR``
-* Run ``main.py run-experiment -s $PATH_TO_DB_DIR -d $PATH_TO_RESULTS``
+First of all, make sure that all the `Requirements`_ are in place.
+
+Assuming that you want to run the ``yip09`` experiment, you'll first need to
+build the RDF dataset starting from the (various) database dumps. From the
+command line, run::
+
+    $ ./main.py make-rdf -s $PATH_TO_DATABASES -d rdf-data -t sgd,yip09
+
+This will take the ``SGD`` and ``yip09`` dumps, turn them into RDF triples,
+and place the result in the ``rdf-data`` directory.
+
+Now you should load the RDF data into your Virtuoso instance of choice, using
+your method of choice. Ocelot provides a shortcut for loading the data to a
+*local* Virtuoso instance via the ``isql`` command. This can be done as
+follows::
+
+    $ ./main.py upload-rdf -s rdf-data -g "http://ocelot-yip09-graph"
+
+where <http://ocelot-yip09-graph> is the RDF graph to be used.
+
+Now you can run the experiment by typing the following::
+
+    $ ./main.py run-experiment -s $PATH_TO_DATABASES -e "http://localhost:8890/sparql" -g "http://ocelot-yip09-graph"
+
+to run the actual experiment. The path to the database dumps should be provided
+here as well, since some data (e.g. the PSSM files and the microarray files) is
+not *actually* converted to RDF (and it would be pointless to do so).
 
 Authors
 -------
 
 - Stefano Teso (``name.surname _AT_ gmail.com``)
-- Luca Masera
-
-
-Contents
-========
-
-.. toctree::
-   :maxdepth: 2
-
-.. automodule:: ocelot.ontology
-    :members:
-.. automodule:: ocelot.converters.ipfam
-    :members:
-.. automodule:: ocelot.converters.pdb
-    :members:
-.. automodule:: ocelot.converters.psimi
-    :members:
-.. automodule:: ocelot.converters.sgd
-    :members:
-.. automodule:: ocelot.converters.sifts
-    :members:
-.. automodule:: ocelot.converters.string
-    :members:
-.. automodule:: ocelot.converters.yip09
-    :members:
-.. automodule:: ocelot.features
-    :members:
-.. automodule:: ocelot.kernels.base
-    :members:
-.. automodule:: ocelot.kernels.vector
-    :members:
-.. automodule:: ocelot.kernels.string
-    :members:
-.. automodule:: ocelot.kernels.graph
-    :members:
-.. automodule:: ocelot.experiments
-    :members:
-
 
 References
-==========
+----------
 
 .. [SRL] `<https://en.wikipedia.org/wiki/Statistical_relational_learning>`_
 
@@ -156,6 +137,55 @@ References
 
 .. [Kondor02] Kondor and Lafferty, *Diffusion Kernels on Graphs and Other
     Discrete Input Spaces*, 2002.
+
+
+Contents
+========
+
+.. toctree::
+   :maxdepth: 2
+
+**RDF**
+
+.. automodule:: ocelot.ontology
+    :members:
+
+**Converters**
+
+.. automodule:: ocelot.converters.ipfam
+    :members:
+.. automodule:: ocelot.converters.pdb
+    :members:
+.. automodule:: ocelot.converters.psimi
+    :members:
+.. automodule:: ocelot.converters.sgd
+    :members:
+.. automodule:: ocelot.converters.sifts
+    :members:
+.. automodule:: ocelot.converters.string
+    :members:
+.. automodule:: ocelot.converters.yip09
+    :members:
+
+**Features and Kernels**
+
+.. automodule:: ocelot.features
+    :members:
+.. automodule:: ocelot.kernels.base
+    :members:
+.. automodule:: ocelot.kernels.vector
+    :members:
+.. automodule:: ocelot.kernels.string
+    :members:
+.. automodule:: ocelot.kernels.graph
+    :members:
+
+**Experiments**
+
+.. automodule:: ocelot.experiments
+    :members:
+
+
 
 
 Indices and tables
