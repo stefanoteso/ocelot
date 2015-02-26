@@ -5,7 +5,7 @@ import numpy as np
 from .base import _Kernel
 
 class DiffusionKernel(_Kernel):
-    """The diffusion kernel between graph nodes [Kondor02]."""
+    """The diffusion kernel between graph nodes [Kondor02]_."""
     def __init__(self, adjmatrix, beta = 1.0, **kwargs):
         n, m = adjmatrix.shape
         assert n == m
