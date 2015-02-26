@@ -55,14 +55,9 @@ _COMPOSITION["?"] = _Info(*averages)
 class CompositionFeatures(object):
     """Per-residue composition features for a single peptide sequence.
 
+    The values are taken from [WikipediaAAa]_, [WikipediaAAb]_, [Swart04]_.
+
     :param targets: list of target composition features (strings).
-
-    *References*
-
-    .. [Compos1] https://en.wikipedia.org/wiki/Amino_acid
-    .. [Compos2] https://en.wikipedia.org/wiki/Proteinogenic_amino_acid
-    .. [Swart04] Swart, Snijders and van Duijnen, "Polarizabilities of amino
-        acid residues", 2004.
     """
     def __init__(self, targets = None):
         if targets == None:
@@ -92,17 +87,11 @@ class ComplexityFeatures(object):
     Measured by computing the Shannon entropy over one or more windows of
     residues.
 
-    XXX implement priors (pseudocounts).
+    Some useful references are [Wootton94]_, [Liao05]_, [Coletta10]_.
 
-    *References*
+    .. todo::
 
-    .. [Wootton94] Wootton J, "Sequences with unusual amino acid compositions",
-        1994.
-    .. [Liao05] Liao, Yeh, Chiang, Jernigan, Lustig, "Protein sequence entropy
-        is closely related to packing density and hydrophobicity", 2005.
-    .. [Coletta10] Coletta, Pinney, Weiss, Solís, Marsh, Pettifer, Attwood,
-        "Low-complexity regions within protein sequences have
-        position-dependent roles", 2010.
+        Implement priors.
     """
     def compute(self, sequence, window_sizes = [8,16,32,64,128], epsilon = 1e-10):
         from scipy.stats import entropy
@@ -143,34 +132,19 @@ class SequenceFeatures(object):
         return np.array([ np.mean(self.features.compute(sequence), axis = 0)
                           for sequence in sequences ])
 
-class SupFamFeatures(object):
-    """Superfamily domain features.
-
-    XXX requires UNIPROT IDs!
-
-    Adapted from an implementation by Luca Masera.
-    """
-    def compute(self, sequences):
-        pass
-
 class EmpiricalFeatures(object):
-    """The Empirical Kernel Map[1]
+    """The Empirical Kernel Map [Scholkopf99]_.
 
-    Given a set of fixed patterns `(z1, ..., zm)` and an input pattern `x`, the
-    empirical kernel map is defined as:
+    Given a fixed set of patterns :math:`(z_1, \\ldots, z_m)` and an input
+    pattern :math:`x`, the empirical kernel map is defined as:
 
     .. math::
 
-        phi(x) := (k(x,z1), ..., k(x,zm))
+        \\varphi(x) := (k(x,z_1), ..., k(x,z_m))
 
-    for any given sub-kernel k.
+    for any given sub-kernel :math:`k`.
 
     NOTE: patterns and indices refer to elements in the sub-kernel.
-
-    *References*
-
-    [1] Scholkopf et al., "Input Space Versus Feature Space in Kernel-Based
-        Methods", 1999.
     """
     def __init__(self, subkernel, patterns):
         self.subkernel = subkernel
