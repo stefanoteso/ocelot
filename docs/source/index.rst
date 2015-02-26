@@ -79,66 +79,6 @@ Authors
 
 - Stefano Teso (``name.surname _AT_ gmail.com``)
 
-References
-----------
-
-.. [SRL] `<https://en.wikipedia.org/wiki/Statistical_relational_learning>`_
-
-.. [Getoor07] Getoor and Taskar, *Introduction to Statistical Relational
-    Learning*, 2007, The MIT Press
-
-.. [DeRaedt08] De Raedt and Kersting, *Probabilistic inductive logic
-    programming*, 2008, Springer
-
-.. [Diligenti12] Diligenti et al., *Bridging Logic and Kernel Machines*, 2012,
-    Machine Learning
-
-.. [Sacca14] Sacca' et al., *Improved multi-level protein-protein interaction
-    prediction with Semantic-based Regularization*, 2014, BMC Bioinformatics
-
-.. [Virtuoso] `<http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/>`_
-
-**Yip et al. experiment**
-
-.. [Yip09] Yip, Kim, McDermott, Gerstein, *Multi-level learning: improving the
-    prediction of protein, domain and residue interactions by allowing
-    information flow between levels*, BMC Bioinformatics, 2009.
-
-**Yeast Datasets**
-
-.. [Ito00] Ito et al. *Toward a Protein-Protein Interaction Map of the Budding
-    Yeast: A Comprehensive System to Examine Two-Hybrid Interactions in All
-    Possible Combinations between the Yeast Proteins*, PNAS, 2000.
-
-.. [Uetz00] Uetz et al., *A Comprehensive Analysis of Protein-Protein
-    Interactions in Saccharomyces cerevisiae*, Nature, 2000.
-
-.. [Gavin06] Gavin et al., *Proteome Survey Reveals Modularity of the Yeast
-    Cell Machinery*, Nature, 2006.
-
-.. [Krogan06] Krogan et al., *Global Landscape of Protein Complexes in the
-    Yeast Saccharomyces cerevisiae*, Nature, 2006
-
-.. [Pu08] Pu et al., *Up-to-date catalogues of yeast protein complexes*, NAR
-    2008
-
-.. [Lee03] Lee and Sonnhammer, *Genomic gene clustering analysis of pathways in
-    eukaryotes*, 2003.
-
-**Kernels**
-
-.. [Leslie02a] Leslie et al., *The spectrum kernel: A string kernel for SVM
-    protein classification*, 2002.
-
-.. [Leslie02b] Leslie et al., *Mismatch String Kernels for SVM Protein
-    Classification*, 2002.
-
-.. [Kuang04] Kuang et al., *Profile-based string kernels for remote homology
-    detection and motif extraction*, 2004.
-
-.. [Kondor02] Kondor and Lafferty, *Diffusion Kernels on Graphs and Other
-    Discrete Input Spaces*, 2002.
-
 
 Contents
 ========
@@ -192,6 +132,85 @@ Contents
     :members:
 
 
+References
+==========
+
+**Machine Learning**
+
+.. [SRL] `<https://en.wikipedia.org/wiki/Statistical_relational_learning>`_
+
+.. [Getoor07] Getoor and Taskar, *Introduction to Statistical Relational
+    Learning*, 2007, The MIT Press
+
+.. [DeRaedt08] De Raedt and Kersting, *Probabilistic inductive logic
+    programming*, 2008, Springer
+
+.. [Diligenti12] Diligenti et al., *Bridging Logic and Kernel Machines*, 2012,
+    Machine Learning
+
+.. [Sacca14] Sacca' et al., *Improved multi-level protein-protein interaction
+    prediction with Semantic-based Regularization*, 2014, BMC Bioinformatics
+
+.. [Virtuoso] `<http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/>`_
+
+**Features**
+
+.. [WikipediaAAa] https://en.wikipedia.org/wiki/Amino_acid
+
+.. [WikipediaAAb] https://en.wikipedia.org/wiki/Proteinogenic_amino_acid
+
+.. [Swart04] Swart et al., *Polarizabilities of amino acid residues*, 2004.
+
+.. [Wootton94] Wootton, *Sequences with unusual amino acid compositions*,
+    1994.
+
+.. [Liao05] Liao et al., *Protein sequence entropy is closely related to
+    packing density and hydrophobicity*, 2005.
+
+.. [Coletta10] Coletta et al., *Low-complexity regions within protein sequences
+    have position-dependent roles*, 2010.
+
+.. [Scholkopf99] Scholkopf et al., *Input Space Versus Feature Space in
+    Kernel-Based Methods*, 1999.
+
+**Kernels**
+
+.. [Leslie02a] Leslie et al., *The spectrum kernel: A string kernel for SVM
+    protein classification*, 2002.
+
+.. [Leslie02b] Leslie et al., *Mismatch String Kernels for SVM Protein
+    Classification*, 2002.
+
+.. [Kuang04] Kuang et al., *Profile-based string kernels for remote homology
+    detection and motif extraction*, 2004.
+
+.. [Kondor02] Kondor and Lafferty, *Diffusion Kernels on Graphs and Other
+    Discrete Input Spaces*, 2002.
+
+**Yip09/Yeast Experiments**
+
+.. [Yip09] Yip, Kim, McDermott, Gerstein, *Multi-level learning: improving the
+    prediction of protein, domain and residue interactions by allowing
+    information flow between levels*, BMC Bioinformatics, 2009.
+
+.. [Ito00] Ito et al. *Toward a Protein-Protein Interaction Map of the Budding
+    Yeast: A Comprehensive System to Examine Two-Hybrid Interactions in All
+    Possible Combinations between the Yeast Proteins*, PNAS, 2000.
+
+.. [Uetz00] Uetz et al., *A Comprehensive Analysis of Protein-Protein
+    Interactions in Saccharomyces cerevisiae*, Nature, 2000.
+
+.. [Gavin06] Gavin et al., *Proteome Survey Reveals Modularity of the Yeast
+    Cell Machinery*, Nature, 2006.
+
+.. [Krogan06] Krogan et al., *Global Landscape of Protein Complexes in the
+    Yeast Saccharomyces cerevisiae*, Nature, 2006
+
+.. [Pu08] Pu et al., *Up-to-date catalogues of yeast protein complexes*, NAR
+    2008
+
+.. [Lee03] Lee and Sonnhammer, *Genomic gene clustering analysis of pathways in
+    eukaryotes*, 2003.
 
 
 Indices and tables
