@@ -41,6 +41,7 @@ def iterate_csv(path, num_skip = 0, **kwargs):
             yield row_as_dict
 
 class Binary(object):
+    """A simple wrapper around binary executables."""
     def __init__(self, path):
         self.path = path
     def run(self, args, shell = True):
@@ -58,9 +59,10 @@ class FASTA(object):
     def read(self, path):
         """Reads the contents of a fasta file.
 
-        It generates pairs of the form `header, sequence`.
+        :param path: path to the FASTA file to be read.
+        :returns: pairs of the form ``(header, sequence)``, as a generator.
 
-        It strips `*` end-of-sequence symbols from the end of the
+        Note that it strips ``*`` end-of-sequence symbols from the end of the
         sequence."""
         with open(path, "rt") as fp:
             header = None
@@ -79,7 +81,11 @@ class FASTA(object):
                     sequence += line
             yield header, sequence.rstrip("*")
     def write(self, path, data):
-        """Writes a fasta file out of a `header->sequence` dictionary."""
+        """Writes a FASTA file.
+
+        :param path: path to the FASTA file to be written.
+        :param data: a list of ``(header, sequence)`` pairs.
+        """
         with open(path, "wt") as fp:
             for header, sequence in data:
                 fp.write("{}\n{}\n".format(header, sequence))
@@ -120,22 +126,18 @@ class PSSM(object):
         return info
 
 class PCL(object):
-    """Reads a Stanford PCL gene expression file.
+    """Reads a `PCL <http://smd.princeton.edu/help/formats.shtml#pcl>`_ gene expression file.
 
     The file is simply a TSV where the first three columns are fixed,
     followed by a variable number of columns (one per condition).
 
     :param path: path to the PCL file.
+    :returns: a ``name`` to ``expression levels`` dictionary.
 
-    XXX we use the NAME column rather than the YORF column, as the NAME's
-    are unique in our files while the YORFs are not. No idea why, really.
-
-    XXX we also ignore the GWEIGHT, its value seems rather arbitrary
+    Note that it uses the ``NAME`` column (rather than the ``YORF`` column) as
+    key to the dictionary, as ``NAME``'s tend to be unique while ``YORF``s are
+    not. We also ignore the ``GWEIGHT``, its value seems rather arbitrary
     anyway.
-
-    *References*
-
-    .. [PCL] http://smd.princeton.edu/help/formats.shtml#pcl
     """
     def read(self, path):
         import numpy as np
@@ -158,17 +160,14 @@ class PCL(object):
         return orf_to_expression, num_conditions
 
 class InterProTSV(object):
-    """Reads the InterPro [interpro]_ tab-separated values files.
+    """Reader for `InterPro <http://www.ebi.ac.uk/interpro/>`_ tab-separated values files.
 
-    The TSV files can be obtained with ``iprscan5_*.py`` or similar tools.
+    The TSV files can be obtained with ``iprscan5_*.py`` or similar tools,
+    which can be found `here <http://www.ebi.ac.uk/Tools/webservices/services/pfa/iprscan5_rest>`_.
 
     .. todo::
 
         We should really integrate the ``iprscan5_*.py`` functionality here.
-
-    *References*
-
-    .. [InterPro] `InterPro: protein sequence analysis & classification <http://www.ebi.ac.uk/interpro/>`_
     """
     def read(self, path, allowed_sources = None):
         """
@@ -197,18 +196,15 @@ class InterProTSV(object):
 class PsiBlast(object):
     """A simple wrapper around NCBI PSI-Blast.
 
-    NOTE: the database should be located in the path specified by either the
-    `BLASTDB` environment variable or by the `~/.ncbirc` INI file[1].
+    The blast database should be located in the path specified by either the
+    ``BLASTDB`` environment variable or by the ``~/.ncbirc`` file (see
+    `here <http://www.ncbi.nlm.nih.gov/books/NBK52640/>`_ for more information).
 
     :param db: database name, e.g. `nr`.
     :param evalue: E-value as a string.
     :param matrix: similarity matrix to use.
     :param num_iterations: number of BLAST iterations, minimum 2.
     :param num_threads: number of CPU threads to use.
-
-    *References*
-
-    [1] http://www.ncbi.nlm.nih.gov/books/NBK52640/
     """
     def __init__(self, cache = "/tmp/psiblast", **kwargs):
         for k in kwargs:
@@ -261,18 +257,18 @@ class PsiBlast(object):
             print e
         return PSSM(basename + ".pssm")
 
-class BlastSeqSim(object):
-    """
-    Uses blastall to compute pairwise sequence similarity.
-    """
-
-    def __init__(self, db, binpath = "/usr/bin/legacy_blast blastall", **kwargs):
-        self.blastall = Binary(binpath)
-        self.db = db
-
-    def run(self, sequences):
-        fasta = FASTA()
-        fasta.write("temp.fasta", sequences)
+# class BlastSeqSim(object):
+#     """
+#     Uses blastall to compute pairwise sequence similarity.
+#     """
+# 
+#     def __init__(self, db, binpath = "/usr/bin/legacy_blast blastall", **kwargs):
+#         self.blastall = Binary(binpath)
+#         self.db = db
+# 
+#     def run(self, sequences):
+#         fasta = FASTA()
+#         fasta.write("temp.fasta", sequences)
 
 #class DSSP(object):
 #    """Handles DSSP services.
