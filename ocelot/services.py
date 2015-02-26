@@ -102,7 +102,7 @@ class PSSM(object):
         result = [ None for _ in xrange(20) ]
         for i, symbol in enumerate(PSSM._ALPHABET):
             result[AMINOACIDS.index(symbol)] = elements[i]
-        return tuple(result)
+        return result
 
     def read(self, path):
         with open(path, "rt") as fp:
@@ -123,7 +123,7 @@ class PSSM(object):
             obsperc = []
             for i in xrange(20):
                 obsperc.append(float(line[70+i*4:70+i*4+4].strip()) / 100.0)
-            info.append((residue, self._shuffle(obsperc)))
+            info.append([residue, self._shuffle(obsperc)])
         return info
 
 class PCL(object):
