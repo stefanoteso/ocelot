@@ -1,7 +1,7 @@
 # -*- coding: utf8 -*-
 
 import numpy as np
-from ocelot.services import AMINOACIDS, BACKGROUND_AA_FREQ, PSSM
+from ocelot.services import AMINOACIDS
 
 from .base import _Kernel
 
@@ -11,14 +11,13 @@ class _RecursivePrefixStringKernel(_Kernel):
     Used to implement the spectrum, mismatch and profile kernels. Adapted from
     `<http://cbio.mskcc.org/leslielab/software/string_kernels.html>`_.
 
-    Note that more efficient, non-recursive implementations are possible. See
-    for instance the `fastprof <https://rostlab.org/owiki/index.php/Fastprofkernel>`_
-    kernel.
+    The matrix update mechanism has been taken from
+    `fastprof <https://rostlab.org/owiki/index.php/Fastprofkernel>`_.
 
     :param strings: a list of strings.
     :param k: kmer size, inclusive (default: 1).
     :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param min_instances_per_node: minimum number of instances to proceed lower
+    :param min_survivors_per_node: minimum number of instances to proceed lower
         within the prefix tree (default: 1)
 
     .. todo::
@@ -30,6 +29,9 @@ class _RecursivePrefixStringKernel(_Kernel):
         filtering them out like we do here, and storing the number of hops
         survived in the instances themselves, then adding a check in _update.
         However this is **very** slow.
+
+        An alternative is to update the matrix when all child nodes have
+        been considered.
     """
     def __init__(self, strings, **kwargs):
         super(_RecursivePrefixStringKernel, self).__init__(strings, **kwargs)
@@ -37,50 +39,78 @@ class _RecursivePrefixStringKernel(_Kernel):
         if not self._k >= 1:
             raise ValueError("k must be >= 1")
         self._alphabet = kwargs.get("alphabet", AMINOACIDS)
-        self._min_instances_per_node = kwargs.get("min_instances_per_node", 1)
-        if not self._min_instances_per_node >= 1:
-            raise ValueError("min_instances_per_node must be >= 1")
+        self._min_survivors_per_node = kwargs.get("min_survivors_per_node", 1)
+        if not self._min_survivors_per_node >= 1:
+            raise ValueError("min_survivors_per_node must be >= 1")
+        self._survivors = []
+        # Precompute a couple things
+        self._index_symbol_pairs = list(enumerate(self._alphabet))
 
-    def _update(self, matrix, instances):
-        """Called when a leaf of the prefix tree is visited. Updates the kernel
-        matrix based on the instances that managed to not-be filtered out."""
-        raise NotImplementedError
+    def _add_survivors(self, instances):
+        for instance_i in instances:
+            i = instance_i[0]
+            for instance_j in instances:
+                j = instance_j[0]
+                self._matrix[i,j] += 1
 
-    def _recurse(self, matrix, instances, depth, prefix):
+#    def _add_survivors(self, instances, leaf):
+#        """Called upon visiting a leaf of the prefix tree. Appends the list of
+#        survivors with the surviving instances."""
+#        raise NotImplementedError
+#
+#        for i in xrange(self._entities):
+#            self._survivors.append((i, leaf, len(filter(lambda instance: instance[0] == i, instances))))
+#        if len(self._survivors) >= self._max_survivors_per_flush:
+#            self._survivors = []
+
+    def _recurse(self, instances, depth, prefix):
         """Depth-first traversal of the prefix-tree."""
         if depth == self._k:
-            self._update(matrix, instances)
+            self._add_survivors(instances)
         else:
-            for symbol in self._alphabet:
+            for s, symbol in self._index_symbol_pairs:
                 # Filter out all instances that do not pass the check at the
                 # current node 
-                filtered_instances = []
+                survivors = []
                 for instance in instances:
-                    new_instance, check = self._check_instance(instance, symbol, depth)
+                    new_instance, check = self._check_instance(instance, s, symbol, depth)
                     if check:
-                        filtered_instances.append(new_instance)
+                        survivors.append(new_instance)
                 # If there are no instances left, there is nothing else to do
-                if len(filtered_instances) < self._min_instances_per_node:
+                if len(survivors) < self._min_survivors_per_node:
                     continue
-                self._recurse(matrix, filtered_instances, depth + 1, prefix + symbol)
-                del filtered_instances
+                # Process the child nodes
+                self._recurse(survivors, depth + 1, prefix + symbol)
+                # Get rid of the list of survivors
+                del survivors
+
+    def _to_instance(self, i, offset):
+        """Given an element index and an offest, returns an instance (i.e.
+        the k-mer indices optionally associated to additional information).
+
+        **Note**: the first element of an instance **must** be the index of
+        the pssm it refers to! The ``_add_survivors`` method relies on it.
+        """
+        raise NotImplementedError
 
     def _get_instances(self):
         """Turns the input strings into instances, i.e. k-mers plus additional
-        information."""
+        information.
+        """
         instances = []
         for i, string in enumerate(self._entities):
             if len(string) < self._k:
                 raise ValueError("string shorter than k")
-            instances.extend([self._substring_to_instance(i, offset)
+            instances.extend([self._to_instance(i, offset)
                               for offset in xrange(len(string) - self._k + 1)])
         return instances
 
     def _compute_all(self):
-        matrix = np.zeros((len(self), len(self)))
+        self._matrix = np.zeros((len(self), len(self)))
         self._instances = self._get_instances()
-        self._recurse(matrix, self._instances, 0, "")
-        return matrix
+        self._recurse(self._instances, 0, "")
+        self._add_survivors([], -1)
+        return self._matrix
 
 class SpectrumKernel(_RecursivePrefixStringKernel):
     """The spectrum kernel for strings [Leslie02a]_.
@@ -88,20 +118,15 @@ class SpectrumKernel(_RecursivePrefixStringKernel):
     :param strings: a list of strings.
     :param k: kmer size, inclusive (default: 1).
     :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param min_instances_per_node: minimum number of instances to proceed lower
+    :param min_survivors_per_node: minimum number of instances to proceed lower
         within the prefix tree (default: 1)
     """
-    def _update(self, matrix, instances):
-        for i, _ in instances:
-            for j, _ in instances:
-                matrix[i,j] += 1
-
-    def _check_instance(self, instance, symbol, depth):
+    def _check_instance(self, instance, _, symbol, depth):
         i, offset = instance
         string_symbol = self._entities[i][offset + depth]
         return instance, string_symbol == symbol
 
-    def _substring_to_instance(self, i, offset):
+    def _to_instance(self, i, offset):
         return (i, offset)
 
 class MismatchKernel(_RecursivePrefixStringKernel):
@@ -111,7 +136,7 @@ class MismatchKernel(_RecursivePrefixStringKernel):
     :param k: kmer size, inclusive (default: 1).
     :param m: maximum number of mismatches (default: 0).
     :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param min_instances_per_node: minimum number of instances to proceed lower
+    :param min_survivors_per_node: minimum number of instances to proceed lower
         within the prefix tree (default: 1)
     """
     def __init__(self, strings, **kwargs):
@@ -120,12 +145,7 @@ class MismatchKernel(_RecursivePrefixStringKernel):
         if not self._m >= 0:
             raise ValueError("m must be >= 0")
 
-    def _update(self, matrix, instances):
-        for i, _, _ in instances:
-            for j, _, _ in instances:
-                matrix[i,j] += 1
-
-    def _check_instance(self, instance, symbol, depth):
+    def _check_instance(self, instance, _, symbol, depth):
         i, offset, num_mismatches = instance
         string_symbol = self._entities[i][offset + depth]
         if string_symbol != symbol:
@@ -133,68 +153,34 @@ class MismatchKernel(_RecursivePrefixStringKernel):
         new_instance = (i, offset, num_mismatches)
         return new_instance, num_mismatches <= self._m
 
-    def _substring_to_instance(self, i, offset):
+    def _to_instance(self, i, offset):
+        # The third element is the number of mismatches survived so far
         return (i, offset, 0)
 
 class ProfileKernel(_RecursivePrefixStringKernel):
     """Implementation of the PSSM-based string kernel [Kuang04]_.
 
-    **Warning**: the contents of the input PSSMs will be clobbered!
-
-    :param pssms: list of PSSM matrices.
+    :param pssms: list of PSSMs of the form ``(residue, transp_score)''.
     :param k: kmer size, inclusive (default: 1).
-    :param threshold: threshold mutation probability to count as a hit (default: 6.0)
+    :param threshold: threshold mutation probability to count as a hit
+        (default: 6.0)
     :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param gamma: amount of smoothing-by-prior (default: 0.8).
-    :param prior: list of priors on amino acid probabilities (default: BACKGROUND_AA_FREQ)
-    :param min_instances_per_node: minimum number of instances to proceed lower
+    :param min_survivors_per_node: minimum number of instances to proceed lower
         within the prefix tree (default: 1)
     """
     def __init__(self, pssms, **kwargs):
         super(ProfileKernel, self).__init__(pssms, **kwargs)
         self._threshold = kwargs.get("threshold", 6.0)
-        self._gamma = kwargs.get("gamma", 0.8)
-        if not (0.0 <= self._gamma <= 1.0):
-            raise ValueError("gamma must be in [0.0, 1.0]")
-        self._prior = kwargs.get("prior", BACKGROUND_AA_FREQ)
 
-        # We convert the PSSM transition probabilities into transition scores
-        # by (i) smoothing the observed transition probabilities given by the
-        # PSSM by some background frequency prior, and (ii) taking the negative
-        # log of the resulting mixture.
-        map(self._to_scores, self._entities)
-
-    def _to_scores(self, pssm):
-        for i in xrange(len(pssm)):
-            _, transition_prob = pssm[i]
-            for j in xrange(len(self._alphabet)):
-                p1 = transition_prob[j]
-                p2 = self._prior[j]
-                p = self._gamma * p1 + (1 - self._gamma) * p2
-                assert 0.0 <= p <= 1.0
-                if p == 0.0:
-                    # XXX some huge value
-                    score = 1e13
-                else:
-                    score = -np.log(p)
-                assert score >= 0.0
-                transition_prob[j] = score
-
-    def _update(self, matrix, instances):
-        for i, _, _ in instances:
-            for j, _, _ in instances:
-                matrix[i, j] += 1
-
-    def _check_instance(self, instance, symbol, depth):
+    def _check_instance(self, instance, j, _, depth):
         i, offset, score = instance
-        j = self._alphabet.index(symbol)
-        transition_score = score + self._entities[i][offset + depth][1][j]
-        new_instance = (i, offset, transition_score)
         # Recall that more likely means (i) probability closer to 1, but (ii)
         # score (= neg log of probability) closer to 0. So to capture the most
-        # likely mutant k-mers we want the total score not to be increase too
-        # much.
-        return new_instance, transition_score <= self._threshold
+        # likely mutant k-mers we want the total score not to increase too
+        # much, and more specifically to remain below a threshold.
+        score += self._entities[i][offset + depth][1][j]
+        return (i, offset, score), score <= self._threshold
 
-    def _substring_to_instance(self, i, offset):
+    def _to_instance(self, i, offset):
+        # The third element is the total score of the mutations so far
         return (i, offset, 0.0)
