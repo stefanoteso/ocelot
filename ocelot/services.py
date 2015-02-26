@@ -115,7 +115,8 @@ class PSSM(object):
             position = int(line[0:5].strip()) - 1
             if old_position:
                 assert position == (old_position + 1), "watch your PSSMs"
-            residue  = line[5:7].strip()
+            old_position = position
+            residue = line[5:7].strip()
             data = []
             for i in xrange(20):
                 data.append(float(line[9+i*3:9+i*3+3].strip()))
