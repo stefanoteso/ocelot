@@ -139,6 +139,8 @@ class MismatchKernel(_RecursivePrefixStringKernel):
 class ProfileKernel(_RecursivePrefixStringKernel):
     """Implementation of the PSSM-based string kernel [Kuang04]_.
 
+    **Warning**: the contents of the input PSSMs will be clobbered!
+
     :param pssms: list of PSSM matrices.
     :param k: kmer size, inclusive (default: 1).
     :param threshold: threshold mutation probability to count as a hit (default: 6.0)
