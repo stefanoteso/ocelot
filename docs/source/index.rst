@@ -86,17 +86,20 @@ Contents
 .. toctree::
    :maxdepth: 2
 
-**RDF**
+RDF
+---
 
 .. automodule:: ocelot.ontology
     :members:
 
-**Services**
+Services
+--------
 
 .. automodule:: ocelot.services
     :members:
 
-**Converters**
+Converters
+----------
 
 .. automodule:: ocelot.converters.ipfam
     :members:
@@ -113,7 +116,8 @@ Contents
 .. automodule:: ocelot.converters.yip09
     :members:
 
-**Features and Kernels**
+Features and Kernels
+--------------------
 
 .. automodule:: ocelot.features
     :members:
@@ -126,16 +130,18 @@ Contents
 .. automodule:: ocelot.kernels.graph
     :members:
 
-**Experiments**
+Experiments
+-----------
 
-.. automodule:: ocelot.experiments
+.. automodule:: ocelot.experiments.yip09
     :members:
 
 
 References
 ==========
 
-**Machine Learning**
+Machine Learning
+----------------
 
 .. [SRL] `<https://en.wikipedia.org/wiki/Statistical_relational_learning>`_
 
@@ -153,7 +159,8 @@ References
 
 .. [Virtuoso] `<http://virtuoso.openlinksw.com/dataspace/doc/dav/wiki/Main/>`_
 
-**Features**
+Features
+--------
 
 .. [WikipediaAAa] https://en.wikipedia.org/wiki/Amino_acid
 
@@ -173,7 +180,8 @@ References
 .. [Scholkopf99] Scholkopf et al., *Input Space Versus Feature Space in
     Kernel-Based Methods*, 1999.
 
-**Kernels**
+Kernels
+-------
 
 .. [Leslie02a] Leslie et al., *The spectrum kernel: A string kernel for SVM
     protein classification*, 2002.
@@ -187,7 +195,8 @@ References
 .. [Kondor02] Kondor and Lafferty, *Diffusion Kernels on Graphs and Other
     Discrete Input Spaces*, 2002.
 
-**Yip09/Yeast Experiments**
+Yip09/Yeast Experiments
+-----------------------
 
 .. [Yip09] Yip, Kim, McDermott, Gerstein, *Multi-level learning: improving the
     prediction of protein, domain and residue interactions by allowing
