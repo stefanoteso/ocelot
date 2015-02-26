@@ -141,16 +141,16 @@ class ProfileKernel(_RecursivePrefixStringKernel):
 
     :param pssms: list of PSSM matrices.
     :param k: kmer size, inclusive (default: 1).
-    :param threshold: threshold mutation probability to count as a hit (default: 0.0)
+    :param threshold: threshold mutation probability to count as a hit (default: 6.0)
     :param alphabet: list of valid symbols (default: AMINOACIDS).
     :param gamma: amount of smoothing-by-prior (default: 0.8).
     :param prior: list of priors on amino acid probabilities (default: BACKGROUND_AA_FREQ)
     :param min_instances_per_node: minimum number of instances to proceed lower
         within the prefix tree (default: 1)
     """
-    def __init__(self, strings, **kwargs):
-        super(ProfileKernel, self).__init__(strings, **kwargs)
-        self._threshold = kwargs.get("threshold", 0.0)
+    def __init__(self, pssms, **kwargs):
+        super(ProfileKernel, self).__init__(pssms, **kwargs)
+        self._threshold = kwargs.get("threshold", 6.0)
         self._gamma = kwargs.get("gamma", 0.8)
         if not (0.0 <= self._gamma <= 1.0):
             raise ValueError("gamma must be in [0.0, 1.0]")
@@ -160,23 +160,27 @@ class ProfileKernel(_RecursivePrefixStringKernel):
         # by (i) smoothing the observed transition probabilities given by the
         # PSSM by some background frequency prior, and (ii) taking the negative
         # log of the resulting mixture.
-        self._scores = []
-        for i, (in_aminoacid, transition_prob) in enumerate(self._entities):
-            scores = []
-            for j in out_aminoacid in enumerate(self._alphabet):
-                p1 = transition_prob[PSSM.alphabet.index(out_aminoacid)]
+        self._scores = map(self._to_scores, pssms)
+
+    def _to_scores(self, pssm):
+        scores = []
+        for i, (in_aminoacid, transition_prob) in enumerate(pssm):
+            row = []
+            for j, out_aminoacid in enumerate(self._alphabet):
+                p1 = transition_prob[j]
                 p2 = self._prior[out_aminoacid]
                 p = self._gamma * p1 + (1 - self._gamma) * p2
                 assert 0.0 <= p <= 1.0
                 if p == 0.0:
                     # XXX some huge value
-                    scores.append(1e13)
+                    row.append(1e13)
                 else:
-                    scores.append(-np.log(p))
-                assert scores[-1] >= 0.0
-            self._scores.append(scores)
+                    row.append(-np.log(p))
+                assert row[-1] >= 0.0
+            scores.append(row)
+        return scores
 
-    def _update(self, matrix, instances, prefix):
+    def _update(self, matrix, instances):
         for i, _, _ in instances:
             for j, _, _ in instances:
                 matrix[i, j] += 1
@@ -190,7 +194,7 @@ class ProfileKernel(_RecursivePrefixStringKernel):
         # score (= neg log of probability) closer to 0. So to capture the most
         # likely mutant k-mers we want the total score not to be increase too
         # much.
-        return new_instance, transition_score <= threshold
+        return new_instance, transition_score <= self._threshold
 
     def _substring_to_instance(self, i, offset):
         return (i, offset, 0.0)
