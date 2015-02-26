@@ -160,12 +160,11 @@ class ProfileKernel(_RecursivePrefixStringKernel):
         # by (i) smoothing the observed transition probabilities given by the
         # PSSM by some background frequency prior, and (ii) taking the negative
         # log of the resulting mixture.
-        self._scores = map(self._to_scores, pssms)
+        map(self._to_scores, self._entities)
 
     def _to_scores(self, pssm):
-        scores = []
-        for i, (in_aminoacid, transition_prob) in enumerate(pssm):
-            row = []
+        for i in xrange(len(pssm)):
+            in_aminoacid, transition_prob = pssm[i]
             for j, out_aminoacid in enumerate(self._alphabet):
                 p1 = transition_prob[j]
                 p2 = self._prior[out_aminoacid]
@@ -173,12 +172,11 @@ class ProfileKernel(_RecursivePrefixStringKernel):
                 assert 0.0 <= p <= 1.0
                 if p == 0.0:
                     # XXX some huge value
-                    row.append(1e13)
+                    score = 1e13
                 else:
-                    row.append(-np.log(p))
-                assert row[-1] >= 0.0
-            scores.append(row)
-        return scores
+                    score = -np.log(p)
+                assert score >= 0.0
+                transition_prob[j] = score
 
     def _update(self, matrix, instances):
         for i, _, _ in instances:
@@ -188,7 +186,7 @@ class ProfileKernel(_RecursivePrefixStringKernel):
     def _check_instance(self, instance, symbol, depth):
         i, offset, score = instance
         j = self._alphabet.index(symbol)
-        transition_score = score + self._scores[i][offset + depth][j]
+        transition_score = score + self._entities[i][offset + depth][1][j]
         new_instance = (i, offset, transition_score)
         # Recall that more likely means (i) probability closer to 1, but (ii)
         # score (= neg log of probability) closer to 0. So to capture the most
