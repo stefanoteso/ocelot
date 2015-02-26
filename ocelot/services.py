@@ -100,7 +100,7 @@ class PSSM(object):
     def _shuffle(self, elements):
         assert len(elements) == 20
         result = [ None for _ in xrange(20) ]
-        for i, symbol in PSSM._ALPHABET:
+        for i, symbol in enumerate(PSSM._ALPHABET):
             result[AMINOACIDS.index(symbol)] = elements[i]
         return tuple(result)
 
