@@ -164,10 +164,10 @@ class ProfileKernel(_RecursivePrefixStringKernel):
 
     def _to_scores(self, pssm):
         for i in xrange(len(pssm)):
-            in_aminoacid, transition_prob = pssm[i]
-            for j, out_aminoacid in enumerate(self._alphabet):
+            _, transition_prob = pssm[i]
+            for j in xrange(len(self._alphabet)):
                 p1 = transition_prob[j]
-                p2 = self._prior[out_aminoacid]
+                p2 = self._prior[j]
                 p = self._gamma * p1 + (1 - self._gamma) * p2
                 assert 0.0 <= p <= 1.0
                 if p == 0.0:
