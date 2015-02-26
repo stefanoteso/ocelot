@@ -63,15 +63,16 @@ follows::
 
     $ ./main.py upload-rdf -s rdf-data -g "http://ocelot-yip09-graph"
 
-where <http://ocelot-yip09-graph> is the RDF graph to be used.
+where ``http://ocelot-yip09-graph`` is the RDF graph to be used.
 
 Now you can run the experiment by typing the following::
 
     $ ./main.py run-experiment -s $PATH_TO_DATABASES -e "http://localhost:8890/sparql" -g "http://ocelot-yip09-graph"
 
-to run the actual experiment. The path to the database dumps should be provided
-here as well, since some data (e.g. the PSSM files and the microarray files) is
-not *actually* converted to RDF (and it would be pointless to do so).
+where ``http://localhost:8890/sparql`` is the URI of the SPARQL endpoint of
+your Virtuoso instance. The path to the database dumps should be provided here
+as well, since some data (e.g. the PSSM files and the microarray files) is
+*not* actually converted to RDF (and it would be pointless to do so).
 
 Authors
 -------
@@ -148,6 +149,11 @@ Contents
 **RDF**
 
 .. automodule:: ocelot.ontology
+    :members:
+
+**Services**
+
+.. automodule:: ocelot.services
     :members:
 
 **Converters**
