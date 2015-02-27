@@ -1,9 +1,12 @@
 # -*- coding: utf8 -*-
 
 import numpy as np
+from scipy import sparse
 from ocelot.services import AMINOACIDS
 
 from .base import _Kernel
+
+MAX_SURVIVORS_PER_FLUSH = 65536
 
 class _RecursivePrefixStringKernel(_Kernel):
     """Base prefix-tree string kernel implemented using recursion.
@@ -42,29 +45,39 @@ class _RecursivePrefixStringKernel(_Kernel):
         self._min_survivors_per_node = kwargs.get("min_survivors_per_node", 1)
         if not self._min_survivors_per_node >= 1:
             raise ValueError("min_survivors_per_node must be >= 1")
-        self._survivors = []
+        # Used for the delayed-update optimization
+        self._survivors_rows, self._survivors_cols, self._survivors_counts = \
+            [], [], []
         # Precompute a couple things
+        self._num_nodes = len(self._alphabet)**(self._k + 1) - 1
         self._index_symbol_pairs = list(enumerate(self._alphabet))
 
+    def _flush_survivors(self):
+        assert len(self._survivors_rows) == len(self._survivors_counts) and \
+               len(self._survivors_cols) == len(self._survivors_counts)
+        v = sparse.coo_matrix((self._survivors_counts,
+                               (self._survivors_rows, self._survivors_cols)),
+                              shape = (len(self._entities), self._num_nodes)).tocsr()
+        self._matrix += v * v.T
+        self._survivors_rows, self._survivors_cols, self._survivors_counts = \
+            [], [], []
+
     def _add_survivors(self, instances):
-        for instance_i in instances:
-            i = instance_i[0]
-            for instance_j in instances:
-                j = instance_j[0]
-                self._matrix[i,j] += 1
+        """Called upon visiting a leaf of the prefix tree. Appends the list of
+        survivors with the surviving instances."""
+        for i in xrange(len(self._entities)):
+            count = sum(1 for instance in instances if instance[0] == i)
+            if count > 0:
+                self._survivors_rows.append(i)
+                self._survivors_cols.append(self._node_counter)
+                self._survivors_counts.append(count)
+        if len(self._survivors_counts) > MAX_SURVIVORS_PER_FLUSH:
+            self._flush_survivors()
 
-#    def _add_survivors(self, instances, leaf):
-#        """Called upon visiting a leaf of the prefix tree. Appends the list of
-#        survivors with the surviving instances."""
-#        raise NotImplementedError
-#
-#        for i in xrange(self._entities):
-#            self._survivors.append((i, leaf, len(filter(lambda instance: instance[0] == i, instances))))
-#        if len(self._survivors) >= self._max_survivors_per_flush:
-#            self._survivors = []
-
-    def _recurse(self, instances, depth, prefix):
+    def _recurse(self, instances, depth):
         """Depth-first traversal of the prefix-tree."""
+        assert 0 <= depth <= self._k
+        self._node_counter += 1
         if depth == self._k:
             self._add_survivors(instances)
         else:
@@ -73,14 +86,15 @@ class _RecursivePrefixStringKernel(_Kernel):
                 # current node 
                 survivors = []
                 for instance in instances:
-                    new_instance, check = self._check_instance(instance, s, symbol, depth)
+                    new_instance, check = \
+                        self._check_instance(instance, s, symbol, depth)
                     if check:
                         survivors.append(new_instance)
                 # If there are no instances left, there is nothing else to do
                 if len(survivors) < self._min_survivors_per_node:
                     continue
                 # Process the child nodes
-                self._recurse(survivors, depth + 1, prefix + symbol)
+                self._recurse(survivors, depth + 1)
                 # Get rid of the list of survivors
                 del survivors
 
@@ -108,8 +122,9 @@ class _RecursivePrefixStringKernel(_Kernel):
     def _compute_all(self):
         self._matrix = np.zeros((len(self), len(self)))
         self._instances = self._get_instances()
-        self._recurse(self._instances, 0, "")
-        self._add_survivors([], -1)
+        self._node_counter = 0
+        self._recurse(self._instances, 0)
+        self._flush_survivors()
         return self._matrix
 
 class SpectrumKernel(_RecursivePrefixStringKernel):
