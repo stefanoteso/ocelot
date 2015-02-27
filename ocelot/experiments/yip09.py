@@ -3,6 +3,7 @@
 from .base import _Experiment
 
 import os
+import numpy as np
 import ocelot.ontology as O
 from ocelot.services import _cls, iterate_csv
 from ocelot.features import *
@@ -124,10 +125,7 @@ class YipExperiment(_Experiment):
     def _get_microarray_kernel(self, p_to_i, which = None):
         """Returns a kernel for gene expression.
 
-        The data can be obtained `here`_.
-
-        .. _here: ftp://downloads.yeastgenome.org/expression/microarray/all_spell_exprconn_pcl.tar.gz
-
+        The data can be obtained `here <ftp://downloads.yeastgenome.org/expression/microarray/all_spell_exprconn_pcl.tar.gz>`_.
         """
         from glob import glob
         pcl = PCL()
@@ -201,7 +199,6 @@ class YipExperiment(_Experiment):
         :param use_evalue: use negative logarithm of the hit e-value as
                            detection score.
         """
-        import numpy as np
         interpro = InterProTSV()
         hits = [ None for _ in xrange(len(p_to_i)) ]
         for p, i in p_to_i.items():
@@ -272,8 +269,7 @@ class YipExperiment(_Experiment):
         return DummyKernel(matrix)
 
     def _get_profile_kernel(self, p_to_i):
-        import numpy as np
-        reader = PSSM()
+        reader = PSSM(targets = ["residue", "nlog_condp"])
         pssms = []
         for p, i in p_to_i.items():
             path = os.path.join(self.src, "yip09", "raw", "profiles",
@@ -308,8 +304,8 @@ class YipExperiment(_Experiment):
         pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
 
         KERNEL_INFO = (
-#            ("p-kernel-colocalization",
-#                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
+            ("p-kernel-colocalization",
+                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
             ("p-kernel-microarray",
                 lambda: self._get_microarray_kernel(p_to_i,
                             which = ["Gasch_2000_PMID_11102521",
@@ -318,8 +314,8 @@ class YipExperiment(_Experiment):
 #                lambda: self._get_microarray_kerne(p_to_i)),
             ("p-kernel-complex",
                 lambda: self._get_complex_kernel(p_to_i)),
-            ("p-kernel-interpro-match-all",
-                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+#            ("p-kernel-interpro-match-all",
+#                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
             ("p-kernel-interpro-weighted-all",
                 lambda: self._get_interpro_kernel(p_to_i)),
             ("p-kernel-profile",
