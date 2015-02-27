@@ -7,10 +7,11 @@
         - kernel: gene expr         DONE
         - kernel: complexes         DONE
         + kernel: spectrum          DONE
-        + kernel: profiles          HALF        Against nr
+        + kernel: profiles          DONE        Against nr, PSI-BLAST: 2 iterations, default values
         + kernel: corrmut
         + kernel: supfam            DONE        Luca
         + kernel: interpro          DONE
+        + kernel: genetic context   DONE
         + kernel: n/c-terminal loc
     - DOMAINS
         - sequences
