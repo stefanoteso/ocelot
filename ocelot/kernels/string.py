@@ -186,7 +186,7 @@ class MismatchKernel(_RecursivePrefixStringKernel):
         return (i, offset, 0)
 
 class ProfileKernel(_RecursivePrefixStringKernel):
-    """Implementation of the PSSM-based string kernel [Kuang04]_.
+    """The profile kernel for strings [Kuang04]_.
 
     :param pssms: list of PSSMs of the form ``(residue, transp_score)''.
     :param k: kmer size, inclusive (default: 1).
