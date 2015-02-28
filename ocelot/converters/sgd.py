@@ -210,7 +210,7 @@ class SGDConverter(Converter):
         """Converts the `go_slim_mapping.tab` file."""
         # XXX there are a few goslim annotations with commas
         FIELDS = (
-            "GENE_ORF"      # Systematic gene name
+            "GENE_ORF",     # Systematic gene name
             "GENE_STD",     # Gene name (optional)
             "SGD_ID",       # Gene SGD ID
             "GO_ASPECT",    # P = Process, F = Function, C = Component
