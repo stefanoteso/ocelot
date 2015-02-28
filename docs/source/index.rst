@@ -153,6 +153,8 @@ Experiments
 
 .. automodule:: ocelot.experiments.yip09
     :members:
+.. automodule:: ocelot.experiments.yeast
+    :members:
 
 
 References
