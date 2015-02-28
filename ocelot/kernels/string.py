@@ -45,6 +45,8 @@ class _RecursivePrefixStringKernel(_Kernel):
         if not self._k >= 1:
             raise ValueError("k must be >= 1")
         self._alphabet = kwargs.get("alphabet", AMINOACIDS)
+        if not len(self._alphabet) >= 2:
+            raise ValueError("alphabet must have at least two symbols")
         self._min_survivors_per_node = kwargs.get("min_survivors_per_node", 1)
         if not self._min_survivors_per_node >= 1:
             raise ValueError("min_survivors_per_node must be >= 1")
@@ -113,7 +115,7 @@ class _RecursivePrefixStringKernel(_Kernel):
         **Note**: the first element of an instance **must** be the index of
         the pssm it refers to! The ``_add_survivors`` method relies on it.
         """
-        raise NotImplementedError
+        return (i, offset)
 
     def _get_instances(self):
         """Turns the input strings into instances, i.e. k-mers plus additional
@@ -212,3 +214,62 @@ class ProfileKernel(_RecursivePrefixStringKernel):
     def _to_instance(self, i, offset):
         # The third element is the total score of the mutations so far
         return (i, offset, 0.0)
+
+class _TestRecursivePrefixStringKernel(object):
+    def test_k_too_small(self):
+        import pytest
+        strings = ("TEST", "TEST")
+        with pytest.raises(ValueError):
+            kernel = _RecursivePrefixStringKernel(strings, k = 0)
+    def test_k_too_large(self):
+        import pytest
+        for k in xrange(10):
+            string = "A" * k
+            strings = (string, string)
+            with pytest.raises(ValueError):
+                kernel = _RecursivePrefixStringKernel(strings, k = k + 1)
+                instances = kernel._get_instances()
+    def test_alphabet(self):
+        import pytest
+        strings = ("TEST", "TEST")
+        with pytest.raises(ValueError):
+            kernel = _RecursivePrefixStringKernel(strings, k = 0, alphabet = "")
+        with pytest.raises(ValueError):
+            kernel = _RecursivePrefixStringKernel(strings, k = 0, alphabet = "?")
+    def test_num_instances(self):
+        from ocelot.services import AMINOACIDS
+        STRING = "".join(AMINOACIDS)
+        for num_replicas in xrange(2, 5):
+            strings = [STRING] * num_replicas
+            for k in xrange(1, len(STRING)):
+                kernel = _RecursivePrefixStringKernel(strings, k = k)
+                instances = kernel._get_instances()
+                assert len(instances) == num_replicas * (len(STRING) - k + 1)
+
+class _TestSpectrumKernel(object):
+    def test_result(self):
+        STRINGSETS = (
+            (("A", "A"), 1, np.array([[1, 1], [1, 1]])),
+            (("A", "Y"), 1, np.array([[1, 0], [0, 1]])),
+            (("AA", "AA"), 1, np.array([[4, 4], [4, 4]])),
+            (("AA", "YY"), 1, np.array([[4, 0], [0, 4]])),
+            (("AA", "AA"), 2, np.array([[1, 1], [1, 1]])),
+            (("AA", "YY"), 2, np.array([[1, 0], [0, 1]])),
+            (("AY", "YA"), 1, np.array([[2, 2], [2, 2]])),
+            (("AY", "AA"), 1, np.array([[2, 2], [2, 4]])),
+        )
+        for strings, k, expected in STRINGSETS:
+            kernel = SpectrumKernel(strings, k = k, do_normalize = False)
+            output = kernel.compute()
+            assert (output == expected).all()
+
+class _TestMismatchKernel(object):
+    def test_foo(self):
+        # WRITEME
+        pass
+
+class _TestProfileKernel(object):
+    def test_foo(self):
+        # WRITEME
+        pass
+
