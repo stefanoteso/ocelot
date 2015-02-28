@@ -56,6 +56,10 @@ To build the documentation:
 
 * `sphinx <http://sphinx-doc.org/>`_, tested with version ``1.2.3``, as well as the `todo plugin <http://sphinx-doc.org/ext/todo.html>`_
 
+To run the (very few) tests:
+
+* `pytest <http://pytest.org/latest/>`_
+
 Usage
 -----
 
