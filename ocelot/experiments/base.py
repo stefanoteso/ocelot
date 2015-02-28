@@ -105,8 +105,6 @@ class _Experiment(object):
 
         results = []
         for i, (ts_indices, tr_indices) in enumerate(folds):
-            print _cls(self), ": fold {}/{}, preparing; C={} norm={}".format(i, len(folds), mkl_c, mkl_norm)
-
             # Split the labels between training and test, and compute the
             # per-class costs on the training labels
             ys_tr, ys_ts = self._split_vector(ys, tr_indices, ts_indices)
@@ -129,11 +127,12 @@ class _Experiment(object):
             model.set_C(cost_pos, cost_neg)
 
             # Learn
-            print _cls(self), ": fold {}/{}, learning (class costs = +{} -{})".format(i, len(folds), cost_pos, cost_neg)
+            print _cls(self), ": fold {}/{}, learning (C = {}; norm = {}; class costs = +{} -{})".format(i, len(folds), mkl_c, mkl_norm, cost_pos, cost_neg)
             model.set_kernel(combined_kernel_tr)
             model.set_labels(BinaryLabels(ys_tr))
             model.train()
             beta = combined_kernel_tr.get_subkernel_weights()
+            print _cls(self), "| kernel weights =", beta
 
             # Infer
             print _cls(self), ": fold {}/{}, predicting".format(i, len(folds))
@@ -141,7 +140,9 @@ class _Experiment(object):
             combined_kernel_ts.set_subkernel_weights(beta)
             ys_pr = model.apply().get_labels()
 
-            results.append(precision_recall_fscore_support(ys_ts, ys_pr))
+            result = precision_recall_fscore_support(ys_ts, ys_pr)
+            print _cls(self), "| pr/rc/f1/supp =", result
+            results.append(result)
 
         return results
 
