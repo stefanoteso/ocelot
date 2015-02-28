@@ -148,7 +148,7 @@ class _Experiment(object):
 
     def _run_mkl(self, ys, kernels, folds):
         c_to_results = {}
-        for c in (1e-4, 1e-3, 1e-2, 1e-1, 1, 1e2, 1e3, 1e4):
+        for c in (1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3, 1e4):
             c_to_results[c] = self._crossvalidate_mkl(ys, kernels, folds, mkl_c = c)
         from pprint import pprint
         pprint(c_to_results)
