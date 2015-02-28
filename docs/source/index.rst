@@ -32,15 +32,29 @@ WRITEME
 Requirements
 ------------
 
-* `OpenLink Virtuoso open-source <https://github.com/openlink/virtuoso-opensource>`_
-* `rdflib <https://rdflib.readthedocs.org/en/latest/>`_
-* `SPARQLWrapper <https://pypi.python.org/pypi/SPARQLWrapper>`_
-* Optionally `BioPython <http://biopython.org>`_
+For dealing with RDF:
+
+* `OpenLink Virtuoso open-source <https://github.com/openlink/virtuoso-opensource>`_, tested with version ``7.2.1``
+* `rdflib <https://rdflib.readthedocs.org/en/latest/>`_, tested with version ``4.1.2``
+* `SPARQLWrapper <https://pypi.python.org/pypi/SPARQLWrapper>`_, tested with version ``1.6.0``
+
+For dealing with other data:
+
+* `NumPy <http://www.numpy.org/>`_, tested with version ``1.8.2``
+* `SciPy <http://www.scipy.org/>`_, tested with version ``0.14.1``
+* Optionally `BioPython <http://biopython.org>`_, tested with version ``1.64``
 * Optionally `mmLib <http://pymmlib.sourceforge.net/>`_
-* `Semantic Based Regularization <https://sites.google.com/site/semanticbasedregularization/home/software>`_
-* `SHOGUN <http://www.shogun-toolbox.org/>`_
-* `scikit-learn <http://scikit-learn.org/stable/>`_
-* `Matplotlib <http://matplotlib.sourceforge.net/>`_
+
+For the learning algorithms:
+
+* `Semantic Based Regularization <https://sites.google.com/site/semanticbasedregularization/home/software>`_, tested with version ``1.1.1``
+* `SHOGUN <http://www.shogun-toolbox.org/>`_ (modular python interface), tested with version ``3.2.1``
+* `scikit-learn <http://scikit-learn.org/stable/>`_, tested with version ``0.15.2``
+* Optionally `Matplotlib <http://matplotlib.sourceforge.net/>`_, tested with version ``1.4.2``
+
+To build the documentation:
+
+* `sphinx <http://sphinx-doc.org/>`_, tested with version ``1.2.3``, as well as the `todo plugin <http://sphinx-doc.org/ext/todo.html>`_
 
 Usage
 -----
