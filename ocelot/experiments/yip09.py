@@ -304,24 +304,24 @@ class YipExperiment(_Experiment):
         pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
 
         KERNEL_INFO = (
-#            ("p-kernel-colocalization",
-#                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
-#            ("p-kernel-microarray",
-#                lambda: self._get_microarray_kernel(p_to_i,
-#                            which = ["Gasch_2000_PMID_11102521",
-#                                     "Spellman_1998_PMID_9843569"])),
+            ("p-kernel-colocalization",
+                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
+            ("p-kernel-microarray",
+                lambda: self._get_microarray_kernel(p_to_i,
+                            which = ["Gasch_2000_PMID_11102521",
+                                     "Spellman_1998_PMID_9843569"])),
 #            ("p-kernel-microarray-all",
 #                lambda: self._get_microarray_kerne(p_to_i)),
-#            ("p-kernel-complex",
-#                lambda: self._get_complex_kernel(p_to_i)),
-#            ("p-kernel-interpro-match-all",
-#                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+            ("p-kernel-complex",
+                lambda: self._get_complex_kernel(p_to_i)),
+            ("p-kernel-interpro-match-all",
+                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
 #            ("p-kernel-interpro-weighted-all",
 #                lambda: self._get_interpro_kernel(p_to_i)),
             ("p-kernel-profile",
                 lambda: self._get_profile_kernel(p_to_i)),
-#            ("p-kernel-yip",
-#                lambda: self._get_yip_kernels()[0]),
+            ("p-kernel-yip",
+                lambda: self._get_yip_kernels()[0]),
         )
 
         print _cls(self), ": computing protein kernels"
