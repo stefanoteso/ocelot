@@ -241,6 +241,9 @@ Yip09/Yeast Experiments
 .. [Lee03] Lee and Sonnhammer, *Genomic gene clustering analysis of pathways in
     eukaryotes*, 2003.
 
+.. [Yu10] Yu et al., *Simple sequence-based kernels do not predict
+    protein–protein interactions*, 2010.
+
 
 Indices and tables
 ==================

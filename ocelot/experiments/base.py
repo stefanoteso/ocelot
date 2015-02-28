@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import os, pickle
 import numpy as np
+from SPARQLWrapper import SPARQLWrapper, JSON
+from modshogun import CombinedKernel, CustomKernel
+from modshogun import BinaryLabels, MKLClassification
+from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
 
 import ocelot.ontology as O
 from ocelot.services import _cls
@@ -13,12 +18,18 @@ class _Experiment(object):
     :param subtargets: prediction targets.
     :param endpoint: URI of the SPARQL endpoint.
     :param default_graph: URI of the default graph.
+
+    .. todo::
+        Add support for standard SVM.
+
+    .. todo::
+        Add support for SBR.
     """
+    # write the SBR output (individuals, kernels, predicates, rules)
     def __init__(self, src, dst, subtargets,
                  endpoint = u"http://127.0.0.1:8890/sparql",
-                 default_graph = u"http://ocelot.disi.unitn.it/graph"):
-        from SPARQLWrapper import SPARQLWrapper
-        import os
+                 default_graph = u"http://ocelot.disi.unitn.it/graph",
+                 force_update = False):
         try:
             os.mkdir(dst)
         except:
@@ -28,9 +39,7 @@ class _Experiment(object):
             raise ValueError("'{}' is not a valid directory".format(src))
         if not (dst and os.path.isdir(dst)):
             raise ValueError("'{}' is not a valid directory".format(dst))
-        self.src = src
-        self.dst = dst
-        self.subtargets = subtargets
+        self.src, self.dst, self.subtargets = src, dst, subtargets
         if not endpoint:
             raise ValueError("no endpoint given.")
         if not default_graph:
@@ -39,6 +48,15 @@ class _Experiment(object):
         self.default_graph = default_graph
         if not self._check_graph(default_graph):
             raise ValueError("no graph '{}' at endpoint '{}'".format(default_graph, endpoint))
+        self.force_update = force_update
+
+    def _pickle(self, what, path):
+        with open(os.path.join(self.dst, path), "wb") as fp:
+            pickle.dump(what, fp)
+
+    def _depickle(self, path):
+        with open(os.path.join(self.dst, path), "rb") as fp:
+            return pickle.load(fp)
 
     def _check_graph(self, graph):
         """Checks whether a graph exists."""
@@ -47,7 +65,6 @@ class _Experiment(object):
 
     def query(self, query):
         """Performs a query at the given endpoint."""
-        from SPARQLWrapper import JSON
         prefixes = ""
         for shortcut, namespace in O.BINDINGS:
             prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
@@ -93,68 +110,73 @@ class _Experiment(object):
 
     @staticmethod
     def _combine_matrices(matrices):
-        from modshogun import CombinedKernel, CustomKernel
         combined_kernel = CombinedKernel()
         for matrix in matrices:
             combined_kernel.append_kernel(CustomKernel(matrix))
         return combined_kernel
 
-    def _crossvalidate_mkl(self, ys, kernels, folds, mkl_c = 1.0, mkl_norm = 1):
-        from modshogun import BinaryLabels, MKLClassification
-        from sklearn.metrics import precision_recall_fscore_support
+    def _train_test_mkl(self, ys_tr, k_tr, ys_ts, k_ts, norm = 1.0, c = 1.0, class_costs = [0.5, 0.5]):
+        """Run a single training/test round with MKL."""
+        # Create the model
+        model = MKLClassification()
+        model.set_C_mkl(c)
+        model.set_mkl_norm(norm)
+        model.set_C(*class_costs)
 
+        # Learn the model
+        model.set_kernel(k_tr)
+        model.set_labels(BinaryLabels(ys_tr))
+        model.train()
+
+        # Infer
+        beta = k_tr.get_subkernel_weights()
+        k_ts.set_subkernel_weights(beta)
+        model.set_kernel(k_ts)
+        ys_pr = model.apply().get_labels()
+
+        # Compute the results
+        fpr, tpr, _ = roc_curve(ys_ts, ys_pr)
+        pr_rc_f1_sup = precision_recall_fscore_support(ys_ts, ys_pr)
+        return pr_rc_f1_sup + [ auc(fpr, tpr) ]
+
+    def _crossvalidate_mkl(self, folds, ys, kernels, **hyperparams):
+        """Perform a k-fold coross-validation with MKL."""
         results = []
         for i, (ts_indices, tr_indices) in enumerate(folds):
             # Split the labels between training and test, and compute the
             # per-class costs on the training labels
             ys_tr, ys_ts = self._split_vector(ys, tr_indices, ts_indices)
-            cost_pos, cost_neg = self._get_class_costs(ys_tr)
+            costs = self._get_class_costs(ys_tr)
 
             # Split the kernels between training and test
             matrices_tr, matrices_ts = [], []
             for kernel in kernels:
                 matrix = kernel.compute()
-                matrix_tr, matrix_ts = self._split_matrix(matrix, tr_indices, ts_indices)
+                matrix_tr, matrix_ts = \
+                    self._split_matrix(matrix, tr_indices, ts_indices)
                 matrices_tr.append(matrix_tr)
                 matrices_ts.append(matrix_ts)
-            combined_kernel_tr = self._combine_matrices(matrices_tr)
-            combined_kernel_ts = self._combine_matrices(matrices_ts)
 
-            # Create the model
-            model = MKLClassification()
-            model.set_C_mkl(mkl_c)
-            model.set_mkl_norm(mkl_norm)
-            model.set_C(cost_pos, cost_neg)
+            # Build the combined train/test kernels
+            k_tr = self._combine_matrices(matrices_tr)
+            k_ts = self._combine_matrices(matrices_ts)
 
-            # Learn
-            print _cls(self), ": fold {}/{}, learning (C = {}; norm = {}; class costs = +{} -{})".format(i, len(folds), mkl_c, mkl_norm, cost_pos, cost_neg)
-            model.set_kernel(combined_kernel_tr)
-            model.set_labels(BinaryLabels(ys_tr))
-            model.train()
-            beta = combined_kernel_tr.get_subkernel_weights()
-            print _cls(self), "| kernel weights =", beta
-
-            # Infer
-            print _cls(self), ": fold {}/{}, predicting".format(i, len(folds))
-            model.set_kernel(combined_kernel_ts)
-            combined_kernel_ts.set_subkernel_weights(beta)
-            ys_pr = model.apply().get_labels()
-
-            result = precision_recall_fscore_support(ys_ts, ys_pr)
-            print _cls(self), "| pr/rc/f1/supp =", result
-            results.append(result)
-
+            # Evaluate MKL
+            print _cls(self), ": fold {}/{}, learning (norm={} C={} costs={})" \
+                                .format(i+1, len(folds), norm, c, costs)
+            result = self._train_test_mkl(ys_tr, k_tr, ys_ts, k_ts,
+                                          class_costs = costs,
+                                          **hyperparams)
+            results.append(results)
         return results
 
     def _run_mkl(self, ys, kernels, folds):
         c_to_results = {}
         for c in (1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3, 1e4):
-            c_to_results[c] = self._crossvalidate_mkl(ys, kernels, folds, mkl_c = c)
+            c_to_results[c] = self._crossvalidate_mkl(folds, ys, kernels,
+                                                      c = c, norm = 1.0)
         from pprint import pprint
         pprint(c_to_results)
-
-    def _crossvalidate_sbr_with_mkl(self, ys, ks, folds):
-        pass
 
     def run(self):
         raise NotImplementedError
