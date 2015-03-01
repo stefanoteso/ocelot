@@ -142,6 +142,7 @@ def _run_experiment(args):
                                        [st[0] for st in subtargets],
                                        endpoint = args.endpoint,
                                        default_graph = args.default_graph,
+                                       force_update = args.force_update,
                                        **target.kwargs)
         experiment.run()
 
@@ -163,15 +164,15 @@ def main():
     parser.add_argument("-y", "--subtargets", nargs="+",
                         help="target-specific sub-targets (default: all)")
     parser.add_argument("-s", "--src", type=str,
-                        help="[make-rdf] where the input databases are")
+                        help="path to the source data")
     parser.add_argument("-d", "--dst", type=str,
-                        help="[make-rdf] where to put the RDF files")
-    parser.add_argument("-f", "--force-update", action="store_true",
-                        help="[make-rdf] force update the RDF files")
+                        help="path to the results destination")
     parser.add_argument("-e", "--endpoint", type=str,
-                        help="[upload-rdf,benchmark] set the SPARQL endpoint")
+                        help="URI of SPARQL endpoint to use")
     parser.add_argument("-g", "--default-graph", type=str, default=None,
-                        help="[upload-rdf] destination graph IRI")
+                        help="URI of the default graph")
+    parser.add_argument("-f", "--force-update", action="store_true",
+                        help="ignores cached data")
     parser.add_argument("--debug", action="store_true",
                         help="[all] enable debugging output")
     args = parser.parse_args()
