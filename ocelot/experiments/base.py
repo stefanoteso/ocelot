@@ -127,6 +127,9 @@ class _Experiment(object):
 
     def _train_test_mkl(self, ys_tr, k_tr, ys_ts, k_ts, norm = 1.0, c = 1.0, class_costs = [0.5, 0.5]):
         """Run a single training/test round with MKL."""
+        print _cls(self), ": running MKL (norm={} C={} costs={})" \
+                            .format(norm, c, class_costs)
+
         # Create the model
         model = MKLClassification()
         model.set_C_mkl(c)
@@ -147,7 +150,7 @@ class _Experiment(object):
         # Compute the results
         fpr, tpr, _ = roc_curve(ys_ts, ys_pr)
         pr_rc_f1_sup = precision_recall_fscore_support(ys_ts, ys_pr)
-        return pr_rc_f1_sup + [ auc(fpr, tpr) ]
+        return pr_rc_f1_sup + ( auc(fpr, tpr), )
 
     def _crossvalidate_mkl(self, folds, ys, kernels, **hyperparams):
         """Perform a k-fold coross-validation with MKL."""
@@ -172,8 +175,6 @@ class _Experiment(object):
             k_ts = self._combine_matrices(matrices_ts)
 
             # Evaluate MKL
-            print _cls(self), ": fold {}/{}, learning (norm={} C={} costs={})" \
-                                .format(i+1, len(folds), norm, c, costs)
             result = self._train_test_mkl(ys_tr, k_tr, ys_ts, k_ts,
                                           class_costs = costs,
                                           **hyperparams)
