@@ -129,11 +129,10 @@ class YeastExperiment(_Experiment):
             pp_pos.update([ (p1,p2) ])
         return pp_pos
 
-    def _cached(self, f, relpath, check = None, *args, **kwargs):
+    def _cached(self, f, relpath, *args, **kwargs):
         try:
             assert not self.force_update
             y = self._depickle(relpath)
-            assert check == None or check(y)
         except Exception, e:
             y = f(*args, **kwargs)
             self._pickle(y, relpath)
@@ -238,9 +237,12 @@ class YeastExperiment(_Experiment):
 
         # Here we pass the low-quality interactions so as to get a better
         # approximation of the negative set.
-        pp_neg = self._get_negative_protein_interactions(ps, pp_pos_lq)
+        pp_neg = self._cached(self._get_negative_protein_interactions,
+                              "sgd_id_interactions_neg.txt",
+                              ps, pp_pos_lq)
         print _cls(self), ": sampled {} p-p negative interactions" \
                 .format(len(pp_neg))
+        self._check_p_pp_are_sane(ps, pp_neg)
 
         # TODO retrieve dom-dom and res-res interaction instances
 
