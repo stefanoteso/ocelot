@@ -122,12 +122,8 @@ class YeastExperiment(_Experiment):
         query += """
                 ocelot:sgd_int_has_type ocelot:sgd_int_type.physical_interactions .
         }}"""
-        ans = self.query(query)
-        assert ans and len(ans) and "results" in ans
         pp_pos = set()
-        for bindings in ans["results"]["bindings"]:
-            bindings = { k: self.cast(v) for k, v in bindings.items() }
-            assert len(bindings) == 2
+        for bindings in self.iterquery(query, n = 2):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
             pp_pos.update([ (p1,p2) ])
