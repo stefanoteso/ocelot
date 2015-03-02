@@ -248,7 +248,8 @@ class ProfileKernel(_RecursivePrefixStringKernel):
 
     is at most :math:`\\tau`. Here the conditional probability :math:`p(\\beta|\\alpha)`
     is taken by the PSSM data, while the prior probability :math:`\\hat{p}(\\beta)`
-    is taken from the prior observation matrix. The kernel between two strings is defined in the
+    is taken from the prior observation matrix; :math:`\\gamma` is a user
+    provided parameter. The kernel between two strings is defined in the
     usual way, i.e. as the dot  product of the feature representations of the
     two strings:
 
