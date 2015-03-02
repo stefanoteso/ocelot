@@ -363,7 +363,17 @@ class _TestMismatchKernel(object):
             assert (output == expected).all()
 
 class _TestProfileKernel(object):
-    def test_foo(self):
-        # WRITEME
-        pass
+    def test_result(self):
+        A = ["A", [0.0] + [1.0]*19]
+        Y = ["Y", [1.0]*19 + [0.0]]
+        PSSMSETS = (
+            [ [[A], [Y]], 1, 0.0, np.array([[1, 0], [0, 1]]) ],
+            [ [[A], [Y]], 1, 0.95, np.array([[1, 0], [0, 1]]) ],
+            [ [[A], [Y]], 1, 1.0, np.array([[20, 20], [20, 20]]) ],
+        )
+        for pssms, k, tau, expected in PSSMSETS:
+            kernel = ProfileKernel(pssms, k = k, threshold = tau,
+                                   do_normalize = False)
+            output = kernel.compute()
+            assert (output == expected).all()
 
