@@ -134,8 +134,7 @@ class _RecursivePrefixStringKernel(_Kernel):
         self._instances = self._get_instances()
 
         if self._num_processes > 1:
-            pool = mp.Pool(self._num_processes)
-            pool.map(self._recurse, self._instances)
+            raise NotImplementedError
         else:
             self._node_counter = 0
             self._recurse(self._instances, 0)
