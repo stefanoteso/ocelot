@@ -104,21 +104,11 @@ Contents
 .. toctree::
    :maxdepth: 2
 
-RDF
----
-
-.. automodule:: ocelot.ontology
-    :members:
-
-Services
---------
-
-.. automodule:: ocelot.services
-    :members:
-
 Converters
 ----------
 
+.. automodule:: ocelot.ontology
+    :members:
 .. automodule:: ocelot.converters.ipfam
     :members:
 .. automodule:: ocelot.converters.pdb
@@ -134,11 +124,22 @@ Converters
 .. automodule:: ocelot.converters.yip09
     :members:
 
-Features and Kernels
---------------------
+Services
+--------
+
+.. automodule:: ocelot.services
+    :members:
+
+
+Features
+--------
 
 .. automodule:: ocelot.features
     :members:
+
+Kernels
+-------
+
 .. automodule:: ocelot.kernels.base
     :members:
 .. automodule:: ocelot.kernels.vector
