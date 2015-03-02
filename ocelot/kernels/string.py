@@ -329,6 +329,9 @@ class _TestSpectrumKernel(object):
             (("AA", "YY"), 2, np.array([[1, 0], [0, 1]])),
             (("AY", "YA"), 1, np.array([[2, 2], [2, 2]])),
             (("AY", "AA"), 1, np.array([[2, 2], [2, 4]])),
+            (("A" * 10, "Y" * 10), 1, np.array([[100, 0], [0, 100]])),
+            (("AY" * 5, "AY" * 5), 1, np.array([[50, 50], [50, 50]])),
+            (("AY" * 5, "YA" * 5), 2, np.array([[41, 40], [40, 41]])),
         )
         for strings, k, expected in STRINGSETS:
             kernel = SpectrumKernel(strings, k = k, do_normalize = False)
