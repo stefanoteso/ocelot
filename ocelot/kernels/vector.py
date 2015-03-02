@@ -85,3 +85,14 @@ class SetKernel(_Kernel):
                     dp = float(len(entity_i & entity_j))
                 matrix[i,j] = matrix[j,i] = dp
         return matrix
+
+class _TestLinearKernel(object):
+    def test_result(self):
+        INPUTS = (
+            ((np.array([1, 0]), np.array([0, 1])), np.array([[1, 0], [0, 1]])),
+            ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
+        )
+        for phis, expected in INPUTS:
+            kernel = LinearKernel(phis, do_normalize = False)
+            output = kernel.compute()
+            assert (output == expected).all()
