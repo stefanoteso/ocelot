@@ -92,6 +92,17 @@ your Virtuoso instance. The path to the database dumps should be provided here
 as well, since some data (e.g. the PSSM files and the microarray files) is
 *not* actually converted to RDF (and it would be pointless to do so).
 
+In case you want to get rid of a graph stored in your local Virtuoso instance,
+Ocelot provides a shortcut (implemented via the ``isql`` command)::
+
+    $ ./main.py clear-rdf -g "http://ocelot-yip09-graph
+
+You can run the (admittedly very thin) test suite by running::
+
+    $ py.test ocelot
+
+from the main Ocelot directory.
+
 Authors
 -------
 
