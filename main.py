@@ -49,6 +49,9 @@ def _make_rdf(args):
         "intact"    : Target(ocelot.PsiMiTabConverter, {
                         "path": "IMEx/IMEx-IntAct-yeast.tab27"
                       }),
+        "string"    : Target(ocelot.STRINGConverter, {
+                        "taxon": "4932", "version": "9.1"
+                      }),
 
         # DATASETS
         "yip09"     : Target(ocelot.Yip09Converter, {}),

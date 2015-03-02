@@ -150,6 +150,17 @@ IPFAM_REGION_INT            = OCELOT.ipfam_region_int
 IPFAM_REGION_INT_OCCURS_IN  = OCELOT.ipfam_region_int_occurs_in
 IPFAM_REGION_INT_HAS_REGION = OCELOT.ipfam_region_int_has_region
 
+# STRING
+STRING_ID               = OCELOT.string_id
+STRING_ID_IN_COG        = OCELOT.string_id_in_cog
+STRING_ID_IN_KOG        = OCELOT.string_id_in_kog
+STRING_ID_IN_NOG        = OCELOT.string_id_in_nog
+
+# COG
+COG_CLUSTER_ID          = OCELOT.cog_cluster_id
+KOG_CLUSTER_ID          = OCELOT.cog_cluster_id
+NOG_CLUSTER_ID          = OCELOT.cog_cluster_id
+
 # SIFTS
 SIFTS_SAME_AS           = OCELOT.sifts_same_as
 
