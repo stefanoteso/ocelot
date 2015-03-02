@@ -30,9 +30,21 @@ class YeastExperiment(_Experiment):
     def __init__(self, *args, **kwargs):
         super(YeastExperiment, self).__init__(*args, **kwargs)
 
-    def _query_proteins_and_info(self):
-        """Queries the ORFs from SGD along with their sequences, etc."""
-        ans = self.query("""
+    def _get_sgd_ids(self):
+        query = """
+        SELECT ?orf ?seq
+        FROM <{default_graph}>
+        WHERE {{
+            ?orf a ocelot:sgd_id ;
+                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF .
+        }}
+        """
+        ids = set(bindings[u"orf"].split(".")[-1]
+                  for bindings in self.iterquery(query, n = 1))
+        return ids
+
+    def _get_sgd_id_to_seq(self):
+        query = """
         SELECT ?orf ?seq
         FROM <{default_graph}>
         WHERE {{
@@ -40,57 +52,53 @@ class YeastExperiment(_Experiment):
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
                  ocelot:sgd_id_has_sequence ?seq .
         }}
-        """)
-        assert ans and len(ans) and "results" in ans
-        p_to_seq = {}
-        for bindings in ans["results"]["bindings"]:
-            bindings = { k: self.cast(v) for k, v in bindings.items() }
-            assert len(bindings) == 2
-            p = bindings[u"orf"].split(".")[-1]
-            p_to_seq[p] = bindings[u"seq"]
+        """
+        sgd_id_to_seq = {}
+        for bindings in self.iterquery(query, n = 2):
+            sgd_id = bindings[u"orf"].split(".")[-1]
+            sgd_id_to_seq[sgd_id] = bindings[u"seq"]
+        return sgd_id_to_seq
 
-        ans = self.query("""
+    def _get_sgd_id_to_fun(self):
+        query = """
         SELECT ?orf ?fun
         FROM <{default_graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
-                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
-                ocelot:sgd_id_has_goslim ?fun .
+                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                 ocelot:sgd_id_has_goslim ?fun .
         }}
-        """)
-        assert ans and len(ans) and "results" in ans
-        p_to_fun = {}
-        for bindings in ans["results"]["bindings"]:
-            bindings = { k: self.cast(v) for k, v in bindings.items() }
-            assert len(bindings) == 2
-            p = bindings[u"orf"].split(".")[-1]
+        """
+        sgd_id_to_fun = {}
+        for bindings in self.iterquery(query, n = 2):
+            sgd_id = bindings[u"orf"].split(".")[-1]
             fun = bindings[u"fun"].split("#")[-1]
-            if not p in p_to_fun:
-                p_to_fun[p] = set([ fun ])
+            if not sgd_id in sgd_id_to_fun:
+                sgd_id_to_fun[sgd_id] = set([ fun ])
             else:
-                p_to_fun[p].update([ fun ])
+                sgd_id_to_fun[sgd_id].add(fun)
+        return sgd_id_to_fun
 
-        p_to_feat = {}
-        return set(p_to_seq.keys()), p_to_seq, p_to_fun, p_to_feat
-
-    def _get_proteins_and_info(self):
-        """Tries to load the SGD ORFs from disk, or falls back to SPARQL."""
-        # XXX not exactly elegant
-        try:
-            assert not self.force_update, "forcing update"
-            ps          = self._depickle("ps.txt")
-            p_to_seq    = self._depickle("p_to_seq.txt")
-            p_to_fun    = self._depickle("p_to_fun.txt")
-            p_to_feat   = self._depickle("p_to_feat.txt")
-        except Exception, e:
-            print _cls(self), ":", e
-            ps, p_to_seq, p_to_fun, p_to_feat = \
-                self._query_proteins_and_info()
-            self._pickle(ps, "ps.txt")
-            self._pickle(p_to_seq, "p_to_seq.txt")
-            self._pickle(p_to_fun, "p_to_fun.txt")
-            self._pickle(p_to_feat, "p_to_feat.txt")
-        return ps, p_to_seq, p_to_fun, p_to_feat
+    def _get_sgd_id_to_feat(self):
+        query = """
+        SELECT ?orf ?feat
+        FROM <{default_graph}>
+        WHERE {{
+            ?orf a ocelot:sgd_id ;
+                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                 owl:sameAs ?feat .
+            ?feat a ocelot:sgd_feature .
+        }}
+        """
+        sgd_id_to_feat = {}
+        for bindings in self.iterquery(query, n = 2):
+            sgd_id = bindings[u"orf"].split(".")[-1]
+            feat   = bindings[u"feat"].split(".")[-1]
+            if not sgd_id in sgd_id_to_feat:
+                sgd_id_to_feat[sgd_id] = set([ feat ])
+            else:
+                sgd_id_to_feat[sgd_id].add(feat)
+        return sgd_id_to_feat
 
     def _get_protein_interactions(self, manual_only = False):
         query = """
@@ -124,6 +132,16 @@ class YeastExperiment(_Experiment):
             p2 = bindings[u"orf2"].split(".")[-1]
             pp_pos.update([ (p1,p2) ])
         return pp_pos
+
+    def _cached(self, f, relpath, check = None):
+        try:
+            assert not self.force_update
+            y = self._depickle(relpath)
+            assert check == None or check(y)
+        except Exception, e:
+            y = f()
+            self._pickle(y, relpath)
+        return y
 
     def _get_negative_protein_interactions(self, ps, pos):
         """Samples the negative interactions from the complement graph.
@@ -183,7 +201,14 @@ class YeastExperiment(_Experiment):
 
     def run(self):
         """Run the yeast prediction experiment."""
-        ps, p_to_seq, p_to_fun, p_to_feat = self._get_proteins_and_info()
+        ps          = self._cached(self._get_sgd_ids,
+                                   "sgd_ids.txt")
+        p_to_seq    = self._cached(self._get_sgd_id_to_seq,
+                                   "sgd_id_to_seq.txt")
+        p_to_fun    = self._cached(self._get_sgd_id_to_fun,
+                                   "sgd_id_to_fun.txt")
+        p_to_feat   = self._cached(self._get_sgd_id_to_feat,
+                                   "sgd_id_to_feat.txt")
         print _cls(self), ": found {} proteins".format(len(ps))
 
         # Filter out sequences shorter than 30 residues
