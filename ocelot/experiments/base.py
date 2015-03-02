@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import os, pickle
+import os
+import cPickle as pickle
 import numpy as np
 from SPARQLWrapper import SPARQLWrapper, JSON
 from modshogun import CombinedKernel, CustomKernel
