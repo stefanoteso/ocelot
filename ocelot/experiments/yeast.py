@@ -133,13 +133,13 @@ class YeastExperiment(_Experiment):
             pp_pos.update([ (p1,p2) ])
         return pp_pos
 
-    def _cached(self, f, relpath, check = None):
+    def _cached(self, f, relpath, check = None, *args, **kwargs):
         try:
             assert not self.force_update
             y = self._depickle(relpath)
             assert check == None or check(y)
         except Exception, e:
-            y = f()
+            y = f(*args, **kwargs)
             self._pickle(y, relpath)
         return y
 
@@ -223,23 +223,27 @@ class YeastExperiment(_Experiment):
                 .format(len(filtered_p_clusters), 0.8)
 
         # Query the hq protein-protein interactions
-        pp_pos_hq = self._get_protein_interactions(manual_only = True)
+        pp_pos_hq = self._cached(self._get_protein_interactions,
+                                 "sgd_id_interactions_hq.txt",
+                                 manual_only = True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} hi-quality protein-protein interactions (density = {})" \
+        print _cls(self), ": found {} hi-quality PPIs (density = {})" \
                 .format(len(pp_pos_hq), density)
         self._check_p_pp_are_sane(ps, pp_pos_hq)
 
         # Query the hq+lq protein-protein interactions
-        pp_pos_lq = self._get_protein_interactions(manual_only = False)
+        pp_pos_lq = self._cached(self._get_protein_interactions,
+                                 "sgd_id_interactions_lq.txt",
+                                 manual_only = False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} lo-quality protein-protein interactions (density = {})" \
+        print _cls(self), ": found {} lo-quality PPIs (density = {})" \
                 .format(len(pp_pos_lq), density)
         self._check_p_pp_are_sane(ps, pp_pos_lq)
 
         # Here we pass the low-quality interactions so as to get a better
         # approximation of the negative set.
         pp_neg = self._get_negative_protein_interactions(ps, pp_pos_lq)
-        print _cls(self), ": sampled {} pp negative interactions" \
+        print _cls(self), ": sampled {} p-p negative interactions" \
                 .format(len(pp_neg))
 
         # TODO retrieve dom-dom and res-res interaction instances
