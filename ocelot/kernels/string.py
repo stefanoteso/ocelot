@@ -340,9 +340,16 @@ class _TestSpectrumKernel(object):
             assert (output == expected).all()
 
 class _TestMismatchKernel(object):
-    def test_foo(self):
-        # WRITEME
-        pass
+    def test_result(self):
+        STRINGSETS = (
+            (("A", "Y"), 1, 0, np.array([[1, 0], [0, 1]])),
+            (("A", "Y"), 1, 1, np.array([[20, 20], [20, 20]])),
+        )
+        for strings, k, m, expected in STRINGSETS:
+            kernel = MismatchKernel(strings, k = k, m = m,
+                                    do_normalize = False)
+            output = kernel.compute()
+            assert (output == expected).all()
 
 class _TestProfileKernel(object):
     def test_foo(self):
