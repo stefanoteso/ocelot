@@ -7,6 +7,19 @@ from ocelot.services import _cls
 class STRINGConverter(Converter):
     """Converter for `STRING <http://string-db.org/>`_.
 
+    The converter assumes that the data directory includes a ``STRING``
+    directory with a species-specific STRING dup, laid out like this::
+
+        ${TAXON}.protein.aliases.v${VERSION}.txt            : DONE
+        ${TAXON}.protein.links.v${VERSION}.txt              : TODO
+        ${TAXON}.protein.links.detailed.v${VERSION}.txt     : TODO
+        ${TAXON}.protein.actions.v${VERSION}.txt            : TODO
+        ${TAXON}.protein.actions.detailed.v${VERSION}.txt   : TODO
+        ${TAXON}.protein.sequences.v${VERSION}.fa           : -
+        COG.links.v${VERSION}.txt                           : DONE
+        COG.links.detailed.v${VERSION}.txt                  : TODO
+        COG.mappings.v${VERSION}.txt                        : TODO
+
     .. warning::
 
         This converter is a STUB.
