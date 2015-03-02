@@ -7,7 +7,7 @@ from ocelot.services import AMINOACIDS
 
 from .base import _Kernel
 
-MAX_SURVIVORS_PER_FLUSH = 65536
+_MAX_SURVIVORS_PER_FLUSH = 65536
 
 class _RecursivePrefixStringKernel(_Kernel):
     """Base prefix-tree string kernel implemented using recursion.
@@ -81,7 +81,7 @@ class _RecursivePrefixStringKernel(_Kernel):
                 self._survivors_rows.append(i)
                 self._survivors_cols.append(self._node_counter)
                 self._survivors_counts.append(count)
-        if len(self._survivors_counts) > MAX_SURVIVORS_PER_FLUSH:
+        if len(self._survivors_counts) > _MAX_SURVIVORS_PER_FLUSH:
             self._flush_survivors()
 
     def _recurse(self, instances, depth):
