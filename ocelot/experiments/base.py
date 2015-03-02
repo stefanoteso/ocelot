@@ -58,21 +58,6 @@ class _Experiment(object):
         with open(os.path.join(self.dst, path), "rb") as fp:
             return pickle.load(fp)
 
-    def _check_graph(self, graph):
-        """Checks whether a graph exists."""
-        ans = self.query(u"ASK WHERE {{ GRAPH <{default_graph}> {{ ?s ?p ?o }} }}")
-        return ans[u"boolean"] == True
-
-    def query(self, query):
-        """Performs a query at the given endpoint."""
-        prefixes = ""
-        for shortcut, namespace in O.BINDINGS:
-            prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
-        query = prefixes + query.format(default_graph=self.default_graph)
-        self.ep.setQuery(query)
-        self.ep.setReturnFormat(JSON)
-        return self.ep.query().convert()
-
     @staticmethod
     def cast(d):
         if d[u"type"] == u"uri":
@@ -87,6 +72,30 @@ class _Experiment(object):
             elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
                 return d[u"value"]
         raise NotImplementedError("can not cast '{}'".format(d.items()))
+
+    def query(self, query):
+        """Performs a query at the given endpoint."""
+        prefixes = ""
+        for shortcut, namespace in O.BINDINGS:
+            prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
+        query = prefixes + query.format(default_graph=self.default_graph)
+        self.ep.setQuery(query)
+        self.ep.setReturnFormat(JSON)
+        return self.ep.query().convert()
+
+    def iterquery(self, query, n = None):
+        ans = self.query(query)
+        assert ans and len(ans) and "results" in ans
+        for bindings in ans["results"]["bindings"]:
+            bindings = { k: self.cast(v) for k, v in bindings.iteritems() }
+            if n != None:
+                assert len(bindings) == n
+            yield bindings
+
+    def _check_graph(self, graph):
+        """Checks whether a graph exists."""
+        ans = self.query(u"ASK WHERE {{ GRAPH <{default_graph}> {{ ?s ?p ?o }} }}")
+        return ans[u"boolean"] == True
 
     @staticmethod
     def _split_vector(ys, tr_indices, ts_indices):
