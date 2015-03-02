@@ -145,6 +145,25 @@ class _RecursivePrefixStringKernel(_Kernel):
 class SpectrumKernel(_RecursivePrefixStringKernel):
     """The spectrum kernel for strings [Leslie02a]_.
 
+    According to the spectrum kernel of order :math:`k`, the feature
+    representation of a string :math:`x` over an alphabet :math:`A` is given
+    by:
+
+    .. math::
+
+        \\varphi(x) := ( count(x,\\alpha) )_{\\alpha \in A^k}
+
+    where :math:`\\alpha` ranges over all possible :math:`k`-mers (i.e. strings
+    composed of :math:`k` symbols taken from :math:`A`), and
+    :math:`count(x,\\alpha)` evaluates the number of occurrences of `\\alpha`
+    in the input string :math:`x`.  The kernel between two strings is the
+    defined in the usual way, i.e. as the dot  product of the feature
+    representations of the two strings:
+
+    .. math::
+
+        K(x,x') := \\langle \\varphi(x), \\varphi(x') \\rangle = \sum_{\\alpha \in A^k} count(x,\\alpha) count(x',\\alpha)
+
     :param strings: a list of strings.
     :param k: kmer size, inclusive (default: 1).
     :param alphabet: list of valid symbols (default: AMINOACIDS).
@@ -162,9 +181,29 @@ class SpectrumKernel(_RecursivePrefixStringKernel):
 class MismatchKernel(_RecursivePrefixStringKernel):
     """The mismatch kernel for strings [Leslie02b]_.
 
+    According to the mismatch kernel of order :math:`k` and mismatch parameter
+    `m`, the feature representation of a string :math:`x` over an alphabet
+    :math:`A` is given by:
+
+    .. math::
+
+        \\varphi_m(x) := ( count_m(x,\\alpha) )_{\\alpha \in A^k}
+
+    where :math:`\\alpha` ranges over all possible :math:`k`-mers (i.e. strings
+    composed of :math:`k` symbols taken from :math:`A`), and
+    :math:`count_m(x,\\alpha)` counts the number of :math:`k`-mers of the input
+    string :math:`x` that are at most :math:`m` mismatches away from
+    :math:`\\alpha`. The kernel between two strings is defined in the usual
+    way, i.e. as the dot  product of the feature representations of the two
+    strings:
+
+    .. math::
+
+        K_m(x,x') := \\langle \\varphi_m(x), \\varphi_m(x') \\rangle = \sum_{\\alpha \in A^k} count_m(x,\\alpha) count_m(x',\\alpha)
+
     :param strings: a list of strings.
     :param k: kmer size, inclusive (default: 1).
-    :param m: maximum number of mismatches (default: 0).
+    :param m: maximum number of mismatches (default: 1).
     :param alphabet: list of valid symbols (default: AMINOACIDS).
     :param min_survivors_per_node: minimum number of instances to proceed lower
         within the prefix tree (default: 1)
@@ -190,7 +229,40 @@ class MismatchKernel(_RecursivePrefixStringKernel):
 class ProfileKernel(_RecursivePrefixStringKernel):
     """The profile kernel for strings [Kuang04]_.
 
-    :param pssms: list of PSSMs of the form ``(residue, transp_score)''.
+    According to the profile kernel of order :math:`k` and threshold parameter
+    `\\tau`, the feature representation of a string :math:`x` over an alphabet
+    :math:`A` is given by:
+
+    .. math::
+
+        \\varphi_{\\tau}(x) := ( count_{\\tau}(x,\\alpha) )_{\\alpha \in A^k}
+
+    where :math:`\\alpha` ranges over all possible :math:`k`-mers (i.e. strings
+    composed of :math:`k` symbols taken from :math:`A`), and
+    :math:`count_m(x,\\alpha)` counts the number of :math:`k`-mers :math:`\\beta` of the input
+    string :math:`x` for which the transition score :math:`\\alpha \\to \\beta`:
+
+    .. math::
+
+        -\\log \\gamma \\; p(\\beta|\\alpha) + (1 - \\gamma) \\; \\hat{p}(\\beta)
+
+    is at most :math:`\\tau`. Here the conditional probability :math:`p(\\beta|\\alpha)`
+    is taken by the PSSM data, while the prior probability :math:`\\hat{p}(\\beta)`
+    is taken from the prior observation matrix. The kernel between two strings is defined in the
+    usual way, i.e. as the dot  product of the feature representations of the
+    two strings:
+
+    .. math::
+
+        K_{\\tau}(x,x') := \\langle \\varphi_{\\tau}(x), \\varphi_{\\tau}(x') \\rangle = \sum_{\\alpha \in A^k} count_{\\tau}(x,\\alpha) count_{\\tau}(x',\\alpha)
+
+    .. note::
+
+        For the sake of efficiency, the input data should already be formatted
+        as (residue, transition-score) pairs (as opposed to (residue, transition-probability)
+        pairs). The ``PSSM`` class be instructed take care of this automatically.
+
+    :param pssms: list of PSSMs of the form (residue, transition-score).
     :param k: kmer size, inclusive (default: 1).
     :param threshold: threshold mutation probability to count as a hit
         (default: 6.0)
