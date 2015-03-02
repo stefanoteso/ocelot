@@ -230,8 +230,8 @@ class ProfileKernel(_RecursivePrefixStringKernel):
     """The profile kernel for strings [Kuang04]_.
 
     According to the profile kernel of order :math:`k` and threshold parameter
-    `\\tau`, the feature representation of a string :math:`x` over an alphabet
-    :math:`A` is given by:
+    :math:`\\tau`, the feature representation of a string :math:`x` over an
+    alphabet :math:`A` is given by:
 
     .. math::
 
@@ -239,19 +239,20 @@ class ProfileKernel(_RecursivePrefixStringKernel):
 
     where :math:`\\alpha` ranges over all possible :math:`k`-mers (i.e. strings
     composed of :math:`k` symbols taken from :math:`A`), and
-    :math:`count_m(x,\\alpha)` counts the number of :math:`k`-mers :math:`\\beta` of the input
-    string :math:`x` for which the transition score :math:`\\alpha \\to \\beta`:
+    :math:`count_{\\tau}(x,\\alpha)` counts the number of :math:`k`-mers
+    :math:`\\beta` of the input string :math:`x` for which the transition score
+    :math:`\\beta \\to \\alpha`:
 
     .. math::
 
-        -\\log \\left( \\gamma \\; p(\\beta|\\alpha) + (1 - \\gamma) \\; \\hat{p}(\\beta) \\right)
+        -\\log \\left( \\gamma \\; p(\\alpha|\\beta) + (1 - \\gamma) \\; \\hat{p}(\\alpha) \\right)
 
-    is at most :math:`\\tau`. Here the conditional probability :math:`p(\\beta|\\alpha)`
-    is taken by the PSSM data, while the prior probability :math:`\\hat{p}(\\beta)`
-    is taken from the prior observation matrix; :math:`\\gamma` is a user
-    provided parameter. The kernel between two strings is defined in the
-    usual way, i.e. as the dot  product of the feature representations of the
-    two strings:
+    is at most :math:`\\tau`. Here the conditional probability
+    :math:`p(\\alpha|\\beta)` is taken by the PSSM data, while the prior
+    probability :math:`\\hat{p}(\\alpha)` is taken from the prior observation
+    matrix; :math:`\\gamma` is a user provided parameter. The kernel between
+    two strings is defined in the usual way, i.e. as the dot  product of the
+    feature representations of the two strings:
 
     .. math::
 
@@ -260,10 +261,21 @@ class ProfileKernel(_RecursivePrefixStringKernel):
     .. note::
 
         For the sake of efficiency, the input data should already be formatted
-        as (residue, transition-score) pairs (as opposed to (residue, transition-probability)
-        pairs). The ``PSSM`` class be instructed take care of this automatically.
+        as (residue, transition-score) pairs (as opposed to (residue,
+        transition-probability) pairs). The ``PSSM`` class be instructed take
+        care of this automatically, as in the following example.
 
-    :param pssms: list of PSSMs of the form (residue, transition-score).
+    Example usage::
+
+        from ocelot.services import PSSM
+        from ocelot.kernels.string import ProfileKernel
+
+        reader = PSSM(targets = ["residue", "nlog_condp"])
+        kernel = ProfileKernel([reader.read(path) for path in paths],
+                               k = 4, threshold = 6.0)
+        matrix = kernel.compute()
+
+    :param pssms: list of PSSMs of the form [(residue, transition-score)*].
     :param k: kmer size, inclusive (default: 1).
     :param threshold: threshold mutation probability to count as a hit
         (default: 6.0)
