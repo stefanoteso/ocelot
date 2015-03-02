@@ -244,7 +244,7 @@ class ProfileKernel(_RecursivePrefixStringKernel):
 
     .. math::
 
-        -\\log \\gamma \\; p(\\beta|\\alpha) + (1 - \\gamma) \\; \\hat{p}(\\beta)
+        -\\log \\left( \\gamma \\; p(\\beta|\\alpha) + (1 - \\gamma) \\; \\hat{p}(\\beta) \\right)
 
     is at most :math:`\\tau`. Here the conditional probability :math:`p(\\beta|\\alpha)`
     is taken by the PSSM data, while the prior probability :math:`\\hat{p}(\\beta)`
