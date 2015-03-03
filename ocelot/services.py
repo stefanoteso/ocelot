@@ -41,30 +41,24 @@ BACKGROUND_AA_FREQ = (
 def _cls(obj):
     return type(obj).__name__
 
+def _filter_targets(all_targets, targets):
+    if targets == None:
+        targets = all_targets
+    else:
+        for target in targets:
+            if not target in all_targets:
+                raise ValueError("invalid target '{}'".format(target))
+    return targets
+
 def iterate_csv(path, num_skip = 0, **kwargs):
+    """Thin wrapper around ``csv.DictReader`` with a couple more options."""
     import csv
     with open(path, "rU") as fp:
-        reader = csv.DictReader(fp, **kwargs)
-        for row_as_dict in reader:
+        for row_as_dict in csv.DictReader(fp, **kwargs):
             if num_skip > 0:
                 num_skip -= 1
                 continue
             yield row_as_dict
-
-class Binary(object):
-    """A simple wrapper around binary executables."""
-    def __init__(self, path):
-        self.path = path
-
-    def run(self, args, shell = True):
-        import subprocess
-        pipe = subprocess.Popen(self.path + " " + " ".join(args),
-                                stdout = subprocess.PIPE,
-                                stderr = subprocess.PIPE,
-                                shell = shell)
-        out, err = pipe.communicate()
-        ret = pipe.wait()
-        return ret, out, err
 
 class FASTA(object):
     """A simple wrapper around FASTA files."""
@@ -250,6 +244,21 @@ class InterProTSV(object):
             hits[row["SOURCE_DB"] + ":" + row["SOURCE_FAMILY"]] = evalue
         return hits
 
+class Binary(object):
+    """A simple wrapper around binary executables."""
+    def __init__(self, path):
+        self.path = path
+
+    def run(self, args, shell = True):
+        import subprocess
+        pipe = subprocess.Popen(self.path + " " + " ".join(args),
+                                stdout = subprocess.PIPE,
+                                stderr = subprocess.PIPE,
+                                shell = shell)
+        out, err = pipe.communicate()
+        ret = pipe.wait()
+        return ret, out, err
+
 class CDHit(object):
     """A wrapper around the local `cdhit <http://weizhongli-lab.org/cd-hit/>`_
     installation.
@@ -306,3 +315,72 @@ class CDHit(object):
             clusters.append(members)
 
         return [ k for k, v in fasta.read("temp.cdhit") ], clusters
+
+class ReProfOutput(object):
+    """Thin wrapper around ``reprof`` output files.
+
+    .. seealso::
+
+        The :py:class:`ocelot.services.ReProf` class.
+    """
+    def read(self, path, which = None):
+        OPS = (
+            ("NO",      lambda s: int(s) - 1),          # Residue position (starting from 1)
+            ("AA",      lambda s: s),                   # Residue
+            ("PHEL",    lambda s: s),                   # Predicted SS (H = Helix, E = Sheet, L = Loop)
+            ("RI_S",    lambda s: float(s) / 10.0),     # Reliability of the SS prediction in [0,9] (low to high)
+            ("PE",      lambda s: float(s) / 100.0),    # Probability of H in [0,1]
+            ("PE",      lambda s: float(s) / 100.0),    # Probability of E in [0,1]
+            ("PL",      lambda s: float(s) / 100.0),    # Probability of L in [0,1]
+            ("PACC",    lambda s: float(s)),            # Predicted absolute SA
+            ("PREL",    lambda s: float(s)),            # Predicted relative SA
+            ("P10",     lambda s: float(s) / 10.0),     # Predicted relative SA in [0-9] (buried to exposed)
+            ("RI_A",    lambda s: float(s) / 10.0),     # Reliability of the SA prediction in [0,9] (low to high)
+            ("PBE",     lambda s: s),                   # Most likely predicted SA in {B,E]
+            ("PBIE",    lambda s: s),                   # Most likely predicted SA
+        )
+        fields = [name for name, f in OPS]
+        filtered_ops = [(field, op) for field, op in OPS
+                        if field in set(_filter_targets(fields, which))]
+        results, old_pos = [], None
+        for row in iterate_csv(path, delimiter = "\t", fieldnames = fields,
+                               num_skip = 18): # XXX very fragile
+            pos = int(row["NO"]) - 1
+            assert old_pos == None or pos == (old_pos + 1)
+            old_pos = pos
+            results.append([op(row[field]) for field, op in filtered_ops ])
+        return results
+
+class ReProf(object):
+    def __init__(self, path = "/usr/bin/reprof"):
+        self.reprof = Binary(path)
+
+    def run(self, sequence, which = None):
+        """Runs reprof on a protein sequence.
+
+        :param sequence: a protein sequence.
+        :param which: which columns should be returned as output.
+        :returns: a list of rows from the ``reprof`` output.
+
+        The ``which`` argument is passed directly to the
+        :py:class:`ocelot.services.ReProfOutput` class.
+
+        .. todo::
+
+            Add support for PSSM inputs.
+            Add support for mutations.
+            Add support for modeldir.
+            Use temporary files, remove them after the fact.
+        """
+        FASTA().write("temp.fasta", [("temp", sequence)])
+        args = [ "-i {}".format("temp.fasta"),
+                 "-o {}".format("temp.reprof") ]
+        ret, out, err = self.reprof.run(args)
+        if ret != 0:
+            raise RuntimeError("reprof exited with error code '{}'".format(ret))
+        return ReProfOutput().read("temp.reprof", which = which)
+
+class _TestReProf(object):
+    def test_output(self):
+        reprof = ReProf()
+        output = reprof.run("".join(AMINOACIDS))
