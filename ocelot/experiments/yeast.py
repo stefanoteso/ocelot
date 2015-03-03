@@ -100,7 +100,7 @@ class YeastExperiment(_Experiment):
                 sgd_id_to_feat[sgd_id].add(feat)
         return sgd_id_to_feat
 
-    def _get_protein_interactions(self, manual_only = False):
+    def _get_sgd_pin(self, manual_only = False):
         query = """
         SELECT ?orf1 ?orf2
         FROM <{default_graph}>
@@ -126,35 +126,29 @@ class YeastExperiment(_Experiment):
         for bindings in self.iterquery(query, n = 2):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
-            pp_pos.update([ (p1,p2) ])
+            pp_pos.add((p1,p2))
         return pp_pos
 
-    def _cached(self, f, relpath, *args, **kwargs):
-        try:
-            assert not self.force_update
-            y = self._depickle(relpath)
-        except Exception, e:
-            y = f(*args, **kwargs)
-            self._pickle(y, relpath)
-        return y
+    @staticmethod
+    def _get_neighbors_and_degree(ps, pps):
+        neighbors_of = { p: set() for p in ps }
+        for p, q in pps:
+            neighbors_of[p].add(q)
+            neighbors_of[q].add(p)
+        return neighbors_of
 
-    def _get_negative_protein_interactions(self, ps, pos):
+    def _get_negative_pin(self, ps, pos):
         """Samples the negative interactions from the complement graph.
 
         Uses the sampling method described in [Yu10]_.
         """
-        neighbors_of = { p: set() for p in ps }
-        for p, q in pos:
-            neighbors_of[p].update([q])
-            neighbors_of[q].update([p])
-        for p in neighbors_of:
-            neighbors_of[p] = list(neighbors_of[p])
-        ps_degree = sorted([(len(neighbors_of[p]), p) for p in ps ],
-                            reverse = True)
-
         def is_candidate(p, q, neg):
             # TODO subtract BioGRID (or even better STRING)
             return p != q and not (p, q) in pos and not (p, q) in neg
+
+        neighbors_of = self._get_neighbors_and_degree(ps, pos)
+        ps_degree = sorted([(len(neighbors_of[p]), p) for p in ps ],
+                            reverse = True)
 
         neg = set()
         for i, (degree, p) in enumerate(ps_degree):
@@ -178,14 +172,8 @@ class YeastExperiment(_Experiment):
             neg.update([(q, p) for p, q in sample])
         return neg
 
-    def _get_folds(ps, pos, neg):
-        # First, the known protein interactions in iPfam were divided into ten
-        # folds. Then, each domain instance interaction and each residue
-        # interaction was put into the fold in which the parent protein
-        # interaction was assigned.  Finally, the remaining protein
-        # interactions and all the negative sets were randomly divided into ten
-        # folds.
-        pass
+    def _get_folds(ps, pos, num_folds = 10):
+        raise NotImplementedError
 
     @staticmethod
     def _check_p_pp_are_sane(ps, pps):
@@ -193,6 +181,15 @@ class YeastExperiment(_Experiment):
             "pairs are not symmetric"
         assert all(p in ps for p, _ in pps), \
             "singletons and pairs do not match"
+
+    def _cached(self, f, relpath, *args, **kwargs):
+        try:
+            assert not self.force_update
+            y = self._depickle(relpath)
+        except Exception, e:
+            y = f(*args, **kwargs)
+            self._pickle(y, relpath)
+        return y
 
     def run(self):
         """Run the yeast prediction experiment."""
@@ -218,7 +215,7 @@ class YeastExperiment(_Experiment):
                 .format(len(filtered_p_clusters), 0.8)
 
         # Query the hq protein-protein interactions
-        pp_pos_hq = self._cached(self._get_protein_interactions,
+        pp_pos_hq = self._cached(self._get_sgd_pin,
                                  "sgd_id_interactions_hq.txt",
                                  manual_only = True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
@@ -227,7 +224,7 @@ class YeastExperiment(_Experiment):
         self._check_p_pp_are_sane(ps, pp_pos_hq)
 
         # Query the hq+lq protein-protein interactions
-        pp_pos_lq = self._cached(self._get_protein_interactions,
+        pp_pos_lq = self._cached(self._get_sgd_pin,
                                  "sgd_id_interactions_lq.txt",
                                  manual_only = False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
@@ -237,7 +234,7 @@ class YeastExperiment(_Experiment):
 
         # Here we pass the low-quality interactions so as to get a better
         # approximation of the negative set.
-        pp_neg = self._cached(self._get_negative_protein_interactions,
+        pp_neg = self._cached(self._get_negative_pin,
                               "sgd_id_interactions_neg.txt",
                               ps, pp_pos_lq)
         print _cls(self), ": sampled {} p-p negative interactions" \
@@ -247,4 +244,6 @@ class YeastExperiment(_Experiment):
         # TODO retrieve dom-dom and res-res interaction instances
 
         # TODO create the folds, with redundancy reduced training sets
-        pp_folds = self._get_folds(ps, pp_pos_hq, pp_neg)
+        pp_folds = self._cached(self._get_folds, "folds", ps, pp_pos_hq)
+        print _cls(self), ": created the folds"
+
