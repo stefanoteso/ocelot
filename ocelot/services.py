@@ -67,9 +67,9 @@ class Binary(object):
         return ret, out, err
 
 class FASTA(object):
-    """A simple wrapper around fasta files."""
+    """A simple wrapper around FASTA files."""
     def read(self, path):
-        """Reads the contents of a fasta file.
+        """Reads the contents of a FASTA file.
 
         :param path: path to the FASTA file to be read.
         :returns: pairs of the form ``(header, sequence)``, as a generator.
@@ -110,8 +110,6 @@ class PSSM(object):
     :param prior: list of priors on amino acid probabilities (default:
         BACKGROUND_AA_FREQ)
     :param gamma: amount of smoothing-by-prior (default: 0.8).
-    :returns: a list of lists, with one inner list for each PSSM residue. The
-        output probabilities/scores are ordered as in ``AMINOACIDS``.
     """
     def __init__(self, **kwargs):
         TARGETS = ["residue", "score", "condp", "nlog_condp"]
@@ -131,6 +129,13 @@ class PSSM(object):
         self._gamma = gamma
 
     def read(self, path):
+        """Reads a PSSM file.
+
+        :param path: path to the file to be read.
+        :returns: a list of lists, with one inner list for each PSSM residue.
+
+        The output probabilities/scores are ordered as in ``AMINOACIDS``.
+        """
         with open(path, "rt") as fp:
             lines = fp.readlines()[3:-6]
         infos = []
@@ -172,22 +177,28 @@ class PSSM(object):
         return infos
 
 class PCL(object):
-    """Reads a `PCL <http://smd.princeton.edu/help/formats.shtml#pcl>`_ gene expression file.
+    """Thin wrapper around `PCL <http://smd.princeton.edu/help/formats.shtml#pcl>`_
+    gene expression files.
 
     The file is simply a TSV where the first three columns are fixed,
     followed by a variable number of columns (one per condition).
-
-    :param path: path to the PCL file.
-    :returns: a ``name`` to ``expression levels`` dictionary.
-
-    Note that it uses the ``NAME`` column (rather than the ``YORF`` column) as
-    key to the dictionary, as ``NAME``'s tend to be unique while ``YORF``s are
-    not. We also ignore the ``GWEIGHT``, its value seems rather arbitrary
-    anyway.
     """
     def read(self, path):
-        import numpy as np
+        """Reads a PCL file into a dictionary.
 
+        .. note::
+
+            This class uses the ``NAME`` column, rather than the ``YORF`` colum,
+            as the key to the dictionary. The ``YORF``'s tend not to be unique
+            within the file.
+
+        .. note::
+
+            This class currently ignores the ``GWEIGHT``.
+
+        :param path: path to the PCL file.
+        :returns: a {``name``: ``expression-levels``} dictionary.
+        """
         FIELDS = ("ORF", "NAME", "GWEIGHT")
         orf_to_expression = {}
         num_conditions = -1
@@ -240,10 +251,10 @@ class InterProTSV(object):
         return hits
 
 class CDHit(object):
-    """A wrapper to the local `cdhit <http://weizhongli-lab.org/cd-hit/>`_ binary.
+    """A wrapper around the local `cdhit <http://weizhongli-lab.org/cd-hit/>`_
+    installation.
 
     :param path: path to the ``cdhit`` binary (default: ``/usr/bin/cdhit``)
-    :returns: list of cluster representatives.
 
     .. todo:
         Use tempfile.
@@ -261,7 +272,7 @@ class CDHit(object):
 
         :param pairs: pairs of the form ``(id, sequence)``.
         :param threshold: clustering threshold (default: ``0.9``).
-        :returns: list of the ids selected by CD-HIT.
+        :returns: list of cluster representatives, list of clusters 
         """
         fasta = FASTA()
         fasta.write("temp.fasta", pairs)
