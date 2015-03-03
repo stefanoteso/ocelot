@@ -55,6 +55,7 @@ def _make_rdf(args):
 
         # DATASETS
         "yip09"     : Target(ocelot.Yip09Converter, {}),
+        "cafa13"    : Target(ocelot.CAFA13Converter, {}),
     }
     for id_, target in _filter_targets(ALL_TARGETS, args.targets):
         target.kwargs["basename"] = id_

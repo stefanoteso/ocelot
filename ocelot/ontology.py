@@ -174,6 +174,16 @@ YIP_NOT_INTERACTS_WITH  = OCELOT.yip_not_interacts_with
 YIP_PARENT_OF           = OCELOT.yip_parent_of
 YIP_INSTANCE_OF         = OCELOT.yip_instance_of
 
+# CAFA13 dataset
+CAFA13_ID               = OCELOT.cafa13_id
+CAFA13_ID_HAS_SEQ       = OCELOT.cafa13_id_has_seq
+CAFA13_ID_HAS_ANNOT     = OCELOT.cafa13_id_has_annot
+CAFA13_ANNOT            = OCELOT.cafa13_annot
+CAFA13_ANNOT_HAS_GO     = OCELOT.cafa13_annot_has_go
+CAFA13_ANNOT_HAS_TAXID  = OCELOT.cafa13_annot_has_taxid
+CAFA13_ANNOT_HAS_QUAL   = OCELOT.cafa13_annot_has_qual
+CAFA13_ANNOT_HAS_EVCODE = OCELOT.cafa13_annot_has_evcode
+
 def uri(root, name):
     return U(root + u"." + name)
 
