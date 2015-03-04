@@ -5,6 +5,7 @@ from .base import _Experiment
 import os
 import numpy as np
 from ocelot.services import _cls, CDHit
+from ocelot.go import GODag, GOTerm
 
 class YeastExperiment(_Experiment):
     """New experiment based on SGD and iPfam.
@@ -194,13 +195,13 @@ class YeastExperiment(_Experiment):
     def run(self):
         """Run the yeast prediction experiment."""
         ps          = self._cached(self._get_sgd_ids,
-                                   "sgd_ids.txt")
+                                   "sgd_ids.pickle")
         p_to_seq    = self._cached(self._get_sgd_id_to_seq,
-                                   "sgd_id_to_seq.txt")
+                                   "sgd_id_to_seq.pickle")
         p_to_fun    = self._cached(self._get_sgd_id_to_fun,
-                                   "sgd_id_to_fun.txt")
+                                   "sgd_id_to_fun.pickle")
         p_to_feat   = self._cached(self._get_sgd_id_to_feat,
-                                   "sgd_id_to_feat.txt")
+                                   "sgd_id_to_feat.pickle")
         print _cls(self), ": found {} proteins".format(len(ps))
 
         # Filter out sequences shorter than 30 residues
@@ -216,7 +217,7 @@ class YeastExperiment(_Experiment):
 
         # Query the hq protein-protein interactions
         pp_pos_hq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_hq.txt",
+                                 "sgd_id_interactions_hq.pickle",
                                  manual_only = True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} hi-quality PPIs (density = {})" \
@@ -225,7 +226,7 @@ class YeastExperiment(_Experiment):
 
         # Query the hq+lq protein-protein interactions
         pp_pos_lq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_lq.txt",
+                                 "sgd_id_interactions_lq.pickle",
                                  manual_only = False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} lo-quality PPIs (density = {})" \
@@ -235,7 +236,7 @@ class YeastExperiment(_Experiment):
         # Here we pass the low-quality interactions so as to get a better
         # approximation of the negative set.
         pp_neg = self._cached(self._get_negative_pin,
-                              "sgd_id_interactions_neg.txt",
+                              "sgd_id_interactions_neg.pickle",
                               ps, pp_pos_lq)
         print _cls(self), ": sampled {} p-p negative interactions" \
                 .format(len(pp_neg))
