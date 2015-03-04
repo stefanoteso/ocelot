@@ -220,6 +220,9 @@ class SGDConverter(Converter):
         )
         for row in iterate_csv(self._get_path("go_slim_mapping.tab"),
                                delimiter = "\t", fieldnames = FIELDS):
+            if row["GO_TERM"] in ("other", "not_yet_annotated"):
+                continue
+            assert len(row["GO_ID"]), row
             sgd_id  = O.uri(O.SGD_ID, self._sanitize(row["SGD_ID"]))
             goslim  = O.go_to_uri(self._sanitize(row["GO_ID"]))
             triples.append((sgd_id, O.SGD_ID_HAS_GOSLIM, goslim))
