@@ -107,6 +107,7 @@ Authors
 -------
 
 - Stefano Teso (``name.surname _AT_ gmail.com``)
+- Luca Masera (WRITEME)
 
 
 Contents
@@ -139,6 +140,8 @@ Services
 --------
 
 .. automodule:: ocelot.services
+    :members:
+.. automodule:: ocelot.go
     :members:
 
 
