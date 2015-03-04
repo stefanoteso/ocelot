@@ -65,11 +65,14 @@ class FASTA(object):
     def read(self, path):
         """Reads the contents of a FASTA file.
 
+        .. note::
+
+            End-of-sequence symbols ``"*"`` are stripped from the end
+            of the sequence. No other sequence transformation is done.
+
         :param path: path to the FASTA file to be read.
         :returns: pairs of the form ``(header, sequence)``, as a generator.
-
-        Note that it strips ``*`` end-of-sequence symbols from the end of the
-        sequence."""
+        """
         with open(path, "rt") as fp:
             header = None
             sequence = None
