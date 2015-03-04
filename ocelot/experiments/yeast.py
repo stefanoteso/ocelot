@@ -108,7 +108,7 @@ class YeastExperiment(_Experiment):
 
     def _get_sgd_pin(self, manual_only = False):
         query = """
-        SELECT ?orf1 ?orf2
+        SELECT DISTINCT ?orf1 ?orf2
         FROM <{default_graph}>
         WHERE {{
             ?orf1 a ocelot:sgd_id ;
