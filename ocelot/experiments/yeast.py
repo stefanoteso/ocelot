@@ -14,6 +14,11 @@ class YeastExperiment(_Experiment):
     experiment, but performed on a different dataset based on SGD, BioGRID
     and iPfam.
 
+    .. note::
+
+        Somewhat unrelated. For up-to-date statistics on GO annotations,
+        see `<http://geneontology.org/page/current-go-statistics>`_.
+
     :param src: source directory of all databases.
     :param dst: destination directory for the results.
     :param subtargets: prediction targets.
@@ -173,6 +178,23 @@ class YeastExperiment(_Experiment):
             neg.update([(q, p) for p, q in sample])
         return neg
 
+    def _propagate_fun_on_dag(self, p_to_fun, dag):
+        propagated_p_to_fun = {}
+        for p, functions in p_to_fun.iteritems():
+            propagated_functions = set()
+            for fun in functions:
+                if fun == "": # This can occur due to empty annotations in SGD
+                    continue
+                paths = dag.paths_to_root(fun)
+                if paths == None:
+                    print "Warning: protein '{}' is annotated with an undefined term '{}', skipping" \
+                            .format(p, fun)
+                    continue
+                for path in paths:
+                    propagated_functions.update(path)
+            propagated_p_to_fun[p] = propagated_functions
+        return propagated_p_to_fun
+
     def _get_folds(ps, pos, num_folds = 10):
         raise NotImplementedError
 
@@ -203,6 +225,13 @@ class YeastExperiment(_Experiment):
         p_to_feat   = self._cached(self._get_sgd_id_to_feat,
                                    "sgd_id_to_feat.pickle")
         print _cls(self), ": found {} proteins".format(len(ps))
+
+        # XXX curiously enough, some SGD proteins are annotated with GO terms
+        # that are **not** part of goslim_yeast.obo... We use go-basic instead.
+        dag = GODag(os.path.join(self.src, "GO", "go-basic.obo"))
+        p_to_fun    = self._cached(self._propagate_fun_on_dag,
+                                   "sgd_id_to_fun_propagated.pickle",
+                                   p_to_fun, dag)
 
         # Filter out sequences shorter than 30 residues
         filtered_ps = filter(lambda p: len(p_to_seq[p]) >= 30, ps)
