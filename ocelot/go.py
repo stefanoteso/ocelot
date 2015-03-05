@@ -9,6 +9,7 @@ class _GOReader(object):
 
         http://purl.obolibrary.org/obo/go/
 
+    :param path: path to the OBO file.
     :param keep_obsolete: whether to keep obsolete nodes (default: ``True``).
 
     Example usage::
@@ -18,7 +19,7 @@ class _GOReader(object):
                 print term
     .. todo::
 
-        Handle the remaining information.
+        Handle the remaining term information.
     """
     _TYPEDEF_TAG    = "[Typedef]"
     _TERM_TAG       = "[Term]"
@@ -62,7 +63,9 @@ class _GOReader(object):
         while True:
             pos = self._handle.tell()
             line = self._handle.readline()
-            if not line or (line.startswith(self._TYPEDEF_TAG) or line.startswith(self._TERM_TAG)):
+            if not line or \
+                (line.startswith(self._TYPEDEF_TAG) or \
+                 line.startswith(self._TERM_TAG)):
                 self._handle.seek(pos)
                 break
             lines.append(line)
@@ -76,7 +79,7 @@ class _GOReader(object):
         # replaced_by, saved-by, subset, subsetdef, synonym, synonymtypedef,
         # transitive_over, xref. We do not handle nearly enough of them.
         #
-        # XXX the fulle set of relations is: happens_during, has_part,
+        # XXX the full set of relations is: happens_during, has_part,
         # negatively_regulates, occurs_in, part_of, positively_regulates,
         # regulates.
 
@@ -132,9 +135,6 @@ class GOTerm(object):
     def __repr__(self):
         return "GOTerm('%s')" % (self.id)
 
-    def get_predicate_name(self):
-        return self.name.replace(',', '').replace(' ', '-').replace('_', '-').upper()
-
     def get_name(self):
         bound = 15
         ret = self.name[0].upper() + self.name[1:].replace('_', ' ')
@@ -142,63 +142,77 @@ class GOTerm(object):
             ret = ret[:bound] + ret[bound:].replace(' ', '\n', 1)
         return ret
 
-    def has_parent(self, term, dag):
-        for p, r in self.parents:
-            if dag[p].id == term or dag[p].has_parent(term):
+    def has_ancestor(self, dag, term_id, relations=set(["is_a"])):
+        """Checks whether ``term_id`` is an ancestor of this term."""
+        for parent_id, relation in self.parents:
+            if not relation in relations:
+                continue
+            if dag._terms[parent_id].id == term_id or \
+               dag._terms[parent_id].has_parent(term_id):
                 return True
         return False
 
-    def has_child(self, term, dag):
-        for p, r in self.children:
-            if dag[p].id == term or dag[p].has_child(term):
+    def has_descendant(self, dag, term, relations=set(["is_a"])):
+        """Checks whether ``term_id`` is a descendant of this term."""
+        for child_id, relation in self.children:
+            if not relation in relations:
+                continue
+            if dag._terms[child_id].id == term_id or \
+               dag._terms[child_id].has_child(term_id):
                 return True
         return False
 
-    def get_all_parents(self, dag, rel=None):
-        if not rel:
-            rel = ['is_a']
-        all_parents = set()
-        for p, r in self.parents:
-            if r in rel:
-                all_parents.add(dag[p].id)
-                all_parents |= dag[p].get_all_parents(dag, rel)
-        return all_parents
-
-    def get_parents(self, dag):
+    def get_parents(self, dag, relations=set(["is_a"])):
+        """Returns the parents of a node."""
         parents = set()
-        for p, r in self.parents:
-            parents.add((dag[p], r))
+        for parent_id, relation in self.parents:
+            if not relation in relations:
+                continue
+            parents.add((dag[parent_id], relation))
         return parents
 
-    def get_all_children(self, dag, rel=None):
-        if not rel:
-            rel = ['is_a']
-        all_children = set()
-        for p, r in self.children:
-            if r in rel:
-                all_children.add(dag[p].id)
-                all_children |= dag[p].get_all_children(dag, rel)
-        return all_children
-
-    def get_children(self, dag):
+    def get_children(self, dag, relations=set(["is_a"])):
+        """Returns the children of a node."""
         children = set()
-        for p, r in self.children:
-            children.add((dag[p], r))
+        for child_id, relation in self.children:
+            if not relation in relations:
+                continue
+            children.add((dag[child_id], relation))
         return children
 
-    def get_all_parent_edges(self, dag):
-        all_parent_edges = set()
-        for p, r in self.parents:
-            all_parent_edges.add((self.id, dag[p].id, r))
-            all_parent_edges |= dag[p].get_all_parent_edges(dag)
-        return all_parent_edges
+    def get_ancestors(self, dag, relations=set(["is_a"])):
+        """Returns the ancestors of a node."""
+        ancestors = set()
+        for parent_id, relation in self.parents:
+            if not relation in relations:
+                continue
+            ancestors.add(dag._terms[parent_id].id)
+            ancestors |= dag._terms[parent_id].get_ancestors(dag, relations)
+        return ancestors
 
-    def get_all_child_edges(self, dag):
-        all_child_edges = set()
-        for p, r in self.children:
-            all_child_edges.add((dag[p].id, self.id, r))
-            all_child_edges |= dag[p].get_all_child_edges(dag)
-        return all_child_edges
+    def get_descendants(self, dag, relations=set(["is_a"])):
+        """Returns the descendants of a node."""
+        descendants = set()
+        for child_id, relation in self.parents:
+            if not relation in relations:
+                continue
+            descendants.add(dag._terms[child_id].id)
+            descendants |= dag._terms[child_id].get_descendants(dag, relations)
+        return descendants
+
+#    def get_all_parent_edges(self, dag):
+#        all_parent_edges = set()
+#        for p, r in self.parents:
+#            all_parent_edges.add((self.id, dag[p].id, r))
+#            all_parent_edges |= dag[p].get_all_parent_edges(dag)
+#        return all_parent_edges
+
+#    def get_all_child_edges(self, dag):
+#        all_child_edges = set()
+#        for p, r in self.children:
+#            all_child_edges.add((dag[p].id, self.id, r))
+#            all_child_edges |= dag[p].get_all_child_edges(dag)
+#        return all_child_edges
 
 class GODag(object):
     """The GO DAG.
@@ -216,14 +230,15 @@ class GODag(object):
     def __init__(self, path = None, keep_obsolete = True):
         self._terms = {}
         self._path = path
-        if path:
-            for term in _GOReader(path, keep_obsolete = keep_obsolete):
-                assert not term.id in self._terms
-                self._terms[term.id] = term
-                for alt_id in term.alt_ids:
-                    assert not alt_id in self._terms
-                    self._terms[alt_id] = term
-            self._populate_terms()
+        if not path:
+            return
+        for term in _GOReader(path, keep_obsolete = keep_obsolete):
+            assert not term.id in self._terms
+            self._terms[term.id] = term
+            for alt_id in term.alt_ids:
+                assert not alt_id in self._terms
+                self._terms[alt_id] = term
+        self._populate_terms()
 
     def _set_term_depth(self, term):
         if term.level < 0:
@@ -249,6 +264,12 @@ class GODag(object):
         return "\n".join("{}: {}".format(id_, term)
                          for id_, term in self._terms.items())
 
+    def __getitem__(self, term_id):
+        """Returns the ``GOTerm`` associated to a term ``id``."""
+        if not term_id in self._terms:
+            return
+        return self._terms[term_id]
+
     def paths_to_root(self, term_id):
         """Returns all possible paths to the root node.
 
@@ -273,6 +294,36 @@ class GODag(object):
             return paths
 
         return _paths_to_root(self._terms[term_id])
+
+    def add_bin_term(parent, proteins = set()):
+        term = GOTerm()
+        term.id = "BIN" + parent.id[parent_term.id.index(":"):]
+        term.name = "Bin term for " + parent.name
+        term.namespace = parent.namespace
+        term.parents = [(parent.id, "bin_for")]
+        term.children = []
+        term.is_obsolete = False
+        term.proteins = proteins
+        term.level = parent.level + 1
+        return term
+
+    def get_valid_term_ids(self, include_bins=False):
+        for id_ in self._terms.iterkeys():
+            if id_.startswith("GO:") or \
+               (include_bins and id_.startswith("BN:")):
+                yield id_
+
+    def get_valid_terms(self, include_bins=False):
+        for id_, term in self.iteritems():
+            if id_.startswith("GO:") or \
+               (include_bins and id_.startswith("BN:")):
+                yield term
+
+    def get_valid_id(self, include_bins=False):
+        for id_, term in self.iteritems():
+            if id_.startswith("GO:") or \
+               (include_bins and id_.startswith("BN:")):
+                yield id_, term
 
 #    def prune(self, ids_to_keep, 
 #        from copy import deepcopy
@@ -316,66 +367,3 @@ class GODag(object):
 #                    new_dag[p].proteins.update(t.proteins)
 #
 #        return new_dag
-
-#    def write_dag(self, out=sys.stdout):
-#        for rec_id, rec in sorted(self.items()):
-#            print >> out, rec
-
-#    def query_term(self, term, verbose=False):
-#        if term not in self:
-#            print >> sys.stderr, "Term %s not found!" % term
-#            return
-#
-#        rec = self._terms[term]
-#        print >> sys.stderr, rec
-#        if verbose:
-#            print >> sys.stderr, "all parents:", rec.get_all_parents()
-#            print >> sys.stderr, "all children:", rec.get_all_children()
-#
-#        return rec
-
-
-#    def _label_wrap(self, label):
-#        wrapped_label = r"%s\n%s" % (label, self._terms[label].name.replace(",", r"\n"))
-#        return wrapped_label
-
-#    def update_association(self, association):
-#        bad_terms = set()
-#        for key, terms in association.items():
-#            parents = set()
-#            for term in terms:
-#                try:
-#                    parents.update(self._terms[term].get_all_parents())
-#                except:
-#                    bad_terms.add(term)
-#            terms.update(parents)
-#        if bad_terms:
-#            print >> sys.stderr, "terms not found: %s", bad_terms
-
-#    def get_valid_keys(self, include_bin=False):
-#        for k in self.iterkeys():
-#            if k.startswith('GO:') or (include_bin and k.startswith('BN:')):
-#                yield k
-
-#    def get_valid_values(self, include_bin=False):
-#        for k, v in self.iteritems():
-#            if k.startswith('GO:') or (include_bin and k.startswith('BN:')):
-#                yield v
-
-#    def get_valid_items(self, include_bin=False):
-#        for k, v in self.iteritems():
-#            if k.startswith('GO:') or (include_bin and k.startswith('BN:')):
-#                yield (k, v)
-
-# def create_bin_node(parent_term, proteins):
-#     ret = GOTerm()
-#     ret.id = 'BN' + parent_term.id[parent_term.id.index(':'):]
-#     ret.name = 'Bin for ' + parent_term.name
-#     ret.namespace = parent_term.namespace
-#     ret.parents = [(parent_term.id, 'bin')]
-#     ret.children = []
-#     ret.is_obsolete = False
-#     ret.proteins = proteins
-#     ret.level = parent_term.level + 1
-# 
-#     return ret
