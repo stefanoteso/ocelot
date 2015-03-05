@@ -1,6 +1,5 @@
 # -*- coding: utf8 -*-
 
-import multiprocessing as mp
 import numpy as np
 from scipy import sparse
 from ocelot.services import AMINOACIDS
@@ -23,8 +22,6 @@ class _RecursivePrefixStringKernel(_Kernel):
     :param alphabet: list of valid symbols (default: AMINOACIDS).
     :param min_survivors_per_node: minimum number of instances to proceed lower
         within the prefix tree (default: 1)
-    :param num_processes: number of processes to distribute the computation on,
-        0 means *use all CPUs* (default: 1)
 
     .. todo::
 
@@ -50,11 +47,6 @@ class _RecursivePrefixStringKernel(_Kernel):
         self._min_survivors_per_node = kwargs.get("min_survivors_per_node", 1)
         if not self._min_survivors_per_node >= 1:
             raise ValueError("min_survivors_per_node must be >= 1")
-        self._num_processes = kwargs.get("num_processes", 1)
-        if self._num_processes == 0:
-            self._num_processes = mp.cpu_count()
-        if not self._num_processes >= 1:
-            raise ValueError("num_processes must be >= 1")
         # Used for the delayed-update optimization
         self._survivors_rows, self._survivors_cols, self._survivors_counts = \
             [], [], []
@@ -132,13 +124,9 @@ class _RecursivePrefixStringKernel(_Kernel):
     def _compute_all(self):
         self._matrix = np.zeros((len(self), len(self)))
         self._instances = self._get_instances()
-
-        if self._num_processes > 1:
-            raise NotImplementedError
-        else:
-            self._node_counter = 0
-            self._recurse(self._instances, 0)
-            self._flush_survivors()
+        self._node_counter = 0
+        self._recurse(self._instances, 0)
+        self._flush_survivors()
         return self._matrix
 
 class SpectrumKernel(_RecursivePrefixStringKernel):
