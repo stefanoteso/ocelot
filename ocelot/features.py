@@ -57,6 +57,14 @@ class CompositionFeatures(object):
 
     The values are taken from [WikipediaAAa]_, [WikipediaAAb]_, [Swart04]_.
 
+    .. warning::
+
+        Residue characters are converted to upper-case prior to computation.
+
+    .. todo::
+
+        Use more accurate values.
+
     :param targets: list of target composition features (strings).
     """
     def __init__(self, targets = None):
@@ -78,16 +86,51 @@ class CompositionFeatures(object):
             phis.append(phi)
         return np.array(phis)
 
+class SecondaryFeatures(object):
+    """Pre-residue secondary structure and solvent accessibility features.
+
+    .. warning::
+
+        Residue characters are converted to upper-case prior to computation.
+
+    :param targets: what features to compute.
+    :param method: method to use (default: ``reprof``).
+    """
+    def __init__(self, targets = [], method = "reprof"):
+        self._targets = targets
+        self._method = method
+    def compute(self, sequence):
+        raise NotImplementedError
+
+class DisorderFeatures(object):
+    """Per-residue disorder features.
+
+    .. warning::
+
+        Residue characters are converted to upper-case prior to computation.
+
+    .. warning::
+
+        Protein disorder has multiple definitions. The particular definition
+        used to compute these features depends on the underlying method.
+
+    :param inputs: a list of sequences.
+    :param method: method to use (default: ``disopred``).
+    """
+    def __init__(self, method = "disopred"):
+        self._method = method
+    def compute(self, sequences):
+        raise NotImplementedError
+
 class ComplexityFeatures(object):
     """Low-complexity region features.
 
     Low-complexity regions are correlated with packing density and
     hydrophobicity and with the interface propensity of residues.
+    Some useful references are [Wootton94]_, [Liao05]_, [Coletta10]_.
 
     Measured by computing the Shannon entropy over one or more windows of
     residues.
-
-    Some useful references are [Wootton94]_, [Liao05]_, [Coletta10]_.
 
     .. todo::
 
@@ -95,7 +138,7 @@ class ComplexityFeatures(object):
     """
     def compute(self, sequence, window_sizes = [8,16,32,64,128], epsilon = 1e-10):
         from scipy.stats import entropy
-        import math
+        from math import fabs
         phi = []
         for window_size in window_sizes:
             window_phi = []
@@ -108,7 +151,7 @@ class ComplexityFeatures(object):
                 counts = [ float(len(filter(lambda res: res == aa, window))) + epsilon
                            for aa in _OLCS ]
                 window_h = entropy(np.array(counts) / np.sum(counts))
-                if math.fabs(window_h) < epsilon:
+                if fabs(window_h) < epsilon:
                     window_h = 0.0
                 window_phi.append(window_h)
             phi.append(window_phi)
@@ -151,3 +194,12 @@ class EmpiricalFeatures(object):
         self.patterns = patterns
     def compute(self, indices):
         return self.subkernel.compute()[indices, self.patterns]
+
+class _TestCompositionFeatures(object):
+    pass
+
+class _TestSecondaryFeatures(object):
+    pass
+
+class _TestComplexityFeatures(object):
+    pass
