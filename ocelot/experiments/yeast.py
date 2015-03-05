@@ -132,7 +132,7 @@ class YeastExperiment(_Experiment):
         for bindings in self.iterquery(query, n = 2):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
-            pp_pos.add((p1,p2))
+            pp_pos.update([(p1,p2), (p2,p1)])
         return pp_pos
 
     @staticmethod
