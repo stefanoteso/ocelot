@@ -64,6 +64,15 @@ def _make_rdf(args):
                                      **target.kwargs)
         converter.siphon()
 
+def _start_virtuoso(args):
+    """Starts a Virtuoso instance"""
+    section = ocelot.config["virtuoso"]
+    virtuoso, ini = ocelot.services.Binary(section["binary"]), section["ini"]
+    print "About to start virtuoso (with '{}')".format(ini)
+    ret, out, err = virtuoso.run(["+configfile {}".format(ini)])
+    if ret != 0:
+        raise RuntimeError("virtuoso-t exited with error code '{}'".format(ret))
+
 def _upload_rdf(args):
     """Uploads the RDF data into a Virtuoso instance.
 
@@ -155,6 +164,7 @@ def main():
 
     COMMANDS = {
         "make-rdf": _make_rdf,
+        "start-virtuoso": _start_virtuoso,
         "upload-rdf": _upload_rdf,
         "clear-rdf": _clear_rdf,
         "run-experiment": _run_experiment,
