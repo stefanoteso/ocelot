@@ -2,9 +2,9 @@
 
 import numpy as np
 
-from .base import _Kernel
+from . import Kernel
 
-class DiffusionKernel(_Kernel):
+class DiffusionKernel(Kernel):
     """The diffusion kernel between graph nodes [Kondor02]_.
 
     The diffusion kernel between two nodes of a graph :math:`G` is defined as:

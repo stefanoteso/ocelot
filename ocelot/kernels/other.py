@@ -1,9 +1,10 @@
 # -*- coding: utf8 -*-
 
-from .base import _Kernel
 import numpy as np
 
-class EmpiricalKernelMap(_Kernel):
+from . import Kernel
+
+class EmpiricalKernelMap(Kernel):
     """Empirical kernel map over an underlying kernel[1].
 
     *References*
@@ -18,7 +19,7 @@ class EmpiricalKernelMap(_Kernel):
     def _compute_all(self):
         LinearKernel(self.features, range(len(self)))
 
-class PairwiseKernel(_Kernel):
+class PairwiseKernel(Kernel):
     """The pairwise kernel.
 
     It computes a kernel between pairs of elements as follows:

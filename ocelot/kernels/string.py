@@ -4,11 +4,11 @@ import numpy as np
 from scipy import sparse
 from ocelot.services import AMINOACIDS
 
-from .base import _Kernel
+from . import Kernel
 
 _MAX_SURVIVORS_PER_FLUSH = 65536
 
-class _RecursivePrefixStringKernel(_Kernel):
+class _RecursivePrefixStringKernel(Kernel):
     """Base prefix-tree string kernel implemented using recursion.
 
     Used to implement the spectrum, mismatch and profile kernels. Adapted from

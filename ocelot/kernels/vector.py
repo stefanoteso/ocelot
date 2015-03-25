@@ -2,9 +2,9 @@
 
 import numpy as np
 
-from .base import _Kernel
+from . import Kernel
 
-class LinearKernel(_Kernel):
+class LinearKernel(Kernel):
     """An explicit dot product kernel.
 
     :param entities: list of real-valued vectors.
@@ -19,7 +19,7 @@ class LinearKernel(_Kernel):
                 matrix[i,j] = matrix[j,i] = np.dot(phi_i.T, phi_j)
         return matrix
 
-class CorrelationKernel(_Kernel):
+class CorrelationKernel(Kernel):
     """A linear kernel over z-scores (computed autmatically).
 
     :param entities: list of real-valued vectors.
@@ -46,7 +46,7 @@ class CorrelationKernel(_Kernel):
                 matrix[i,j] = matrix[j,i] = np.dot(phi_i.T, phi_j)
         return matrix
 
-class SparseLinearKernel(_Kernel):
+class SparseLinearKernel(Kernel):
     """A sparse linear kernel.
 
     :param entities: list of dictionaries whose keys are the indices and the
@@ -67,7 +67,7 @@ class SparseLinearKernel(_Kernel):
                 matrix[i,j] = matrix[j,i] = dp
         return matrix
 
-class SetKernel(_Kernel):
+class SetKernel(Kernel):
     """A generic set kernel.
 
     :param entities: list of sets.
