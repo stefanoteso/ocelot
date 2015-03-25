@@ -68,7 +68,9 @@ class _Experiment(object):
         elif d[u"type"] == u"typed-literal":
             if d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
                 return int(d[u"value"])
-            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#float":
+                return float(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#double":
                 return float(d[u"value"])
             elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
                 return d[u"value"]
