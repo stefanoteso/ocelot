@@ -149,13 +149,15 @@ Features
 Kernels
 -------
 
-.. automodule:: ocelot.kernels.base
+.. automodule:: ocelot.kernels
     :members:
 .. automodule:: ocelot.kernels.vector
     :members:
 .. automodule:: ocelot.kernels.string
     :members:
 .. automodule:: ocelot.kernels.graph
+    :members:
+.. automodule:: ocelot.kernels.other
     :members:
 
 Experiments

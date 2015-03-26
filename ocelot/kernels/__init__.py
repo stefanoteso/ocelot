@@ -81,6 +81,7 @@ class Kernel(object):
         np.savetxt(path, self.compute())
 
 class DummyKernel(Kernel):
+    """A wrapper around ``np.ndarray``'s and files."""
     def __init__(self, arg, **kwargs):
         num = kwargs.get("num")
         if isinstance(arg, str):
