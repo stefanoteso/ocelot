@@ -158,10 +158,10 @@ class Yip09Converter(Converter):
         pps = [(words[0], words[1]) for words
                in (self._read(os.path.join("ppi", "ready", "goldPosProteinPairs.txt")) + \
                    self._read(os.path.join("ppi", "ready", "goldNegProteinPairs.txt")))]
-        dds = [(words[0:2], words[2:4]) for words
+        dds = [(tuple(words[0:2]), tuple(words[2:4])) for words
                in (self._read(os.path.join("ddi", "ready", "goldPosDomainPairs.txt")) + \
                    self._read(os.path.join("ddi", "ready", "goldNegDomainPairs.txt")))]
-        rrs = [(words[0:3], words[3:6]) for words
+        rrs = [(tuple(words[0:3]), tuple(words[3:6])) for words
                in (self._read(os.path.join("rri", "ready", "goldPosResiduePairs.txt")) + \
                    self._read(os.path.join("rri", "ready", "goldNegResiduePairs.txt")))]
         return pps, dds, rrs
