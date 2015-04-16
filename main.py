@@ -128,8 +128,9 @@ def _clear_rdf(args):
 def _run_experiment(args):
     """Converts the RDF data into a machine-learnable dataset.
 
-    :param args.dst: destination directory for the results.
+    :param args.target: target experiment.
     :param args.subtargets: prediction targets.
+    :param args.dst: destination directory for the results.
     :param args.endpoint: Virtuoso SPARQL endpoint.
     :param args.default_graph: URI of the default graph.
     """
