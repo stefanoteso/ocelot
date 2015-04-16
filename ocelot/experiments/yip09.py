@@ -27,7 +27,7 @@ class YipExperiment(_Experiment):
 
     def _get_sequences(self):
         """Reads the ORFs and their sequences from the endpoint."""
-        ans = self.query("""
+        query = """
         SELECT ?p ?seq
         FROM <{default_graph}>
         WHERE {{
@@ -40,14 +40,10 @@ class YipExperiment(_Experiment):
                 ?orf owl:sameAs ?feat .
             }}
         }}
-        """)
-        assert ans and len(ans) and "results" in ans
-        p_to_seq = {}
-        for bindings in ans["results"]["bindings"]:
-            bindings = { k: self.cast(v) for k, v in bindings.items() }
-            assert len(bindings) == 2
-            p = bindings[u"p"].split(".")[-1]
-            p_to_seq[p] = bindings[u"seq"]
+        """
+        p_to_seq = {binding[u"p"].split(".")[-1]: binding[u"seq"]
+                    for binding in self.iterquery(query, n = 2)}
+        assert len(p_to_seq) == 1681
         return p_to_seq
 
     def _get_ppis(self, symmetrize = False):
@@ -60,7 +56,7 @@ class YipExperiment(_Experiment):
         :param symmetrize: whether to symmetrize the interactions.
         """
         assert not symmetrize
-        pos_ans = self.query("""
+        pos_query = """
         SELECT ?p1 ?p2
         FROM <{default_graph}>
         WHERE {{
@@ -68,8 +64,8 @@ class YipExperiment(_Experiment):
             ?p2 a ocelot:yip_protein .
             ?p1 ocelot:yip_interacts_with ?p2 .
         }}
-        """)
-        neg_ans = self.query("""
+        """
+        neg_query = """
         SELECT DISTINCT ?p1 ?p2
         FROM <{default_graph}>
         WHERE {{
@@ -77,47 +73,112 @@ class YipExperiment(_Experiment):
             ?p2 a ocelot:yip_protein .
             ?p1 ocelot:yip_not_interacts_with ?p2 .
         }}
-        """)
-        assert len(pos_ans["results"]["bindings"]) == 3201
-        assert len(neg_ans["results"]["bindings"]) == 3201
-        pos_ppi, neg_ppi = set(), set()
-        for bindings in pos_ans["results"]["bindings"]:
-            assert len(bindings) == 2
-            pos_ppi.update([(self.cast(bindings[u"p1"]).split(".")[-1],
-                             self.cast(bindings[u"p2"]).split(".")[-1])])
-        for bindings in neg_ans["results"]["bindings"]:
-            assert len(bindings) == 2
-            neg_ppi.update([(self.cast(bindings[u"p1"]).split(".")[-1],
-                             self.cast(bindings[u"p2"]).split(".")[-1])])
+        """
+        def binding_to_pair(binding):
+            return binding[u"p1"].split(".")[-1], binding[u"p2"].split(".")[-1]
+        pos_ppi = set(binding_to_pair(binding)
+                      for binding in self.iterquery(pos_query, n = 2))
+        neg_ppi = set(binding_to_pair(binding)
+                      for binding in self.iterquery(neg_query, n = 2))
         assert len(pos_ppi) == 3201
         assert len(neg_ppi) == 3201
         assert len(pos_ppi & neg_ppi) == 0
         return pos_ppi, neg_ppi
 
-    def _compute_ppi_y(self, pps):
-        """Compute the y vector for protein-protein interactions.
-
-        :param pps: sorted list of proteins.
+    def _get_ddis(self, symmetrize = False):
+        """Reads the positive and negative DDIs from the endpoint."""
+        assert not symmetrize
+        pos_query = """
+        SELECT ?d1 ?d2
+        FROM <{default_graph}>
+        WHERE {{
+            ?d1 a ocelot:yip_domain .
+            ?d2 a ocelot:yip_domain .
+            ?d1 ocelot:yip_interacts_with ?d2 .
+        }}
         """
-        print _cls(self), "retrieving protein-protein interactions"
-        pos_ppi, neg_ppi = self._get_ppis()
-        print " #ppi+={} #ppi-={}".format(len(pos_ppi), len(neg_ppi))
+        neg_query = """
+        SELECT ?d1 ?d2
+        FROM <{default_graph}>
+        WHERE {{
+            ?d1 a ocelot:yip_domain .
+            ?d2 a ocelot:yip_domain .
+            ?d1 ocelot:yip_not_interacts_with ?d2 .
+        }}
+        """
+        def binding_to_pair(binding):
+            return tuple(binding[u"d1"].split(".")[-1].split("_")), \
+                   tuple(binding[u"d2"].split(".")[-1].split("_"))
+        pos_ddi = set(binding_to_pair(binding)
+                      for binding in self.iterquery(pos_query, n = 2))
+        neg_ddi = set(binding_to_pair(binding)
+                      for binding in self.iterquery(neg_query, n = 2))
+        assert len(pos_ddi) == 422, len(pos_ddi)
+        assert len(neg_ddi) == 422, len(neg_ddi)
+        assert len(pos_ddi & neg_ddi) == 0
+        return pos_ddi, neg_ddi
 
-        path = os.path.join(self.dst, "ppi-y.txt")
+    def _get_rris(self, symmetrize = False):
+        """Reads the positive and negative RRIs from the endpoint."""
+        pos_query = """
+        SELECT ?r1 ?r2
+        FROM <{default_graph}>
+        WHERE {{
+            ?r1 a ocelot:yip_residue .
+            ?r2 a ocelot:yip_residue .
+            ?r1 ocelot:yip_interacts_with ?r2 .
+        }}
+        """
+        neg_query = """
+        SELECT ?r1 ?r2
+        FROM <{default_graph}>
+        WHERE {{
+            ?r1 a ocelot:yip_residue .
+            ?r2 a ocelot:yip_residue .
+            ?r1 ocelot:yip_not_interacts_with ?r2 .
+        }}
+        """
+        def binding_to_pair(binding):
+            return tuple(binding[u"r1"].split(".")[-1].split("_")), \
+                   tuple(binding[u"r2"].split(".")[-1].split("_"))
+        pos_ddi = set(binding_to_pair(binding)
+                      for binding in self.iterquery(pos_query, n = 2))
+        neg_ddi = set(binding_to_pair(binding)
+                      for binding in self.iterquery(neg_query, n = 2))
+        assert len(pos_ddi) == 2000, len(pos_ddi)
+        assert len(neg_ddi) == 2000, len(neg_ddi)
+        assert len(pos_ddi & neg_ddi) == 0
+        return pos_ddi, neg_ddi
+
+    def _compute_ppi_y(self, pps):
+        return self._compute_xxi_y(pps, self._get_ppis, "ppi")
+
+    def _compute_ddi_y(self, dds):
+        return self._compute_xxi_y(dds, self._get_ddis, "ddi")
+
+    def _compute_rri_y(self, rrs):
+        return self._compute_xxi_y(rrs, self._get_rris, "rri")
+
+    def _compute_xxi_y(self, pairs, get_interactions, name):
+        print _cls(self), ": retrieving {} interactions".format(name)
+        pos_ints, neg_ints = get_interactions()
+        print " #{}+={} #{}-={}".format(name, len(pos_ints), name, len(neg_ints))
+
+        path = os.path.join(self.dst, "{}-y.txt".format(name))
         try:
             ys = np.loadtxt(path)
-            assert len(ys) == (len(pos_ppi) + len(neg_ppi)), "y vector length mismatch"
+            assert len(ys) == (len(pos_ints) + len(neg_ints))
         except Exception, e:
             print _cls(self), ":", e
-            print _cls(self), "computing protein-protein y"
+            print _cls(self), ": computing {} y".format(name)
             ys = []
-            for i, pp in enumerate(pps):
-                if pp in pos_ppi:
+            for i, pair in enumerate(pairs):
+                if pair in pos_ints:
                     ys.append(1.0)
-                elif pp in neg_ppi:
+                elif pair in neg_ints:
                     ys.append(-1.0)
                 else:
-                    raise RuntimeError, "yip is angry with you '{}'".format(pp)
+                    raise ValueError, "yip is angry with you '{}'".format(pair)
             ys = np.array(ys)
             np.savetxt(path, ys)
         return ys
@@ -384,8 +445,10 @@ class YipExperiment(_Experiment):
         # which pairs appear in the pairwise kernels (XXX please double check)
         pp_to_i = { pp: i for i, pp in enumerate(pps) }
 
-        # Retrieve the protein interactions
-        pp_ys = self._compute_ppi_y(pps);
+        # Retrieve the interactions
+        pp_ys = self._compute_ppi_y(pps)
+        dd_ys = self._compute_ddi_y(dds)
+        rr_ys = self._compute_rri_y(rrs)
 
         # Compute the protein kernels
         p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i)
