@@ -183,9 +183,11 @@ def main():
     parser.add_argument("-d", "--dst", type=str,
                         help="path to the results destination")
     parser.add_argument("-e", "--endpoint", type=str,
-                        help="URI of SPARQL endpoint to use")
-    parser.add_argument("-g", "--default-graph", type=str, default=None,
-                        help="URI of the default graph")
+                        default = ocelot.config["virtuoso"][u"endpoint"],
+                        help="URI of SPARQL endpoint to use (default: value in ocelot.ini)")
+    parser.add_argument("-g", "--default-graph", type=str,
+                        default = ocelot.config["virtuoso"][u"default_graph"],
+                        help="URI of the default graph (default: value in ocelot.ini)")
     parser.add_argument("-f", "--force-update", action="store_true",
                         help="ignores cached data")
     parser.add_argument("--debug", action="store_true",
