@@ -10,12 +10,14 @@ __version__ = "0.0-dontuse"
 import os, configparser
 
 _DEFAULT_INI = """\
+[rdf]
+endpoint = http://localhost:8890/sparql
+default_graph = http://ocelot
+
 [virtuoso]
 ini = /home/virtuoso/virtuoso.ini
 virtuoso = virtuoso-t
 isql = isql
-endpoint = http://localhost:8890/sparql
-default_graph = http://ocelot
 """
 
 _ini_paths = ["ocelot.ini"]
