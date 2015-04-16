@@ -25,6 +25,24 @@ class YipExperiment(_Experiment):
     def __init__(self, *args, **kwargs):
         super(YipExperiment, self).__init__(*args, **kwargs)
 
+    def _get_p_to_seq(self):
+        query = """
+        SELECT ?yip_p ?seq
+        FROM <{default_graph}>
+        WHERE {{
+            ?yip_p a ocelot:yip_protein ;
+                owl:sameAs ?sgd_feat .
+            ?sgd_feat a ocelot:sgd_feature .
+            ?sgd_id a ocelot:sgd_id ;
+                owl:sameAs ?sgd_feat ;
+                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_sequence ?seq .
+        }}
+        """
+        p_to_seq = {binding[u"yip_p"].split(".")[-1]: binding[u"seq"]
+                    for binding in self.iterquery(query, n = 2)}
+        return p_to_seq
+
     def _get_d_r_info(self):
         # Note that all positions start from 1.
         # XXX this only fetches domains that *do* have child residues in the
@@ -371,6 +389,32 @@ class YipExperiment(_Experiment):
             pssms.append(pssm)
         return ProfileKernel(pssms, k = 4, threshold = 6.0)
 
+    def _get_domain_ptcorr_kernel(self):
+        # TODO: for each pfam pair, compute the phylogenetic tree correlation,
+        #       giving a real matrix; empirical kernel map
+        pass
+
+    def _get_domain_family_frequency_kernel(self):
+        # TODO: for each pfam, count the number of proteins that have a domain
+        #       in that pfam; poly 3
+        # TODO: for each pfam, count the number of proteins that have only
+        #       domains of that pfam; poly 3
+        pass
+
+    def _get_domain_frequency_kernel(self):
+        # TODO: for each domain, count the number of domains in the parent
+        #       protein; poly 3
+        pass
+
+    def _get_residue_profile_kernel(self):
+        pass
+
+    def _get_residue_ss_kernel(self):
+        pass
+
+    def _get_residue_sa_kernel(self):
+        pass
+
     def _get_yip_kernels(self):
         try:
             return self.yip_p_kernel, self.yip_d_kernel, self.yip_r_kernel
@@ -383,77 +427,118 @@ class YipExperiment(_Experiment):
     def _get_p_kernels(self, ps, pps, p_to_i):
         """Computes all the kernels and pairwise kernels for proteins.
 
-        Note that the order in which objects are passed in is preserved when
-        computing the kernels.
-
-        XXX since all our kernel matrices are dense, this procedure is very
-            memory intensive; we should definitely do something about that
+        The order in which objects are passed in is preserved.
 
         :param ps: list of protein identifiers
         :param pps: list of pairs of protein identifiers
-        :param p_to_i: map between protein identifiers and indices
+        :param p_to_i: map from protein ID to protein index
         """
-        pp_indices = [ (p_to_i[p1], p_to_i[p2]) for p1, p2 in pps ]
-
-        KERNEL_INFO = (
+        INFOS = (
             ("p-kernel-colocalization",
                 lambda: self._get_genetic_colocalization_kernel(p_to_i)),
             ("p-kernel-microarray",
                 lambda: self._get_microarray_kernel(p_to_i,
                             which = ["Gasch_2000_PMID_11102521",
                                      "Spellman_1998_PMID_9843569"])),
-#            ("p-kernel-microarray-all",
-#                lambda: self._get_microarray_kerne(p_to_i)),
             ("p-kernel-complex",
                 lambda: self._get_complex_kernel(p_to_i)),
             ("p-kernel-interpro-match-all",
                 lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
-#            ("p-kernel-interpro-weighted-all",
-#                lambda: self._get_interpro_kernel(p_to_i)),
             ("p-kernel-profile",
                 lambda: self._get_profile_kernel(p_to_i)),
             ("p-kernel-yip",
                 lambda: self._get_yip_kernels()[0]),
         )
+        return self._get_x_kernels(INFOS, ps, pps, p_to_i, "protein")
 
-        print _cls(self), ": computing protein kernels"
+    def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
+        """Computes all the kernels and pairwise kernels for domains.
+
+        The order in which objects are passed in is preserved.
+
+        .. todo::
+
+            We are missing two domain kernels still. They need per-fold
+            computation though, so they are not trivial to stitch in.
+
+        :param ds: list of domain IDs.
+        :param dds: list of domain ID pairs.
+        :param d_to_i: map from domain ID to kernel index.
+        :param p_to_seq: map from protein ID to protein sequence.
+        :param d_to_pos: map from domain ID to position within the protein.
+        """
+        INFOS = (
+            ("d-kernel-ptcorr",
+                lambda: self._get_domain_ptcorr_kernel()),
+            ("d-kernel-family-freq",
+                lambda: self._get_domain_family_freq_kernel()),
+            ("d-kernel-parent-freq",
+                lambda: self._get_domain_parent_freq_kernel()),
+        )
+        return self._get_x_kernels(INFOS, ds, dds, d_to_i, "domain")
+
+    def _get_r_kernels(self, rs, rrs, r_to_i, p_to_seq, r_to_pos):
+        """Computes all the kernels and pairwise kernels for residues.
+
+        The order in which objects are passed in is preserved.
+
+        :param rs: list of residue IDs.
+        :param rrs: list of residue ID pairs.
+        :param r_to_i: map from residue ID to kernel index.
+        :param p_to_seq: map from protein ID to protein sequence.
+        :param r_to_pos: map from residue ID to position within the protein.
+        """
+        INFOS = (
+            ("r-kernel-profile",
+                lambda: self._get_residue_profile_kernel()),
+            ("r-kernel-ss",
+                lambda: self._get_residue_ss_kernel()),
+            ("r-kernel-sa",
+                lambda: self._get_residue_sa_kernel()),
+        )
+        return self._get_x_kernels(INFOS, rs, rrs, r_to_i, "residue")
+
+    def _get_x_kernels(self, infos, xs, xxs, x_to_i, name):
+        """Helper for computing kernels and pairwise kernels."""
+        print _cls(self), ": computing {} kernels".format(name)
+
+        xx_indices = [(x_to_i[x1], x_to_i[x2]) for x1, x2 in xxs]
+
         kernels, pairwise_kernels = [], []
-        for path, compute_kernel in KERNEL_INFO:
+        for path, compute_kernel in infos:
             path = os.path.join(self.dst, path)
             try:
                 print _cls(self), ": loading '{}'".format(path)
-                kernel = DummyKernel(path + ".txt", num = len(ps))
+                kernel = DummyKernel(path + ".txt", num = len(xs))
                 assert kernel.is_psd(), "non-PSD kernel!"
             except Exception, e:
                 print _cls(self), "|", e
                 print _cls(self), ": computing '{}'".format(path)
                 kernel = compute_kernel()
+                if kernel == None:
+                    continue
                 kernel.check_and_fixup(1e-10) 
                 kernel.save(path + ".txt")
                 kernel.draw(path + ".png")
-            kernels.append(kernel)
+            if kernel:
+                kernels.append(kernel)
 
             path += "-pairwise"
             try:
                 print _cls(self), ": loading '{}".format(path)
-                pairwise_kernel = DummyKernel(path + ".txt", num = len(pp_indices))
+                pairwise_kernel = DummyKernel(path + ".txt", num = len(xxs))
                 assert kernel.is_psd(), "non-PSD kernel!"
             except Exception, e:
                 print _cls(self), "|", e
                 print _cls(self), ": computing '{}'".format(path)
-                pairwise_kernel = PairwiseKernel(pp_indices, kernel)
-                kernel.check_and_fixup(1e-10) 
+                pairwise_kernel = PairwiseKernel(xx_indices, kernel)
+                assert not pairwise_kernel is None
+                pairwise_kernel.check_and_fixup(1e-10) 
                 pairwise_kernel.save(path + ".txt")
                 pairwise_kernel.draw(path + ".png")
             pairwise_kernels.append(pairwise_kernel)
 
         return kernels, pairwise_kernels
-
-    def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
-        pass
-
-    def _get_r_kernels(self, rs, rrs, r_to_i, r_to_pos):
-        pass
 
     def run(self):
         """Run the Yip et al. experiment replica."""
@@ -490,13 +575,16 @@ class YipExperiment(_Experiment):
         dd_ys = self._compute_ddi_y(dds)
         rr_ys = self._compute_rri_y(rrs)
 
+        # Retrieve the protein sequences
+        p_to_seq = self._get_p_to_seq()
+
         # Compute the domain/residue positions (in a best effort fashion)
         d_to_pos, r_to_pos, d_to_pfam = self._get_d_r_info()
 
         # Compute the protein kernels
         p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i)
-        d_kernels, dd_kernels = self._get_d_kernels(ds, dds, d_to_i, d_to_pos, d_to_pfam)
-        r_kernels, rr_kernels = self._get_r_kernels(rs, rrs, r_to_i, r_to_pos)
+        d_kernels, dd_kernels = self._get_d_kernels(ds, dds, d_to_i, p_to_seq, d_to_pos, d_to_pfam)
+        r_kernels, rr_kernels = self._get_r_kernels(rs, rrs, r_to_i, p_to_seq, r_to_pos)
 
         # Get the original fold splits and convert them to indices
         pp_ts_ids, dd_ts_ids, rr_ts_ids = converter.get_test_sets()
