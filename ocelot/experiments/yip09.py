@@ -76,7 +76,7 @@ class YipExperiment(_Experiment):
             r = binding[u"yip_r"].split(".")[-1]
             d_to_pos[d] = (binding[u"d_pos0"], binding[u"d_pos1"])
             r_to_pos[r] = binding[u"r_pos"]
-            d_to_pfam[d] = bdingin[u"pfam"]
+            d_to_pfam[d] = binding[u"pfam"]
         return d_to_pos, r_to_pos, d_to_pfam
 
     def _get_ppis(self, symmetrize = False):
@@ -451,6 +451,12 @@ class YipExperiment(_Experiment):
 
         return kernels, pairwise_kernels
 
+    def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
+        pass
+
+    def _get_r_kernels(self, rs, rrs, r_to_i, r_to_pos):
+        pass
+
     def run(self):
         """Run the Yip et al. experiment replica."""
 
@@ -470,13 +476,16 @@ class YipExperiment(_Experiment):
         # The index of an ID is given by the order in which it appears within
         # the `proteins.txt`, `domains.txt` or `residues.txt` files. This is
         # the same order in which entities appear in the non-pairwise kernels.
-        p_to_i = { p: i for i, p in enumerate(ps) }
-
         # The index of a pair of IDs is given by the order in which it appears
         # within the `goldPosProteinPairs.txt` etc. files, where all positives
         # are read first and all negatives follow. This is the same order in
         # which pairs appear in the pairwise kernels (XXX please double check)
-        pp_to_i = { pp: i for i, pp in enumerate(pps) }
+        def f(coll):
+            return {x: i for i, x in enumerate(coll)}
+
+        p_to_i, pp_to_i = f(ps), f(pps)
+        d_to_i, dd_to_i = f(ds), f(dds)
+        r_to_i, rr_to_i = f(rs), f(rrs)
 
         # Retrieve the interactions
         pp_ys = self._compute_ppi_y(pps)
@@ -488,6 +497,8 @@ class YipExperiment(_Experiment):
 
         # Compute the protein kernels
         p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i)
+        d_kernels, dd_kernels = self._get_d_kernels(ds, dds, d_to_i, d_to_pos, d_to_pfam)
+        r_kernels, rr_kernels = self._get_r_kernels(rs, rrs, r_to_i, r_to_pos)
 
         # Get the original fold splits and convert them to indices
         pp_ts_ids, dd_ts_ids, rr_ts_ids = converter.get_test_sets()
