@@ -325,7 +325,7 @@ class YipExperiment(_Experiment):
         way), while this may have a rather serious biological implications.
 
         The idea comes from [Lee03]_."""
-        ans = self.query("""
+        query = """
         SELECT ?p ?chrom ?strand ?start ?stop
         FROM <{default_graph}>
         WHERE {{
@@ -339,11 +339,9 @@ class YipExperiment(_Experiment):
             ?id ocelot:sgd_id_starts_at ?start .
             ?id ocelot:sgd_id_stops_at ?stop .
         }}
-        """)
-        assert ans and len(ans) and "results" in ans
+        """
         context = {}
-        for bindings in ans["results"]["bindings"]:
-            bindings = { k: self.cast(v) for k, v in bindings.items() }
+        for bindings in self.iterquery(query, n = 5):
             p       = bindings[u"p"].split(".")[-1]
             chrom   = bindings[u"chrom"].split(".")[-1]
             strand  = bindings[u"strand"]
