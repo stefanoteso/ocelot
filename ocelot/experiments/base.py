@@ -144,8 +144,7 @@ class _Experiment(object):
         model.train()
 
         # Infer
-        beta = k_tr.get_subkernel_weights()
-        k_ts.set_subkernel_weights(beta)
+        k_ts.set_subkernel_weights(k_tr.get_subkernel_weights())
         model.set_kernel(k_ts)
         ys_pr = model.apply().get_labels()
 
