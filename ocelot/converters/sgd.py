@@ -192,6 +192,10 @@ class SGDConverter(Converter):
             feat_id = O.uri(O.SGD_FEATURE, self._sanitize(row["FEAT_NAME"]))
             is_true = L({ "T":True, "?":False }[row["STATUS"]])
 
+            db_id = L(None)
+            if row["METHOD"] == "Pfam" and row["STATUS"] == "T":
+                db_id = O.uri(O.PFAM_ID, row["DB_MEMBERS"])
+
             try:
                 evalue = L(float(row["EVALUE"]))
             except ValueError:
@@ -202,6 +206,7 @@ class SGDConverter(Converter):
                 (_, O.RDF.type,                 O.SGD_IPR_HIT),
                 (_, O.SGD_IPR_HIT_HAS_ID,       L(row["IPR_ID"])),
                 (_, O.SGD_IPR_HIT_HAS_METHOD,   L(row["METHOD"])),
+                (_, O.SGD_IPR_HIT_HAS_DB_ID,    db_id),
                 (_, O.SGD_IPR_HIT_STARTS_AT,    L(int(row["START"]))),
                 (_, O.SGD_IPR_HIT_STOPS_AT,     L(int(row["STOP"]))),
                 (_, O.SGD_IPR_HIT_HAS_EVALUE,   evalue),
