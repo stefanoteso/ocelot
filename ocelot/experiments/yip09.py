@@ -25,26 +25,59 @@ class YipExperiment(_Experiment):
     def __init__(self, *args, **kwargs):
         super(YipExperiment, self).__init__(*args, **kwargs)
 
-    def _get_sequences(self):
-        """Reads the ORFs and their sequences from the endpoint."""
+    def _get_d_r_info(self):
+        # Note that all positions start from 1.
+        # XXX this only fetches domains that *do* have child residues in the
+        # yip dataset; one exception is YAL038W, which has no residues -- and
+        # is filtered out by the query. Will fix it later.
         query = """
-        SELECT ?p ?seq
+        SELECT ?yip_d ?yip_r ?d_pos0 ?d_pos1 ?r_pos ?pfam
         FROM <{default_graph}>
         WHERE {{
-            ?p a ocelot:yip_protein .
-            OPTIONAL {{
-                ?feat a ocelot:sgd_feature .
-                ?p owl:sameAs ?feat .
-                ?orf a ocelot:sgd_id ;
-                    ocelot:sgd_id_has_sequence ?seq .
-                ?orf owl:sameAs ?feat .
-            }}
+            # a yip protein
+            ?yip_p a ocelot:yip_protein ;
+                ocelot:yip_parent_of ?yip_d ;
+                owl:sameAs ?sgd_feat .
+
+            # a yip domain, child of the yip protein
+            ?yip_d a ocelot:yip_domain ;
+                ocelot:yip_parent_of ?yip_r ;
+                ocelot:yip_instance_of ?pfam .
+
+            # a yip residue, child of the yip residue
+            ?yip_r a ocelot:yip_residue ;
+                ocelot:yip_residue_has_position ?r_pos .
+
+            # map the yip protein to an SGD ORF
+            ?sgd_feat a ocelot:sgd_feature ;
+                ocelot:sgd_feature_has_ipr_hit ?ipr_hit .
+            ?sgd_id a ocelot:sgd_id ;
+                owl:sameAs ?sgd_feat ;
+                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF .
+
+            # get the InterPro hits for the SGD ORF that match the protein
+            # family of the yip domain
+            ?ipr_hit a ocelot:sgd_ipr_hit ;
+                ocelot:sgd_ipr_hit_is_true true ;
+                ocelot:sgd_ipr_hit_has_method "Pfam" ;
+                ocelot:sgd_ipr_hit_has_db_id ?pfam ;
+                ocelot:sgd_ipr_hit_starts_at ?d_pos0 ;
+                ocelot:sgd_ipr_hit_stops_at ?d_pos1 .
+
+            FILTER((?r_pos >= ?d_pos0) && (?r_pos <= ?d_pos1))
         }}
         """
-        p_to_seq = {binding[u"p"].split(".")[-1]: binding[u"seq"]
-                    for binding in self.iterquery(query, n = 2)}
-        assert len(p_to_seq) == 1681
-        return p_to_seq
+        # The yip dataset does not contain duplicates; that is, the child
+        # domains of a protein always have *distinct* Pfam IDs. However, we
+        # should make sure that the domains are also unique.
+        d_to_pos, d_to_pfam, r_to_pos = {}, {}, {}
+        for binding in self.iterquery(query):
+            d = binding[u"yip_d"].split(".")[-1]
+            r = binding[u"yip_r"].split(".")[-1]
+            d_to_pos[d] = (binding[u"d_pos0"], binding[u"d_pos1"])
+            r_to_pos[r] = binding[u"r_pos"]
+            d_to_pfam[d] = bdingin[u"pfam"]
+        return d_to_pos, r_to_pos, d_to_pfam
 
     def _get_ppis(self, symmetrize = False):
         """Reads the positive and negative PPIs from the endpoint.
@@ -449,6 +482,9 @@ class YipExperiment(_Experiment):
         pp_ys = self._compute_ppi_y(pps)
         dd_ys = self._compute_ddi_y(dds)
         rr_ys = self._compute_rri_y(rrs)
+
+        # Compute the domain/residue positions (in a best effort fashion)
+        d_to_pos, r_to_pos, d_to_pfam = self._get_d_r_info()
 
         # Compute the protein kernels
         p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i)
