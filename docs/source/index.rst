@@ -60,23 +60,32 @@ Usage
 
 First of all, make sure that all the `Requirements`_ are in place.
 
+You can glance at the Ocelot help text to get an overview of the
+commands it accepts and the available options::
+
+    $ ./main.py --help
+
 Assuming that you want to run the ``yip09`` experiment, you'll first need to
-build the RDF dataset starting from the (various) database dumps. From the
-command line, run::
+build the RDF dataset starting from the (various) database dumps.
+Unfortunately, this stel is not automated (yet), so you will need to manually
+fetch the required source databases. After you collected all of them, run the
+following::
 
     $ ./main.py make-rdf -s $PATH_TO_DATABASES -d rdf-data -t sgd,yip09
 
 This will take the ``SGD`` and ``yip09`` dumps, turn them into RDF triples,
 and place the result in the ``rdf-data`` directory.
 
-Now you should load the RDF data into your Virtuoso instance of choice, using
-your method of choice. Ocelot provides a shortcut for loading the data to a
-*local* Virtuoso instance via the ``isql`` command. This can be done as
-follows::
+Now you can (and should) load the RDF data into your Virtuoso instance of
+choice, using your method of choice. Ocelot provides a shortcut for loading the
+data to a *local* Virtuoso instance via the ``isql`` command. This can be done
+as follows::
 
     $ ./main.py upload-rdf -s rdf-data -g "http://ocelot-yip09-graph"
 
-where ``http://ocelot-yip09-graph`` is the RDF graph to be used.
+where ``http://ocelot-yip09-graph`` is the RDF graph to be used. The ``-g``
+option is *optional*; by default Ocelot will use the default graph specified
+in the ``ocelot.ini`` configuration file.
 
 Now you can run the experiment by typing the following::
 
@@ -90,7 +99,7 @@ as well, since some data (e.g. the PSSM files and the microarray files) is
 In case you want to get rid of a graph stored in your local Virtuoso instance,
 Ocelot provides a shortcut (implemented via the ``isql`` command)::
 
-    $ ./main.py clear-rdf -g "http://ocelot-yip09-graph
+    $ ./main.py clear-graph -g "http://ocelot-yip09-graph
 
 You can run the (admittedly very thin) test suite by running::
 
