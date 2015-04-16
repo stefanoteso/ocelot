@@ -67,7 +67,7 @@ def _make_rdf(args):
 def _start_virtuoso(args):
     """Starts a Virtuoso instance"""
     section = ocelot.config["virtuoso"]
-    virtuoso, ini = ocelot.services.Binary(section["binary"]), section["ini"]
+    virtuoso, ini = ocelot.services.Binary(section[u"virtuoso"]), section[u"ini"]
     print "About to start virtuoso (with '{}')".format(ini)
     ret, out, err = virtuoso.run(["+configfile {}".format(ini)])
     if ret != 0:
