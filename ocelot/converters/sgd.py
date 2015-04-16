@@ -200,10 +200,13 @@ class SGDConverter(Converter):
             _ = B()
             triples.extend([
                 (_, O.RDF.type,                 O.SGD_IPR_HIT),
+                (_, O.SGD_IPR_HIT_HAS_ID,       L(row["IPR_ID"])),
+                (_, O.SGD_IPR_HIT_HAS_METHOD,   L(row["METHOD"])),
                 (_, O.SGD_IPR_HIT_STARTS_AT,    L(int(row["START"]))),
                 (_, O.SGD_IPR_HIT_STOPS_AT,     L(int(row["STOP"]))),
                 (_, O.SGD_IPR_HIT_HAS_EVALUE,   evalue),
                 (_, O.SGD_IPR_HIT_IS_TRUE,      is_true),
+                (feat_id, O.SGD_FEATURE_HAS_IPR_HIT, _),
             ])
 
     def _siphon_goslims(self, triples):

@@ -86,10 +86,13 @@ SGD_PDB_TARGET_STOP     = OCELOT.sgd_pdb_target_stop
 
 # An individual SGD-InterPro domain hit
 SGD_IPR_HIT             = OCELOT.sgd_ipr_hit
+SGD_IPR_HIT_HAS_ID      = OCELOT.sgd_ipr_hit_has_id
+SGD_IPR_HIT_HAS_METHOD  = OCELOT.sgd_ipr_hit_has_method
 SGD_IPR_HIT_STARTS_AT   = OCELOT.sgd_ipr_hit_starts_at
 SGD_IPR_HIT_STOPS_AT    = OCELOT.sgd_ipr_hit_stops_at
 SGD_IPR_HIT_HAS_EVALUE  = OCELOT.sgd_ipr_hit_has_evalue
 SGD_IPR_HIT_IS_TRUE     = OCELOT.sgd_ipr_hit_is_true
+SGD_FEATURE_HAS_IPR_HIT = OCELOT.sgd_feature_has_ipr_hit
 
 # An individual SGD interaction record
 SGD_INT                 = OCELOT.sgd_int
