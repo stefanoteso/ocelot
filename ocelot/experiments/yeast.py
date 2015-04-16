@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 from .base import _Experiment
 
 import os
@@ -13,6 +12,11 @@ class YeastExperiment(_Experiment):
     This experiment is structured exactly the same as the Yip et al. [Yip09]_
     experiment, but performed on a different dataset based on SGD, BioGRID
     and iPfam.
+
+    .. todo::
+
+        Compute number of functions per protein and number of proteins per
+        function; add to the GODag class.
 
     .. note::
 
@@ -135,6 +139,75 @@ class YeastExperiment(_Experiment):
             pp_pos.update([(p1,p2), (p2,p1)])
         return pp_pos
 
+    def _get_sgd_din(self):
+        query = """
+        SELECT DISTINCT ?id ?family ?chain ?evalue ?complex
+        FROM <{default_graph}>
+        WHERE {{
+            # Pick all SGD ORFs
+            ?orf a ocelot:sgd_id ;
+                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                owl:sameAs ?feat .
+
+            # Map them to SGD feature names
+            ?feat a ocelot:sgd_feature .
+
+            # Map them to PDB chains via SGD's precomputed homology mappings
+            ?_h a ocelot:sgd_pdb_homology ;
+                ocelot:sgd_pdb_has_query ?feat ;
+                ocelot:sgd_pdb_has_target ?chain ;
+                ocelot:sgd_pdb_alignment ?evalue .
+
+            # Find all iPfam domain instances including that chain
+            ?region a ocelot:ipfam_region ;
+                ocelot:ipfam_region_instance_of ?family ;
+                ocelot:ipfam_region_occurs_in ?chain .
+
+            ?_ri a ocelot:ipfam_region_int ;
+                ocelot:ipfam_region_int_has_region ?region ;
+                ocelot:ipfam_region_int_occurs_in ?complex .
+
+            # TODO filter out all non-yeast complexes
+        }}"""
+        dd_pos = set()
+        for bindings in self.iterquery(query, n=5):
+            print bindings
+        sys.exit(1)
+        return dd_pos
+
+        query = """
+        SELECT DISTINCT ?feat1 ?chain1 ?pfam1 ?feat2 ?chain2 ?pfam2 ?pdb
+        FROM <{default_graph}>
+        WHERE {{
+            ?feat1 a ocelot:sgd_feature .
+            ?hom1 a ocelot:sgd_pdb_homology ;
+                ocelot:sgd_pdb_has_query ?feat1 ;
+                ocelot:sgd_pdb_has_target ?chain1 ;
+                ocelot:sgd_pdb_alignment ?evalue1 .
+            ?region1 a ocelot:ipfam_region ;
+                ocelot:ipfam_region_instance_of ?pfam1 ;
+                ocelot:ipfam_region_occurs_in ?chain1 .
+
+            ?feat2 a ocelot:sgd_feature .
+            ?hom2 a ocelot:sgd_pdb_homology ;
+                ocelot:sgd_pdb_has_query ?feat2 ;
+                ocelot:sgd_pdb_has_target ?chain2 ;
+                ocelot:sgd_pdb_alignment ?evalue2 .
+            ?region2 a ocelot:ipfam_region ;
+                ocelot:ipfam_region_instance_of ?pfam2 ;
+                ocelot:ipfam_region_occurs_in ?chain2 .
+
+            ?_ a ocelot:ipfam_region_int ;
+                ocelot:ipfam_region_int_has_region ?region1 ;
+                ocelot:ipfam_region_int_has_region ?region2 ;
+                ocelot:ipfam_region_int_occurs_in ?pdb .
+        }}"""
+        dd_pos = set()
+        for bindings in self.iterquery(query, n=7):
+            print bindings
+        sys.exit(1)
+        return dd_pos
+
     @staticmethod
     def _get_neighbors_and_degree(ps, pps):
         neighbors_of = { p: set() for p in ps }
@@ -215,6 +288,7 @@ class YeastExperiment(_Experiment):
         return y
 
     def run(self):
+        print self._get_sgd_ipfam_din()
         """Run the yeast prediction experiment."""
         ps          = self._cached(self._get_sgd_ids,
                                    "sgd_ids.pickle")
