@@ -109,7 +109,7 @@ def _upload_rdf(args):
     if ret != 0:
         raise RuntimeError("upload-rdf failed, isql exited with '{}':\n{}\n{}\n".format(ret, out, err))
 
-def _clear_rdf(args):
+def _clear_graph(args):
     """Clears a given graph URI.
 
     :param args.default_graph: default graph IRI.
@@ -167,7 +167,7 @@ def main():
         "make-rdf": _make_rdf,
         "start-virtuoso": _start_virtuoso,
         "upload-rdf": _upload_rdf,
-        "clear-rdf": _clear_rdf,
+        "clear-graph": _clear_graph,
         "run-experiment": _run_experiment,
     }
 
