@@ -278,15 +278,6 @@ class YeastExperiment(_Experiment):
         assert all(p in ps for p, _ in pps), \
             "singletons and pairs do not match"
 
-    def _cached(self, f, relpath, *args, **kwargs):
-        try:
-            assert not self.force_update
-            y = self._depickle(relpath)
-        except Exception, e:
-            y = f(*args, **kwargs)
-            self._pickle(y, relpath)
-        return y
-
     def run(self):
         print self._get_sgd_ipfam_din()
         """Run the yeast prediction experiment."""

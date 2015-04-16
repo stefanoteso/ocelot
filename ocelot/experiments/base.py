@@ -59,6 +59,15 @@ class _Experiment(object):
         with open(os.path.join(self.dst, path), "rb") as fp:
             return pickle.load(fp)
 
+    def _cached(self, f, relpath, *args, **kwargs):
+        try:
+            assert not self.force_update
+            y = self._depickle(relpath)
+        except Exception, e:
+            y = f(*args, **kwargs)
+            self._pickle(y, relpath)
+        return y
+
     @staticmethod
     def cast(d):
         if d[u"type"] in (u"uri", u"bnode", u"literal"):
