@@ -61,9 +61,7 @@ class _Experiment(object):
 
     @staticmethod
     def cast(d):
-        if d[u"type"] == u"uri":
-            return d[u"value"]
-        elif d[u"type"] == u"literal":
+        if d[u"type"] in (u"uri", u"bnode", u"literal"):
             return d[u"value"]
         elif d[u"type"] == u"typed-literal":
             if d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
