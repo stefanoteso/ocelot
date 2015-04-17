@@ -176,39 +176,6 @@ class YeastExperiment(_Experiment):
         sys.exit(1)
         return dd_pos
 
-        query = """
-        SELECT DISTINCT ?feat1 ?chain1 ?pfam1 ?feat2 ?chain2 ?pfam2 ?pdb
-        FROM <{default_graph}>
-        WHERE {{
-            ?feat1 a ocelot:sgd_feature .
-            ?hom1 a ocelot:sgd_pdb_homology ;
-                ocelot:sgd_pdb_has_query ?feat1 ;
-                ocelot:sgd_pdb_has_target ?chain1 ;
-                ocelot:sgd_pdb_alignment ?evalue1 .
-            ?region1 a ocelot:ipfam_region ;
-                ocelot:ipfam_region_instance_of ?pfam1 ;
-                ocelot:ipfam_region_occurs_in ?chain1 .
-
-            ?feat2 a ocelot:sgd_feature .
-            ?hom2 a ocelot:sgd_pdb_homology ;
-                ocelot:sgd_pdb_has_query ?feat2 ;
-                ocelot:sgd_pdb_has_target ?chain2 ;
-                ocelot:sgd_pdb_alignment ?evalue2 .
-            ?region2 a ocelot:ipfam_region ;
-                ocelot:ipfam_region_instance_of ?pfam2 ;
-                ocelot:ipfam_region_occurs_in ?chain2 .
-
-            ?_ a ocelot:ipfam_region_int ;
-                ocelot:ipfam_region_int_has_region ?region1 ;
-                ocelot:ipfam_region_int_has_region ?region2 ;
-                ocelot:ipfam_region_int_occurs_in ?pdb .
-        }}"""
-        dd_pos = set()
-        for bindings in self.iterquery(query, n=7):
-            print bindings
-        sys.exit(1)
-        return dd_pos
-
     @staticmethod
     def _get_neighbors_and_degree(ps, pps):
         neighbors_of = { p: set() for p in ps }
