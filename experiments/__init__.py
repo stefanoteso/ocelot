@@ -107,6 +107,19 @@ class _Experiment(object):
             self._pickle(y, relpath)
         return y
 
+    def _cached_kernel(self, K, num, relpath, *args, **kwargs):
+        path = os.path.join(self.dst, relpath)
+        try:
+            assert not self.force_update
+            kernel = DummyKernel(path + ".txt", num = num, check_psd = True)
+        except Exception, e:
+            kernel = K(*args, **kwargs)
+            assert not kernel is None
+            kernel.check_and_fixup(kwargs.get("tol", 1e-10))
+            kernel.save(path + ".txt")
+            kernel.draw(path + ".png")
+        return kernel
+
     def _compute_kernels(self, infos, xs, xxs, tolerance = 1e-10):
         """Helper for computing kernels."""
         x_to_i = {x: i for i, x in enumerate(xs)}
