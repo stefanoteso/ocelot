@@ -506,7 +506,10 @@ class YipExperiment(_Experiment):
 
         xx_indices = [(x_to_i[x1], x_to_i[x2]) for x1, x2 in xxs]
 
-        kernels, pairwise_kernels = [], []
+        # In order to compute the kernels without loading too much the machine,
+        # we first compute all the kernels and store them to disk, and *then*
+        # load them up again from disk.
+
         for path, compute_kernel in infos:
             path = os.path.join(self.dst, path)
             try:
@@ -517,13 +520,10 @@ class YipExperiment(_Experiment):
                 print _cls(self), "|", e
                 print _cls(self), ": computing '{}'".format(path)
                 kernel = compute_kernel()
-                if kernel == None:
-                    continue
+                assert not kernel is None
                 kernel.check_and_fixup(1e-10) 
                 kernel.save(path + ".txt")
                 kernel.draw(path + ".png")
-            if kernel:
-                kernels.append(kernel)
 
             path += "-pairwise"
             try:
@@ -538,8 +538,18 @@ class YipExperiment(_Experiment):
                 pairwise_kernel.check_and_fixup(1e-10) 
                 pairwise_kernel.save(path + ".txt")
                 pairwise_kernel.draw(path + ".png")
-            pairwise_kernels.append(pairwise_kernel)
 
+            del kernel
+            del pairwise_kernel
+
+        kernels, pairwise_kernels = [], []
+        for path, compute_kernel in infos:
+            path = os.path.join(self.dst, path)
+            print _cls(self), ": loading '{}".format(path)
+            kernels.append(DummyKernel(path + ".txt", num = len(xs)))
+            path += "-pairwise"
+            print _cls(self), ": loading '{}".format(path)
+            pairwise_kernels.append(DummyKernel(path + ".txt", num = len(xxs)))
         return kernels, pairwise_kernels
 
     def run(self):
