@@ -51,6 +51,45 @@ class _Experiment(object):
             raise ValueError("no graph '{}' at endpoint '{}'".format(default_graph, endpoint))
         self.force_update = force_update
 
+    def _check_graph(self, graph):
+        """Checks whether a graph exists."""
+        ans = self.query(u"ASK WHERE {{ GRAPH <{default_graph}> {{ ?s ?p ?o }} }}")
+        return ans[u"boolean"] == True
+
+    def query(self, query):
+        """Performs a query at the given endpoint."""
+        prefixes = ""
+        for shortcut, namespace in O.BINDINGS:
+            prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
+        query = prefixes + query.format(default_graph=self.default_graph)
+        self.ep.setQuery(query)
+        self.ep.setReturnFormat(JSON)
+        return self.ep.query().convert()
+
+    @staticmethod
+    def _cast(d):
+        if d[u"type"] in (u"uri", u"bnode", u"literal"):
+            return d[u"value"]
+        elif d[u"type"] == u"typed-literal":
+            if d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+                return int(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#float":
+                return float(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#double":
+                return float(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+                return d[u"value"]
+        raise NotImplementedError("can not cast '{}'".format(d.items()))
+
+    def iterquery(self, query, n = None):
+        ans = self.query(query)
+        assert ans and len(ans) and "results" in ans
+        for bindings in ans["results"]["bindings"]:
+            bindings = { k: self._cast(v) for k, v in bindings.iteritems() }
+            if n != None:
+                assert len(bindings) == n
+            yield bindings
+
     def _pickle(self, what, path):
         with open(os.path.join(self.dst, path), "wb") as fp:
             pickle.dump(what, fp)
@@ -67,45 +106,6 @@ class _Experiment(object):
             y = f(*args, **kwargs)
             self._pickle(y, relpath)
         return y
-
-    @staticmethod
-    def cast(d):
-        if d[u"type"] in (u"uri", u"bnode", u"literal"):
-            return d[u"value"]
-        elif d[u"type"] == u"typed-literal":
-            if d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
-                return int(d[u"value"])
-            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#float":
-                return float(d[u"value"])
-            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#double":
-                return float(d[u"value"])
-            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
-                return d[u"value"]
-        raise NotImplementedError("can not cast '{}'".format(d.items()))
-
-    def query(self, query):
-        """Performs a query at the given endpoint."""
-        prefixes = ""
-        for shortcut, namespace in O.BINDINGS:
-            prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
-        query = prefixes + query.format(default_graph=self.default_graph)
-        self.ep.setQuery(query)
-        self.ep.setReturnFormat(JSON)
-        return self.ep.query().convert()
-
-    def iterquery(self, query, n = None):
-        ans = self.query(query)
-        assert ans and len(ans) and "results" in ans
-        for bindings in ans["results"]["bindings"]:
-            bindings = { k: self.cast(v) for k, v in bindings.iteritems() }
-            if n != None:
-                assert len(bindings) == n
-            yield bindings
-
-    def _check_graph(self, graph):
-        """Checks whether a graph exists."""
-        ans = self.query(u"ASK WHERE {{ GRAPH <{default_graph}> {{ ?s ?p ?o }} }}")
-        return ans[u"boolean"] == True
 
     @staticmethod
     def _split_vector(ys, tr_indices, ts_indices):
