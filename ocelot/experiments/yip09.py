@@ -444,6 +444,8 @@ class YipExperiment(_Experiment):
                 lambda: self._get_complex_kernel(p_to_i)),
             ("p-kernel-interpro-match-all",
                 lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
+            ("p-kernel-interpro-weighted",
+                lambda: self._get_interpro_kernel(p_to_i, use_evalue = True)),
             ("p-kernel-profile",
                 lambda: self._get_profile_kernel(p_to_i)),
             ("p-kernel-yip",
