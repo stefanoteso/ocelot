@@ -4,8 +4,166 @@ from . import _Experiment
 
 import os
 import numpy as np
-from ocelot.services import _cls, CDHit
+import itertools as it
+from glob import glob
+from ocelot.services import _cls, iterate_csv, CDHit, PCL
 from ocelot.go import GODag, GOTerm
+from ocelot.kernels import *
+
+class SGDGeneExpressionKernel(Kernel):
+    """A yeast-specific correlation kernel on gene expression data.
+
+    It uses the microarray files located at::
+
+        $src/yeast/microarray/*.pcl
+
+    :param p_to_i: map between ORF feature names to indices in the kernel matrix.
+    :param src: path to the data source directory.
+    :param experiments: list of microarray experiments to use.
+    """
+    def __init__(self, p_to_i, src, experiments, *args, **kwargs):
+        self._wc = os.path.join(src, "SGD", "microarray", "*", "*.pcl")
+        self._experiments = experiments
+        super(SGDGeneExpressionKernel, self).__init__(p_to_i, *args, **kwargs)
+
+    def _get_pcl_paths(self):
+        for path in glob(self._wc):
+            if not any(exp in path for exp in self._experiments):
+                continue
+            yield path
+
+    def _compute_all(self):
+        pcl = PCL()
+        p_to_i = self._entities
+        matrix = np.zeros((len(self), len(self)))
+        for path in self._get_pcl_paths():
+            print _cls(self), ": processing '{}'".format(path)
+            p_to_levels, num_conditions = pcl.read(path)
+            exp_levels, num_missing = [], 0
+            for p, i in sorted(p_to_i.iteritems(), key = lambda p_i: p_i[1]):
+                try:
+                    p_levels = p_to_levels[p]
+                except:
+                    p_levels = np.zeros((num_conditions,))
+                    num_missing += 1
+                exp_levels.append(p_levels)
+            if num_missing > 0:
+                 print _cls(self), ": '{}' has no measurements for '{}/{}' proteins" \
+                                    .format(path, num_missing, len(self))
+            matrix += CorrelationKernel(exp_levels).compute()
+            break
+        return matrix
+
+class YeastProteinComplexKernel(Kernel):
+    """A yeast-specific diffusion kernel on protein complexes.
+
+    It uses the protein complex file located at::
+
+        $src/yeast/ppi/CYC2008_complex.tab
+
+    :param p_to_i: map between ORF feature names to indices in the kernel matrix.
+    :param src: path to the data source directory.
+    :param gamma: parameter of the diffusion kernel.
+    """
+    def __init__(self, p_to_i, src, *args, **kwargs):
+        self._path = os.path.join(src, "yeast", "ppi", "CYC2008_complex.tab")
+        super(YeastProteinComplexKernel, self).__init__(p_to_i, *args, **kwargs)
+
+    def _read_complex_to_orf(self):
+        FIELDS = ("ORF", "_", "COMPLEX")
+        complex_to_orfs = {}
+        for row in iterate_csv(self._path, delimiter = "\t", num_skip = 1,
+                               fieldnames = FIELDS):
+            orf, cplex = row["ORF"], row["COMPLEX"]
+            if not cplex in complex_to_orfs:
+                complex_to_orfs[cplex] = set()
+            complex_to_orfs[cplex].add(orf)
+        return complex_to_orfs
+
+    def _compute_all(self):
+        p_to_i = self._entities
+
+        complex_to_orfs = self._read_complex_to_orf()
+
+        adjmatrix = np.zeros((len(self), len(self)))
+        for _, orfs in complex_to_orfs.iteritems():
+            orf_indices = [p_to_i[orf] for orf in orfs if orf in p_to_i]
+            for i, j in it.product(orf_indices, orf_indices):
+                if i != j:
+                    adjmatrix[i,j] = 1
+        return DiffusionKernel(adjmatrix).compute()
+
+class InterProKernel(Kernel):
+    """A simple domain kernel built around InterPro.
+
+    :param p_to_i: map between protein identifiers and kernel index.
+    :param cache_path: path to the directory holding the interpro output.
+    :param allowed_sources: list of allowed domain providers (default: None).
+    :param use_evalue: whether to use the evalue to score the predictions.
+    """
+    def __init__(self, p_to_i, cache_path, allowed_sources = None,
+                 use_evalue = False, *args, **kwargs):
+        self._cache_path = cache_path
+        self._allowed_providers = allowed_providers
+        self._use_evalue = use_evalue
+        super(InterProKernel, self).__init__(p_to_i, *args, **kwargs)
+
+    def _path(self, p):
+        return os.path.join(self.cache_path, "interpro", "{}.f.tsv.txt".format(p))
+
+    def _retrieve_interpro_predictions(self):
+        raise NotImplementedError
+
+    def _compute_all(self):
+        self._retrieve_interpro_predictions()
+
+        parser = InterProTSV()
+
+        all_hits = []
+        for p, i in sorted(p_to_i.items(), key = lambda p_i: p_i[1]):
+            domain_to_evalue = interpro.read(self._path(p), allowed_sources)
+            if not self._use_evalue:
+                hits = set(domain_to_evalue.keys())
+            else:
+                hits = {domain: (-np.log(evalue) if evalue is None else DEFAULT_SCORE)
+                        for domain, evalue in domain_to_evalue.iteritems()}
+            all_hits.append(hits)
+
+        if not self._use_evalue:
+            return SetKernel(all_hits).compute()
+        else:
+            return SparseLinearKernel(all_hits).compute()
+
+class PSSMKernel(ProfileKernel):
+    """A simple wrapper around the profile kernel for strings [Kuang04]_.
+
+    It takes care of generating the PSSM profiles.
+
+    :param p_to_i: WRITEME
+    :param cache_path: WRITEME
+    :param num_iterations: WRITEME (default: 2)
+
+    All remaining options are passed to the underlying ``ProfileKernel``.
+    """
+    def __init__(self, p_to_i, cache_path, num_iterations = 2, *args, **kwargs):
+        self._cache_path = cache_path
+        super(PSSMKernel, self).__init__(p_to_i, *args, **kwargs)
+
+    def _get_pssm_path(self, p):
+        return os.path.join(self.cache_path, "pssm", "{}.ascii-pssm".format(p))
+
+    def _compute_pssms(self):
+        raise NotImplementedError
+
+    def _compute_all(self):
+        self._compute_pssms()
+
+        reader = PSSM(targets = ("residue", "nlog_condp"))
+        pssms = []
+        for p, i in sorted(p_to_i.items(), key = lambda p_i: p_i[1]):
+            pssms.append(reader.read(self._get_pssm_path(p)))
+        self._entities = pssms
+        return super(PSSMKernel, self)._compute_all()
 
 class YeastExperiment(_Experiment):
     """New experiment based on SGD and iPfam.
@@ -13,11 +171,6 @@ class YeastExperiment(_Experiment):
     This experiment is structured exactly the same as the Yip et al. [Yip09]_
     experiment, but performed on a different dataset based on SGD, BioGRID
     and iPfam.
-
-    .. todo::
-
-        Compute number of functions per protein and number of proteins per
-        function; add to the GODag class.
 
     .. note::
 
@@ -30,14 +183,6 @@ class YeastExperiment(_Experiment):
     :param endpoint: URI of the SPARQL endpoint.
     :param default_graph: URI of the default graph.
     """
-    # TODO compute composition features
-    # TODO compute complexity features
-    # TODO compute conservation (profile) features
-    # TODO compute secondary features
-    # TODO compute cell-cycle gene expression features (correlations)
-    # TODO compute environment-response gene expression features (correlations)
-    # TODO read in the Y2H raw data
-    # TODO read in the TAP-MS raw data
     def __init__(self, *args, **kwargs):
         super(YeastExperiment, self).__init__(*args, **kwargs)
 
@@ -52,7 +197,7 @@ class YeastExperiment(_Experiment):
         """
         ids = set(bindings[u"orf"].split(".")[-1]
                   for bindings in self.iterquery(query, n = 1))
-        return ids
+        return sorted(list(ids))
 
     def _get_sgd_id_to_seq(self):
         query = """
@@ -109,7 +254,35 @@ class YeastExperiment(_Experiment):
                 sgd_id_to_feat[sgd_id] = set([ feat ])
             else:
                 sgd_id_to_feat[sgd_id].add(feat)
+        for sgd_id, featset in sgd_id_to_feat.iteritems():
+            assert len(featset) == 1
+            sgd_id_to_feat[sgd_id] = list(featset)[0]
         return sgd_id_to_feat
+
+    def _get_sgd_id_to_context(self):
+        query = """
+        SELECT ?orf ?chrom ?strand ?start ?stop
+        FROM <{default_graph}>
+        WHERE {{
+            ?orf a ocelot:sgd_id ;
+                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF .
+            ?orf ocelot:sgd_id_in_chromosome ?chrom .
+            ?orf ocelot:sgd_id_in_strand ?strand .
+            ?orf ocelot:sgd_id_starts_at ?start .
+            ?orf ocelot:sgd_id_stops_at ?stop .
+        }}
+        """
+        p_to_context = {}
+        for bindings in self.iterquery(query, n = 5):
+            orf     = bindings[u"orf"].split(".")[-1]
+            chrom   = bindings[u"chrom"].split(".")[-1]
+            strand  = bindings[u"strand"]
+            start   = bindings[u"start"]
+            stop    = bindings[u"stop"]
+            assert strand in ("C", "W")
+            p_to_context[orf] = \
+                (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
+        return p_to_context
 
     def _get_sgd_pin(self, manual_only = False):
         query = """
@@ -176,6 +349,39 @@ class YeastExperiment(_Experiment):
         sys.exit(1)
         return dd_pos
 
+    def _compute_protein_kernels(self, ps, p_to_feat):
+        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
+
+        # Compute the gene colocalization kernel
+        p_to_context = self._cached(self._get_sgd_id_to_context,
+                                    "sgd_id_to_context.pickle")
+        contexts = [p_to_context[p] for p in ps]
+        self._cached_kernel(ColocalizationKernel, len(ps),
+                            "p-colocalization-kernel", contexts,
+                            gamma = 1.0, do_normalize = False)
+
+        # Compute the gene expression kernel
+        self._cached_kernel(SGDGeneExpressionKernel, len(ps),
+                            "p-gene-expression-kernel", feat_to_i, self.src,
+                            ["Gasch_2000_PMID_11102521",
+                             "Spellman_1998_PMID_9843569"],
+                            do_normalize = False)
+
+        # Compute the protein complex kernel
+        self._cached_kernel(YeastProteinComplexKernel, len(ps),
+                            "p-complex-kernel", feat_to_i, self.src,
+                            do_normalize = False)
+
+        # Compute the InterPro domain kernel
+        self._cached_kernel(InterProKernel, len(ps),
+                            "p-interpro-kernel", p_to_i, self.dst,
+                            do_normalize = False)
+
+        # Compute the profile kernel
+        self._cached_kernel(PSSMKernel, len(ps),
+                            "p-profile-kernel", p_to_i, self.dst,
+                            k = 4, threshold = 6.0, do_normalize = False)
+
     @staticmethod
     def _get_neighbors_and_degree(ps, pps):
         neighbors_of = { p: set() for p in ps }
@@ -239,6 +445,25 @@ class YeastExperiment(_Experiment):
     def _get_folds(ps, pos, num_folds = 10):
         raise NotImplementedError
 
+    def _draw_dataset_statistics(self, ps, p_to_seq, p_to_fun):
+        import matplotlib.pyplot as plt
+
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        x = [len(p_to_seq[p]) for p in ps]
+        ax.hist(x, range(min(x), max(x) + 50, 50), color = "red", alpha = 0.8)
+        ax.yaxis.grid(True)
+        fig.savefig(os.path.join(self.dst, "p-length-hist.png"),
+                    bbox_inches = "tight", pad_inches = 0)
+
+        # TODO: function co-occurrence
+        # TODO: plot P(f|p)
+        # TODO: plot P(p|f)
+        # TODO: plot GO annotation depth
+        # TODO: plot GO consistency w.r.t. one-path rule
+        # TODO: plot GO consistency w.r.t. mutual exclusion
+        # TODO: plot GO consistency w.r.t. interactions
+
     @staticmethod
     def _check_p_pp_are_sane(ps, pps):
         assert all((p, q) in pps for (p, q) in pps), \
@@ -246,17 +471,23 @@ class YeastExperiment(_Experiment):
         assert all(p in ps for p, _ in pps), \
             "singletons and pairs do not match"
 
-    def run(self):
+    def run(self, min_sequence_len = 30, cdhit_threshold = 0.8):
         """Run the yeast prediction experiment."""
+
         ps          = self._cached(self._get_sgd_ids,
                                    "sgd_ids.pickle")
+        p_to_feat   = self._cached(self._get_sgd_id_to_feat,
+                                   "sgd_id_to_feat.pickle")
         p_to_seq    = self._cached(self._get_sgd_id_to_seq,
                                    "sgd_id_to_seq.pickle")
         p_to_fun    = self._cached(self._get_sgd_id_to_fun,
                                    "sgd_id_to_fun.pickle")
-        p_to_feat   = self._cached(self._get_sgd_id_to_feat,
-                                   "sgd_id_to_feat.pickle")
         print _cls(self), ": found {} proteins".format(len(ps))
+
+        for p in ps:
+            assert p in p_to_seq, "'{}' has no sequence".format(p)
+            assert p in p_to_fun, "'{}' has no GO annotation".format(p)
+            assert p in p_to_feat, "'{}' has no associated feature ID".format(p)
 
         # XXX curiously enough, some SGD proteins are annotated with GO terms
         # that are **not** part of goslim_yeast.obo... We use go-basic instead.
@@ -265,16 +496,20 @@ class YeastExperiment(_Experiment):
                                    "sgd_id_to_fun_propagated.pickle",
                                    p_to_fun, dag)
 
-        # Filter out sequences shorter than 30 residues
-        filtered_ps = filter(lambda p: len(p_to_seq[p]) >= 30, ps)
+        self._draw_dataset_statistics(ps, p_to_seq, p_to_fun)
+
+        # Filter out sequences shorter than min_sequence_len residues
+        filtered_ps = filter(lambda p: len(p_to_seq[p]) >= min_sequence_len, ps)
         print _cls(self), ": found {} proteins with at least {} residues" \
-                .format(len(ps), 30)
+                .format(len(ps), min_sequence_len)
 
         # Cluster sequences with CD-HIT
         filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
-        _, filtered_p_clusters = CDHit().run(filtered_p_seq, threshold = 0.8)
+        _, clusters = CDHit().run(filtered_p_seq, threshold = cdhit_threshold)
         print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
-                .format(len(filtered_p_clusters), 0.8)
+                .format(len(clusters), cdhit_threshold)
+
+        filtered_ps = [list(cluster)[0][0] for cluster in clusters]
 
         # Query the hq protein-protein interactions
         pp_pos_hq = self._cached(self._get_sgd_pin,
@@ -303,9 +538,13 @@ class YeastExperiment(_Experiment):
                 .format(len(pp_neg))
         self._check_p_pp_are_sane(ps, pp_neg)
 
+        # Compute the protein kernels
+        self._compute_protein_kernels(filtered_ps, p_to_feat)
+
         # TODO retrieve dom-dom and res-res interaction instances
 
         # TODO create the folds, with redundancy reduced training sets
         pp_folds = self._cached(self._get_folds, "folds", ps, pp_pos_hq)
         print _cls(self), ": created the folds"
+
 
