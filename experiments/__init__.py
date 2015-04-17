@@ -116,8 +116,8 @@ class _Experiment(object):
             path = os.path.join(self.dst, path)
             try:
                 print _cls(self), ": loading '{}'".format(path)
-                kernel = DummyKernel(path + ".txt", num = len(xs))
-                assert kernel.is_psd(), "non-PSD kernel"
+                kernel = DummyKernel(path + ".txt", num = len(xs),
+                                     check_psd = True)
             except Exception, e:
                 print _cls(self), "|", e
                 print _cls(self), ": computing '{}'".format(path)
@@ -130,8 +130,8 @@ class _Experiment(object):
             path += "-pairwise"
             try:
                 print _cls(self), ": loading '{}".format(path)
-                pairwise_kernel = DummyKernel(path + ".txt", num = len(xxs))
-                assert kernel.is_psd(), "non-PSD kernel"
+                pairwise_kernel = DummyKernel(path + ".txt", num = len(xxs),
+                                              check_psd = True)
             except Exception, e:
                 print _cls(self), "|", e
                 print _cls(self), ": computing '{}'".format(path)
