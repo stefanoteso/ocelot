@@ -81,18 +81,28 @@ class Kernel(object):
         np.savetxt(path, self.compute())
 
 class DummyKernel(Kernel):
-    """A wrapper around ``np.ndarray``'s and files."""
+    """A wrapper around ``np.ndarray``'s and files.
+
+    :param arg: either a ``numpy.ndarray`` or a path to a file.
+    :param num: number of elements in the wrapper kernel.
+    :param check_psd: whether to raise an exception if the wrapped kernel is not PSD.
+    """
     def __init__(self, arg, **kwargs):
+        arg = arg
         num = kwargs.get("num")
+        check_psd = kwargs.get("check_psd")
         if isinstance(arg, str):
             matrix = np.loadtxt(arg)
         else:
             matrix = arg
-        assert matrix.shape[0] == matrix.shape[1]
-        if num != None:
-            assert matrix.shape == (num, num)
+        if matrix.shape[0] != matrix.shape[1]:
+            raise ValueError("matrix is not symmetric '{}'".format(matrix.shape))
+        if num != None and matrix.shape != (num, num):
+            raise ValueError("matrix has invalid shape '{}', was expecting ({},{})".format(matrix.shape, num, num))
         super(DummyKernel, self).__init__(range(matrix.shape[0]),
                                           **kwargs)
+        if check_psd and not self.is_psd():
+            raise ValueError("matrix is not PSD")
         self._matrix = matrix
         if self._do_normalize:
             self._matrix = self._normalize(self._matrix)
