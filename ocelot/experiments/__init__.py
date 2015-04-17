@@ -107,6 +107,52 @@ class _Experiment(object):
             self._pickle(y, relpath)
         return y
 
+    def _compute_kernels(self, infos, xs, xxs, tolerance = 1e-10):
+        """Helper for computing kernels."""
+        x_to_i = {x: i for i, x in enumerate(xs)}
+        xx_indices = [(x_to_i[x1], x_to_i[x2]) for x1, x2 in xxs]
+
+        for path, compute in infos:
+            path = os.path.join(self.dst, path)
+            try:
+                print _cls(self), ": loading '{}'".format(path)
+                kernel = DummyKernel(path + ".txt", num = len(xs))
+                assert kernel.is_psd(), "non-PSD kernel"
+            except Exception, e:
+                print _cls(self), "|", e
+                print _cls(self), ": computing '{}'".format(path)
+                kernel = compute()
+                assert not kernel is None
+                kernel.check_and_fixup(tolerance)
+                kernel.save(path + ".txt")
+                kernel.draw(path + ".png")
+
+            path += "-pairwise"
+            try:
+                print _cls(self), ": loading '{}".format(path)
+                pairwise_kernel = DummyKernel(path + ".txt", num = len(xxs))
+                assert kernel.is_psd(), "non-PSD kernel"
+            except Exception, e:
+                print _cls(self), "|", e
+                print _cls(self), ": computing '{}'".format(path)
+                pairwise_kernel = PairwiseKernel(xx_indices, kernel)
+                pairwise_kernel.check_and_fixup(tolerance) 
+                pairwise_kernel.save(path + ".txt")
+                pairwise_kernel.draw(path + ".png")
+
+            del kernel
+            del pairwise_kernel
+
+        kernels, pairwise_kernels = [], []
+        for path, compute_kernel in infos:
+            path = os.path.join(self.dst, path)
+            print _cls(self), ": loading '{}".format(path)
+            kernels.append(DummyKernel(path + ".txt", num = len(xs)))
+            path += "-pairwise"
+            print _cls(self), ": loading '{}".format(path)
+            pairwise_kernels.append(DummyKernel(path + ".txt", num = len(xxs)))
+        return kernels, pairwise_kernels
+
     @staticmethod
     def _split_vector(ys, tr_indices, ts_indices):
         return ys[np.ix_(tr_indices)], ys[np.ix_(ts_indices)]

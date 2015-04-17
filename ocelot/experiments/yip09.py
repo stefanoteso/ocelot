@@ -451,7 +451,7 @@ class YipExperiment(_Experiment):
             ("p-kernel-yip",
                 lambda: self._get_yip_kernels()[0]),
         )
-        return self._get_x_kernels(INFOS, ps, pps, p_to_i, "protein")
+        return self._compute_kernels(INFOS, ps, pps)
 
     def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
         """Computes all the kernels and pairwise kernels for domains.
@@ -477,7 +477,7 @@ class YipExperiment(_Experiment):
             ("d-kernel-parent-freq",
                 lambda: self._get_domain_parent_freq_kernel()),
         )
-        return self._get_x_kernels(INFOS, ds, dds, d_to_i, "domain")
+        return self._compute_kernels(INFOS, ds, dds)
 
     def _get_r_kernels(self, rs, rrs, r_to_i, p_to_seq, r_to_pos):
         """Computes all the kernels and pairwise kernels for residues.
@@ -498,59 +498,7 @@ class YipExperiment(_Experiment):
             ("r-kernel-sa",
                 lambda: self._get_residue_sa_kernel()),
         )
-        return self._get_x_kernels(INFOS, rs, rrs, r_to_i, "residue")
-
-    def _get_x_kernels(self, infos, xs, xxs, x_to_i, name):
-        """Helper for computing kernels and pairwise kernels."""
-        print _cls(self), ": computing {} kernels".format(name)
-
-        xx_indices = [(x_to_i[x1], x_to_i[x2]) for x1, x2 in xxs]
-
-        # In order to compute the kernels without loading too much the machine,
-        # we first compute all the kernels and store them to disk, and *then*
-        # load them up again from disk.
-
-        for path, compute_kernel in infos:
-            path = os.path.join(self.dst, path)
-            try:
-                print _cls(self), ": loading '{}'".format(path)
-                kernel = DummyKernel(path + ".txt", num = len(xs))
-                assert kernel.is_psd(), "non-PSD kernel!"
-            except Exception, e:
-                print _cls(self), "|", e
-                print _cls(self), ": computing '{}'".format(path)
-                kernel = compute_kernel()
-                assert not kernel is None
-                kernel.check_and_fixup(1e-10) 
-                kernel.save(path + ".txt")
-                kernel.draw(path + ".png")
-
-            path += "-pairwise"
-            try:
-                print _cls(self), ": loading '{}".format(path)
-                pairwise_kernel = DummyKernel(path + ".txt", num = len(xxs))
-                assert kernel.is_psd(), "non-PSD kernel!"
-            except Exception, e:
-                print _cls(self), "|", e
-                print _cls(self), ": computing '{}'".format(path)
-                pairwise_kernel = PairwiseKernel(xx_indices, kernel)
-                assert not pairwise_kernel is None
-                pairwise_kernel.check_and_fixup(1e-10) 
-                pairwise_kernel.save(path + ".txt")
-                pairwise_kernel.draw(path + ".png")
-
-            del kernel
-            del pairwise_kernel
-
-        kernels, pairwise_kernels = [], []
-        for path, compute_kernel in infos:
-            path = os.path.join(self.dst, path)
-            print _cls(self), ": loading '{}".format(path)
-            kernels.append(DummyKernel(path + ".txt", num = len(xs)))
-            path += "-pairwise"
-            print _cls(self), ": loading '{}".format(path)
-            pairwise_kernels.append(DummyKernel(path + ".txt", num = len(xxs)))
-        return kernels, pairwise_kernels
+        return self._compute_kernels(INFOS, rs, rrs)
 
     def run(self):
         """Run the Yip et al. experiment replica."""
