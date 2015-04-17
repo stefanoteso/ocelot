@@ -172,9 +172,9 @@ Kernels
 Experiments
 -----------
 
-.. automodule:: ocelot.experiments.yip09
+.. automodule:: experiments.yip09
     :members:
-.. automodule:: ocelot.experiments.yeast
+.. automodule:: experiments.yeast
     :members:
 
 

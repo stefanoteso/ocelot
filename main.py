@@ -2,7 +2,7 @@
 # -*- coding: utf8 -*-
 
 import os
-import ocelot
+import ocelot, experiments
 
 from collections import namedtuple
 
@@ -136,9 +136,9 @@ def _run_experiment(args):
     """
     Target = namedtuple("Target", ("Experiment", "kwargs"))
     ALL_TARGETS = {
-        "yip"   : Target(ocelot.YipExperiment, {}),
-        "yeast" : Target(ocelot.YeastExperiment, {}),
-        "all"   : Target(ocelot.AllSpeciesExperiment, {}),
+        "yip"   : Target(experiments.YipExperiment, {}),
+        "yeast" : Target(experiments.YeastExperiment, {}),
+        "all"   : Target(experiments.AllSpeciesExperiment, {}),
     }
 
     ALL_SUBTARGETS = {
