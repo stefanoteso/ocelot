@@ -256,7 +256,7 @@ class YipExperiment(_Experiment):
                 levels = [ [0.0]*num_conditions for _ in xrange(len(p_to_i)) ]
                 # XXX add support for bad/SGD IDs
                 num_missing = 0
-                for orf, index in p_to_i.items():
+                for orf, index in p_to_i.iteritems():
                     try:
                         levels[index] = orf_to_expression[orf]
                     except KeyError, key:
@@ -289,7 +289,7 @@ class YipExperiment(_Experiment):
 
         # Now compute the adjacency matrix
         adj_matrix = np.zeros((len(p_to_i), len(p_to_i)))
-        for _, orfs in complex_to_orfs.items():
+        for _, orfs in complex_to_orfs.iteritems():
             orf_indices = [p_to_i[orf] for orf in orfs if orf in p_to_i]
             for i, j in it.product(orf_indices, orf_indices):
                 if i != j:
@@ -313,13 +313,13 @@ class YipExperiment(_Experiment):
         """
         interpro = InterProTSV()
         hits = [ None for _ in xrange(len(p_to_i)) ]
-        for p, i in p_to_i.items():
+        for p, i in p_to_i.iteritems():
             path = os.path.join(self.src, "yip09", "raw", "interpro",
                                 "{}.iprscan5.tsv.txt".format(p))
             hit = interpro.read(path, allowed_sources)
             if use_evalue:
                 # weight each hit by the negative log of its e-value
-                for k, v in hit.items():
+                for k, v in hit.iteritems():
                     if v == None or v <= 0.0:
                         hit[k] = default_score
                     else:
@@ -381,7 +381,7 @@ class YipExperiment(_Experiment):
     def _get_profile_kernel(self, p_to_i):
         reader = PSSM(targets = ["residue", "nlog_condp"])
         pssms = []
-        for p, i in p_to_i.items():
+        for p, i in p_to_i.iteritems():
             path = os.path.join(self.src, "yip09", "raw", "profiles",
                                 "{}.ascii-pssm".format(p))
             print "loading {}".format(path)
