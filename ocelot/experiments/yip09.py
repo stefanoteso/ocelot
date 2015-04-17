@@ -372,8 +372,8 @@ class YipExperiment(_Experiment):
                 start, stop = stop, start
             context[p] = (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
         matrix = np.zeros((len(p_to_i), len(p_to_i)))
-        for p, i in p_to_i.items():
-            for q, j in p_to_i.items():
+        for p, i in p_to_i.iteritems():
+            for q, j in p_to_i.iteritems():
                 if context[p][0] == context[q][0]:
                     matrix[i,j] = np.exp(-gamma * (context[p][1] - context[q][1])**2)
         return DummyKernel(matrix)
