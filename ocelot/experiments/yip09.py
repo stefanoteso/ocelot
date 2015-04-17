@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .base import _Experiment
+from . import _Experiment
 
 import os
 import numpy as np
