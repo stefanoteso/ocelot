@@ -279,7 +279,6 @@ class YeastExperiment(_Experiment):
             "singletons and pairs do not match"
 
     def run(self):
-        print self._get_sgd_ipfam_din()
         """Run the yeast prediction experiment."""
         ps          = self._cached(self._get_sgd_ids,
                                    "sgd_ids.pickle")
