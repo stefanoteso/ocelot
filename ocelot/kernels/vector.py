@@ -1,6 +1,7 @@
 # -*- coding: utf8 -*-
 
 import numpy as np
+import itertools as it
 
 from . import Kernel
 
@@ -65,6 +66,42 @@ class SparseLinearKernel(Kernel):
                     common_keys = set(entity_i.keys()) & set(entity_j.keys())
                     dp = sum([entity_i[k]*entity_j[k] for k in common_keys])
                 matrix[i,j] = matrix[j,i] = dp
+        return matrix
+
+class ColocalizationKernel(Kernel):
+    """An exponential kernel over genetic contexts.
+
+    :param contexts: a sequence of tuples of the form ``(chromosome, position)``.
+    """
+    def __init__(self, contexts, *args, **kwargs):
+        self._gamma = kwargs.get("gamma", 1.0)
+        super(ColocalizationKernel, self).__init__(contexts, *args, **kwargs)
+
+    def _compute_all(self):
+        # Group the contexts by chromosome
+        chromosome_to_contexts = {}
+        for i, (chromosome, pos) in enumerate(self._entities):
+            if not chromosome in chromosome_to_contexts:
+                chromosome_to_contexts[chromosome] = []
+            chromosome_to_contexts[chromosome].append((i, pos))
+
+        matrix = np.zeros((len(self), len(self)))
+        for contexts in chromosome_to_contexts.itervalues():
+            # Figure out the maximum distance between genes
+            max_d = None
+            for (i, pos_i), (j, pos_j) in it.product(contexts, contexts):
+                if i <= j:
+                    continue
+                d = np.abs(pos_i - pos_j)
+                if d > max_d or max_d == None:
+                    max_d = d
+            # Compute the kernel matrix
+            for (i, pos_i), (j, pos_j) in it.product(contexts, contexts):
+                if i < j:
+                    continue
+                matrix[i,j] = \
+                matrix[j,i] = \
+                     np.exp(-self._gamma * (np.abs(pos_i - pos_j) / max_d))
         return matrix
 
 class SetKernel(Kernel):
