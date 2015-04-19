@@ -87,7 +87,7 @@ class _Experiment(object):
         for bindings in ans["results"]["bindings"]:
             bindings = { k: self._cast(v) for k, v in bindings.iteritems() }
             if n != None:
-                assert len(bindings) == n
+                assert len(bindings) == n, bindings
             yield bindings
 
     def _pickle(self, what, path):
