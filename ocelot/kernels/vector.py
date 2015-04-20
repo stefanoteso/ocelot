@@ -15,31 +15,26 @@ class LinearKernel(Kernel):
         return np.dot(phis, phis.T)
 
 class CorrelationKernel(Kernel):
-    """A linear kernel over z-scores (computed autmatically).
+    """An explicit dot product kernel over z-scores.
+
+    Entities with no measurements should be set to all-zeroes.
+
+    .. note::
+
+        The computation of the standard deviation uses the Maximum
+        Likelihood (i.e. unbiased) estimator.
 
     :param entities: list of real-valued vectors.
     """
     def _compute_all(self):
-        for i, vector in enumerate(self._entities):
-            m = np.mean(vector)
-            s = np.std(vector)
-            if s == 0.0:
-                assert m == 0.0
-                # missing expression levels for this entry
-                s = 1.0
-            self._entities[i] = (vector - m) / s
-        num = len(self)
-        matrix = np.zeros((num, num))
-        for i in xrange(num):
-            phi_i = self._entities[i]
-            if not any(phi_i):
-                # missing expression levels for this entry
-                matrix[i,i] = 1.0
-                continue
-            for j in xrange(i + 1):
-                phi_j = self._entities[j]
-                matrix[i,j] = matrix[j,i] = np.dot(phi_i.T, phi_j)
-        return matrix
+        phis = np.array(self._entities)
+        m = np.mean(phis, axis = 1, keepdims = True)
+        s = np.std(phis, axis = 1, keepdims = True)
+        temp = np.seterr(divide = 'ignore', invalid = 'ignore')
+        z = (phis - m) / s
+        np.seterr(**temp)
+        z[np.isnan(z)] = 0.0
+        return np.dot(z, z.T)
 
 class SparseLinearKernel(Kernel):
     """A sparse linear kernel.
@@ -120,10 +115,23 @@ class SetKernel(Kernel):
 class _TestLinearKernel(object):
     def test_result(self):
         INPUTS = (
+            ((np.array([0, 0]), np.array([0, 0])), np.array([[0, 0], [0, 0]])),
             ((np.array([1, 0]), np.array([0, 1])), np.array([[1, 0], [0, 1]])),
             ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
         )
         for phis, expected in INPUTS:
             kernel = LinearKernel(phis, do_normalize = False)
+            output = kernel.compute()
+            assert (output == expected).all()
+
+class _TestCorrelationKernel(object):
+    def test_result(self):
+        INPUTS = (
+            ((np.array([0, 0]), np.array([0, 0])), np.array([[0, 0], [0, 0]])),
+            ((np.array([1, 0]), np.array([0, 1])), np.array([[2, -2], [-2, 2]])),
+            ((np.array([1, 0]), np.array([1, 0])), np.array([[2, 2], [2, 2]])),
+        )
+        for phis, expected in INPUTS:
+            kernel = CorrelationKernel(phis, do_normalize = False)
             output = kernel.compute()
             assert (output == expected).all()
