@@ -101,9 +101,9 @@ class DummyKernel(Kernel):
             raise ValueError("matrix has invalid shape '{}', was expecting ({},{})".format(matrix.shape, num, num))
         super(DummyKernel, self).__init__(range(matrix.shape[0]),
                                           **kwargs)
+        self._matrix = matrix
         if check_psd and not self.is_psd():
             raise ValueError("matrix is not PSD")
-        self._matrix = matrix
         if self._do_normalize:
             self._matrix = self._normalize(self._matrix)
 
