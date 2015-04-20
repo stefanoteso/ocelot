@@ -111,8 +111,11 @@ class _Experiment(object):
         path = os.path.join(self.dst, relpath)
         try:
             assert not self.force_update
+            print _cls(self), ": loading '{}'".format(path)
             kernel = DummyKernel(path + ".txt", num = num, check_psd = True)
         except Exception, e:
+            print _cls(self), "|", e
+            print _cls(self), ": computing '{}'".format(path)
             kernel = K(*args, **kwargs)
             assert not kernel is None
             kernel.check_and_fixup(kwargs.get("tol", 1e-10))
