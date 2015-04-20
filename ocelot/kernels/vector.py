@@ -57,6 +57,21 @@ class SparseLinearKernel(Kernel):
                 matrix[i,j] = matrix[j,i] = dp
         return matrix
 
+class SetKernel(Kernel):
+    """A generic set kernel.
+
+    :param entities: list of sets.
+    """
+    def _compute_all(self):
+        num = len(self)
+        matrix = np.zeros((num, num), dtype=np.float64)
+        for i in xrange(num):
+            entity_i = self._entities[i]
+            for j in xrange(i + 1):
+                entity_j = self._entities[j]
+                matrix[i,j] = matrix[j,i] = float(len(entity_i & entity_j))
+        return matrix
+
 class ColocalizationKernel(Kernel):
     """An exponential kernel over genetic contexts.
 
@@ -91,21 +106,6 @@ class ColocalizationKernel(Kernel):
                 matrix[i,j] = \
                 matrix[j,i] = \
                      np.exp(-self._gamma * (np.abs(pos_i - pos_j) / max_d))
-        return matrix
-
-class SetKernel(Kernel):
-    """A generic set kernel.
-
-    :param entities: list of sets.
-    """
-    def _compute_all(self):
-        num = len(self)
-        matrix = np.zeros((num, num), dtype=np.float64)
-        for i in xrange(num):
-            entity_i = self._entities[i]
-            for j in xrange(i + 1):
-                entity_j = self._entities[j]
-                matrix[i,j] = matrix[j,i] = float(len(entity_i & entity_j))
         return matrix
 
 class _TestLinearKernel(object):
