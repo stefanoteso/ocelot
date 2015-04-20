@@ -64,7 +64,7 @@ class SetKernel(Kernel):
     """
     def _compute_all(self):
         num = len(self)
-        matrix = np.zeros((num, num), dtype=np.float64)
+        matrix = np.zeros((num, num))
         for i in xrange(num):
             entity_i = self._entities[i]
             for j in xrange(i + 1):
