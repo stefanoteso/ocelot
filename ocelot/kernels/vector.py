@@ -49,12 +49,9 @@ class SparseLinearKernel(Kernel):
             entity_i = self._entities[i]
             for j in xrange(i + 1):
                 entity_j = self._entities[j]
-                if i == j and len(entity_i) == 0 and len(entity_j) == 0:
-                    dp = 1.0
-                else:
-                    common_keys = set(entity_i.keys()) & set(entity_j.keys())
-                    dp = sum([entity_i[k]*entity_j[k] for k in common_keys])
-                matrix[i,j] = matrix[j,i] = dp
+                common_keys = set(entity_i.keys()) & set(entity_j.keys())
+                matrix[i,j] = matrix[j,i] = \
+                    sum([entity_i[k]*entity_j[k] for k in common_keys])
         return matrix
 
 class SetKernel(Kernel):
@@ -129,6 +126,19 @@ class _TestCorrelationKernel(object):
         )
         for phis, expected in INPUTS:
             kernel = CorrelationKernel(phis, do_normalize = False)
+            output = kernel.compute()
+            assert (output == expected).all()
+
+class _TestSparseLinearKernel(object):
+    def test_results(self):
+        INPUTS = (
+            (({}, {}), np.array([[0, 0], [0, 0]])),
+            (({0:0.0}, {0:0.0}), np.array([[0, 0], [0, 0]])),
+            (({0:1.0}, {1:1.0}), np.array([[1, 0], [0, 1]])),
+            (({0:1.0, 1:1.0}, {0:1.0, 1:1.0}), np.array([[2, 2], [2, 2]])),
+        )
+        for phis, expected in INPUTS:
+            kernel = SparseLinearKernel(phis, do_normalize = False)
             output = kernel.compute()
             assert (output == expected).all()
 
