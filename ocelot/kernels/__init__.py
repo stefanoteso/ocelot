@@ -69,11 +69,11 @@ class Kernel(object):
             print "matplotlib is required; can not draw"
             return
         try:
-            fig = plt.figure()
+            fig = plt.figure(figsize = (len(self) / 96, len(self) / 96), dpi = 96)
             ax = fig.add_subplot(1, 1, 1)
             matrix = self.compute()
             ax.matshow(matrix, interpolation = "nearest", cmap = cm.OrRd)
-            fig.savefig(path)
+            fig.savefig(path, bbox_inches="tight", pad_inches=0)
         except Exception, e:
             print "failed to draw kernel; skipping"
 
