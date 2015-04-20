@@ -11,14 +11,8 @@ class LinearKernel(Kernel):
     :param entities: list of real-valued vectors.
     """
     def _compute_all(self):
-        num = len(self)
-        matrix = np.zeros((num, num))
-        for i in xrange(num):
-            phi_i = self._entities[i]
-            for j in xrange(i + 1):
-                phi_j = self._entities[j]
-                matrix[i,j] = matrix[j,i] = np.dot(phi_i.T, phi_j)
-        return matrix
+        phis = np.array(self._entities)
+        return np.dot(phis, phis.T)
 
 class CorrelationKernel(Kernel):
     """A linear kernel over z-scores (computed autmatically).
