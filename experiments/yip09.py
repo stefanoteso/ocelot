@@ -271,7 +271,7 @@ class YipExperiment(_Experiment):
 
         The original experiment relies of Y2H [Ito00]_, [Uetz00]_ and TAP-MS
         [Gavin06]_, [Krogan06]_ datasets of protein complexes. Here we make
-        use of the dataset described in [Pu08], which is supposed to be more
+        use of the dataset described in [Pu08]_, which is supposed to be more
         complete and up-to-date.
         """
         import itertools as it
