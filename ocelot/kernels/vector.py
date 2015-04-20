@@ -105,11 +105,7 @@ class SetKernel(Kernel):
             entity_i = self._entities[i]
             for j in xrange(i + 1):
                 entity_j = self._entities[j]
-                if i == j and len(entity_i) == 0 and len(entity_j) == 0:
-                    dp = 1.0
-                else:
-                    dp = float(len(entity_i & entity_j))
-                matrix[i,j] = matrix[j,i] = dp
+                matrix[i,j] = matrix[j,i] = float(len(entity_i & entity_j))
         return matrix
 
 class _TestLinearKernel(object):
@@ -133,5 +129,18 @@ class _TestCorrelationKernel(object):
         )
         for phis, expected in INPUTS:
             kernel = CorrelationKernel(phis, do_normalize = False)
+            output = kernel.compute()
+            assert (output == expected).all()
+
+class _TestSetKernel(object):
+    def test_results(self):
+        INPUTS = (
+            ((set(), set()), np.array([[0, 0], [0, 0]])),
+            ((set([0]), set([1])), np.array([[1, 0], [0, 1]])),
+            ((set([0]), set([0])), np.array([[1, 1], [1, 1]])),
+            ((set(["a", "b"]), set(["a", "b"])), np.array([[2, 2], [2, 2]])),
+        )
+        for phis, expected in INPUTS:
+            kernel = SetKernel(phis, do_normalize = False)
             output = kernel.compute()
             assert (output == expected).all()
