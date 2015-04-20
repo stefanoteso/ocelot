@@ -105,52 +105,46 @@ class ColocalizationKernel(Kernel):
                      np.exp(-self._gamma * (np.abs(pos_i - pos_j) / max_d))
         return matrix
 
+def _test_results(Kernel, data, *args, **kwargs):
+    for phis, expected in data:
+        kernel = Kernel(phis, *args, **kwargs)
+        output = kernel.compute()
+        assert (output == expected).all()
+
 class _TestLinearKernel(object):
     def test_result(self):
-        INPUTS = (
+        DATA = (
             ((np.array([0, 0]), np.array([0, 0])), np.array([[0, 0], [0, 0]])),
             ((np.array([1, 0]), np.array([0, 1])), np.array([[1, 0], [0, 1]])),
             ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
         )
-        for phis, expected in INPUTS:
-            kernel = LinearKernel(phis, do_normalize = False)
-            output = kernel.compute()
-            assert (output == expected).all()
+        _test_results(LinearKernel, DATA, do_normalize = False)
 
 class _TestCorrelationKernel(object):
     def test_result(self):
-        INPUTS = (
+        DATA = (
             ((np.array([0, 0]), np.array([0, 0])), np.array([[0, 0], [0, 0]])),
             ((np.array([1, 0]), np.array([0, 1])), np.array([[2, -2], [-2, 2]])),
             ((np.array([1, 0]), np.array([1, 0])), np.array([[2, 2], [2, 2]])),
         )
-        for phis, expected in INPUTS:
-            kernel = CorrelationKernel(phis, do_normalize = False)
-            output = kernel.compute()
-            assert (output == expected).all()
+        _test_results(CorrelationKernel, DATA, do_normalize = False)
 
 class _TestSparseLinearKernel(object):
     def test_results(self):
-        INPUTS = (
+        DATA = (
             (({}, {}), np.array([[0, 0], [0, 0]])),
             (({0:0.0}, {0:0.0}), np.array([[0, 0], [0, 0]])),
             (({0:1.0}, {1:1.0}), np.array([[1, 0], [0, 1]])),
             (({0:1.0, 1:1.0}, {0:1.0, 1:1.0}), np.array([[2, 2], [2, 2]])),
         )
-        for phis, expected in INPUTS:
-            kernel = SparseLinearKernel(phis, do_normalize = False)
-            output = kernel.compute()
-            assert (output == expected).all()
+        _test_results(SparseLinearKernel, DATA, do_normalize = False)
 
 class _TestSetKernel(object):
     def test_results(self):
-        INPUTS = (
+        DATA = (
             ((set(), set()), np.array([[0, 0], [0, 0]])),
             ((set([0]), set([1])), np.array([[1, 0], [0, 1]])),
             ((set([0]), set([0])), np.array([[1, 1], [1, 1]])),
             ((set(["a", "b"]), set(["a", "b"])), np.array([[2, 2], [2, 2]])),
         )
-        for phis, expected in INPUTS:
-            kernel = SetKernel(phis, do_normalize = False)
-            output = kernel.compute()
-            assert (output == expected).all()
+        _test_results(SetKernel, DATA, do_normalize = False)
