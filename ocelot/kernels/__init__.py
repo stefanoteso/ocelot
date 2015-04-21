@@ -78,7 +78,7 @@ class Kernel(object):
             print "failed to draw kernel; skipping"
 
     def save(self, path):
-        np.savetxt(path, self.compute())
+        np.save(path, self.compute())
 
 class DummyKernel(Kernel):
     """A wrapper around ``np.ndarray``'s and files.
@@ -92,7 +92,7 @@ class DummyKernel(Kernel):
         num = kwargs.get("num")
         check_psd = kwargs.get("check_psd")
         if isinstance(arg, str):
-            matrix = np.loadtxt(arg)
+            matrix = np.load(arg)
         else:
             matrix = arg
         if matrix.shape[0] != matrix.shape[1]:
