@@ -381,7 +381,7 @@ class YipExperiment(_Experiment):
     def _get_profile_kernel(self, p_to_i):
         reader = PSSM(targets = ["residue", "nlog_condp"])
         pssms = []
-        for p, i in p_to_i.iteritems():
+        for p, i in sorted(p_to_i.iteritems(), key = lambda p_i: p_i[1]):
             path = os.path.join(self.src, "yip09", "raw", "profiles",
                                 "{}.ascii-pssm".format(p))
             print "loading {}".format(path)
