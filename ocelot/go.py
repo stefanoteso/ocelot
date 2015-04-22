@@ -110,7 +110,7 @@ class GOTerm(object):
     """A GO Term."""
     def __init__(self):
         self.id = ""
-        """ID of the term, e.g. ``"GO:GO:0048308'"``"""
+        """ID of the term, e.g. ``"GO:0048308'"``"""
         self.alt_ids = []
         """List of alternative IDs."""
         self.name = ""
