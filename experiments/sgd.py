@@ -165,7 +165,7 @@ class PSSMKernel(ProfileKernel):
         self._entities = pssms
         return super(PSSMKernel, self)._compute_all()
 
-class YeastExperiment(_Experiment):
+class SGDExperiment(_Experiment):
     """New experiment based on SGD and iPfam.
 
     This experiment is structured exactly the same as the Yip et al. [Yip09]_
@@ -184,7 +184,7 @@ class YeastExperiment(_Experiment):
     :param default_graph: URI of the default graph.
     """
     def __init__(self, *args, **kwargs):
-        super(YeastExperiment, self).__init__(*args, **kwargs)
+        super(SGDExperiment, self).__init__(*args, **kwargs)
 
     def _get_sgd_ids(self):
         query = """
@@ -471,7 +471,7 @@ class YeastExperiment(_Experiment):
         assert all(p in ps for p, _ in pps), \
             "singletons and pairs do not match"
 
-    def run(self, min_sequence_len = 30, cdhit_threshold = 0.8):
+    def run(self, min_sequence_len = 50, cdhit_threshold = 0.75):
         """Run the yeast prediction experiment."""
 
         ps          = self._cached(self._get_sgd_ids,

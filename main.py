@@ -136,9 +136,9 @@ def _run_experiment(args):
     """
     Target = namedtuple("Target", ("Experiment", "kwargs"))
     ALL_TARGETS = {
-        "yip"   : Target(experiments.YipExperiment, {}),
-        "yeast" : Target(experiments.YeastExperiment, {}),
-        "all"   : Target(experiments.AllSpeciesExperiment, {}),
+        "yip" : Target(experiments.YipExperiment, {}),
+        "sgd" : Target(experiments.SGDExperiment, {}),
+        "all" : Target(experiments.AllSpeciesExperiment, {}),
     }
 
     ALL_SUBTARGETS = {

@@ -263,6 +263,6 @@ class _Experiment(object):
         raise NotImplementedError
 
 from yip09 import *
+from sgd import *
 from cafa13 import *
-from yeast import *
 from full import *
