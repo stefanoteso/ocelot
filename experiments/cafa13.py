@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .base import _Experiment
+from . import _Experiment
 
 class CAFA13Experiment(_Experiment):
     """New experiment based on the CAFA13 dataset.

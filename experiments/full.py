@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .base import _Experiment
+from . import _Experiment
 
 class AllSpeciesExperiment(_Experiment):
     """New experiment based of species-agnostic BioGRID and iPfam."""
