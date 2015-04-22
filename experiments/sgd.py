@@ -357,30 +357,29 @@ class SGDExperiment(_Experiment):
                                     "sgd_id_to_context.pickle")
         contexts = [p_to_context[p] for p in ps]
         self._cached_kernel(ColocalizationKernel, len(ps),
-                            "p-colocalization-kernel", contexts,
-                            gamma = 1.0, do_normalize = False)
+                            "p-colocalization-kernel",
+                            contexts, gamma = 1.0)
 
         # Compute the gene expression kernel
         self._cached_kernel(SGDGeneExpressionKernel, len(ps),
-                            "p-gene-expression-kernel", feat_to_i, self.src,
+                            "p-gene-expression-kernel",
+                            feat_to_i, self.src,
                             ["Gasch_2000_PMID_11102521",
-                             "Spellman_1998_PMID_9843569"],
-                            do_normalize = False)
+                             "Spellman_1998_PMID_9843569"])
 
         # Compute the protein complex kernel
         self._cached_kernel(YeastProteinComplexKernel, len(ps),
-                            "p-complex-kernel", feat_to_i, self.src,
-                            do_normalize = False)
+                            "p-complex-kernel",
+                            feat_to_i, self.src)
 
-        # Compute the InterPro domain kernel
-        self._cached_kernel(InterProKernel, len(ps),
-                            "p-interpro-kernel", p_to_i, self.dst,
-                            do_normalize = False)
-
-        # Compute the profile kernel
-        self._cached_kernel(PSSMKernel, len(ps),
-                            "p-profile-kernel", p_to_i, self.dst,
-                            k = 4, threshold = 6.0, do_normalize = False)
+#        # Compute the InterPro domain kernel
+#        self._cached_kernel(InterProKernel, len(ps),
+#                            "p-interpro-kernel", p_to_i, self.dst)
+#
+#        # Compute the profile kernel
+#        self._cached_kernel(PSSMKernel, len(ps),
+#                            "p-profile-kernel", p_to_i, self.dst,
+#                            k = 4, threshold = 6.0)
 
     @staticmethod
     def _get_neighbors_and_degree(ps, pps):
