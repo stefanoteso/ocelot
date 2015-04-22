@@ -30,6 +30,11 @@ class Kernel(object):
         """
         ones = np.ones((1, matrix.shape[1]))
         invd = np.divide(ones, np.sqrt(matrix.diagonal()))
+        # We may get infinities if the diagonal is zero; in that case we
+        # *assume* that the corresponding non-diagonal entries are also zero,
+        # which implies that it is safe to turn the infinities to 1, as doing
+        # so retains the zeros on the non-diagonal entries.
+        invd[np.isinf(invd)] = 1.0
         return np.multiply(matrix, np.dot(invd.T, invd))
 
     def compute(self):
