@@ -50,7 +50,7 @@ class SGDGeneExpressionKernel(Kernel):
             if num_missing > 0:
                  print _cls(self), ": '{}' has no measurements for '{}/{}' proteins" \
                                     .format(path, num_missing, len(self))
-            matrix += CorrelationKernel(exp_levels).compute()
+            matrix += CorrelationKernel(exp_levels, do_normalize = self._do_normalize).compute()
             break
         return matrix
 
