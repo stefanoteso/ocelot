@@ -195,6 +195,13 @@ def main():
                         help="[all] enable debugging output")
     parser.add_argument("--seed", type=int, default=None,
                         help="[all] seed for the RNG.")
+    parser.add_argument("--go-aspects", type=list, default="BP,CC,MF",
+                        help="[run-experiment] restrict GO annotations/predictions to these aspects (default: 'BP,CC,MF'])")
+    parser.add_argument("--max-go-depth", type=int, default=0,
+                        help="[run-experiment] restrict GO annotations/predictions to terms with at most this depth (default: 0)")
+    parser.add_argument("--min-go-annot", type=int, default=0,
+                        help="[run-experiment] restrict GO annotations/predictions to term with at least this many annotations (default: 0)")
+
     args = parser.parse_args()
 
     if not args.seed is None:
