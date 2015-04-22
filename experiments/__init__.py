@@ -26,7 +26,6 @@ class _Experiment(object):
     .. todo::
         Add support for SBR.
     """
-    # write the SBR output (individuals, kernels, predicates, rules)
     def __init__(self, src, dst, subtargets,
                  endpoint = u"http://127.0.0.1:8890/sparql",
                  default_graph = u"http://ocelot.disi.unitn.it/graph",
