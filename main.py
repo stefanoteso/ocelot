@@ -1,7 +1,8 @@
 #!/usr/bin/env python2
 # -*- coding: utf8 -*-
 
-import os
+import os, random
+import numpy as np
 import ocelot, experiments
 
 from collections import namedtuple
@@ -192,7 +193,13 @@ def main():
                         help="ignores cached data")
     parser.add_argument("--debug", action="store_true",
                         help="[all] enable debugging output")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="[all] seed for the RNG.")
     args = parser.parse_args()
+
+    if not args.seed is None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
 
     command = COMMANDS.get(args.command)
     if not command:
