@@ -4,9 +4,10 @@ from . import _Experiment
 
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 import itertools as it
 from glob import glob
-from ocelot.services import _cls, iterate_csv, CDHit, PCL
+from ocelot.services import _cls, iterate_csv, CDHit, PCL, InterProTSV
 from ocelot.go import GODag, GOTerm
 from ocelot.kernels import *
 
@@ -96,38 +97,55 @@ class YeastProteinComplexKernel(Kernel):
 class InterProKernel(Kernel):
     """A simple domain kernel built around InterPro.
 
-    :param p_to_i: map between protein identifiers and kernel index.
+    :param ps: list of protein IDs.
     :param cache_path: path to the directory holding the interpro output.
-    :param allowed_sources: list of allowed domain providers (default: None).
-    :param use_evalue: whether to use the evalue to score the predictions.
+    :param allowed_sources: list of allowed domain providers (default: ``None``).
+    :param use_evalue: whether to use the evalue to score the predictions (default: ``False``).
+    :param default_score: default score to use when no evalue is provided (default: ``1.0``).
     """
-    def __init__(self, p_to_i, cache_path, allowed_sources = None,
-                 use_evalue = False, *args, **kwargs):
+    def __init__(self, ps, cache_path, allowed_sources = None,
+                 use_evalue = False, default_score = 1.0, *args, **kwargs):
         self._cache_path = cache_path
-        self._allowed_providers = allowed_providers
+        self._allowed_sources = allowed_sources
         self._use_evalue = use_evalue
-        super(InterProKernel, self).__init__(p_to_i, *args, **kwargs)
+        self._default_score = default_score
+        super(InterProKernel, self).__init__(ps, *args, **kwargs)
 
     def _path(self, p):
-        return os.path.join(self.cache_path, "interpro", "{}.f.tsv.txt".format(p))
+        return os.path.join(self._cache_path, "interpro",
+                            "{}.f.tsv.txt".format(p))
 
-    def _retrieve_interpro_predictions(self):
-        raise NotImplementedError
+    def _compute_iprscan_hits(self):
+        # WRITEME
+        pass
+
+    def _to_score(self, evalue):
+        if evalue is None or evalue <= 0.0:
+            return self._default_score
+        return -np.log(evalue)
 
     def _compute_all(self):
-        self._retrieve_interpro_predictions()
-
+        self._compute_iprscan_hits()
         parser = InterProTSV()
 
-        all_hits = []
-        for p, i in sorted(p_to_i.items(), key = lambda p_i: p_i[1]):
-            domain_to_evalue = interpro.read(self._path(p), allowed_sources)
+        all_hits, num_missing = [], 0
+        for p in self._entities:
+            try:
+                domain_to_evalue = parser.read(self._path(p),
+                                               self._allowed_sources)
+            except IOError, e:
+                domain_to_evalue = {}
+                num_missing += 1
             if not self._use_evalue:
                 hits = set(domain_to_evalue.keys())
             else:
-                hits = {domain: (-np.log(evalue) if evalue is None else DEFAULT_SCORE)
+                hits = {domain: self._to_score(evalue)
                         for domain, evalue in domain_to_evalue.iteritems()}
             all_hits.append(hits)
+
+        if num_missing > 0:
+            print _cls(self), ": no interpro domains for '{}/{}' proteins" \
+                                .format(num_missing, len(self))
 
         if not self._use_evalue:
             return SetKernel(all_hits).compute()
@@ -284,7 +302,7 @@ class SGDExperiment(_Experiment):
                 (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
         return p_to_context
 
-    def _get_sgd_pin(self, manual_only = False):
+    def _get_sgd_pin(self, ps = None, manual_only = False):
         query = """
         SELECT DISTINCT ?orf1 ?orf2
         FROM <{default_graph}>
@@ -311,6 +329,13 @@ class SGDExperiment(_Experiment):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
             pp_pos.update([(p1,p2), (p2,p1)])
+        if not ps is None:
+            # Filter out all pairs that do not fall in ``ps``
+            ps, filtered_pp_pos = set(ps), set()
+            for (p1, p2) in pp_pos:
+                if p1 in ps and p2 in ps:
+                    filtered_pp_pos.add((p1, p2))
+            pp_pos = filtered_pp_pos
         return pp_pos
 
     def _get_sgd_din(self):
@@ -372,10 +397,14 @@ class SGDExperiment(_Experiment):
                             "p-complex-kernel",
                             feat_to_i, self.src)
 
-#        # Compute the InterPro domain kernel
-#        self._cached_kernel(InterProKernel, len(ps),
-#                            "p-interpro-kernel", p_to_i, self.dst)
-#
+        # Compute the InterPro domain kernel
+        self._cached_kernel(InterProKernel, len(ps),
+                            "p-interpro-kernel", ps, self.dst,
+                            use_evalue = False)
+        self._cached_kernel(InterProKernel, len(ps),
+                            "p-interpro-score-kernel", ps, self.dst,
+                            use_evalue = True)
+
 #        # Compute the profile kernel
 #        self._cached_kernel(PSSMKernel, len(ps),
 #                            "p-profile-kernel", p_to_i, self.dst,
@@ -425,34 +454,120 @@ class SGDExperiment(_Experiment):
         return neg
 
     def _propagate_fun_on_dag(self, p_to_fun, dag):
+        """WRITEME
+
+        :param p_to_fun: map from protein IDs to GO term IDs.
+        :param dag: the full GO DAG.
+        :returns: map from protein IDs to ``GOTerm``'s.
+        """
         propagated_p_to_fun = {}
-        for p, functions in p_to_fun.iteritems():
+        for p, term_ids in p_to_fun.iteritems():
             propagated_functions = set()
-            for fun in functions:
-                if fun == "": # This can occur due to empty annotations in SGD
+            for term_id in term_ids:
+                if term_id == "": # This can occur due to empty annotations in SGD
                     continue
-                paths = dag.paths_to_root(fun)
+                paths = dag.paths_to_root(term_id)
                 if paths == None:
                     print "Warning: protein '{}' is annotated with an undefined term '{}', skipping" \
-                            .format(p, fun)
+                            .format(p, term_id)
                     continue
                 for path in paths:
                     propagated_functions.update(path)
             propagated_p_to_fun[p] = propagated_functions
         return propagated_p_to_fun
 
-    def _get_folds(ps, pos, num_folds = 10):
-        raise NotImplementedError
+    def _preprocess_dag(self, dag, ps, p_to_fun, aspects = None,
+                        min_proteins_per_term = 30, max_depth = 5):
+        """Processes the GO DAG by removing unwanted terms and adding bin terms.
 
-    def _draw_dataset_statistics(self, ps, p_to_seq, p_to_fun):
-        import matplotlib.pyplot as plt
+        :param dag: the full GO DAG.
+        :param ps: list of protein IDs.
+        :param p_to_fun: map from protein IDs to ``GOTerm``'s.
+        :param aspects: list of aspects to keep, in ``("BP", "CC", "MF")``.
+        :param min_proteins_per_term: minimum number of proteins to keep a term.
+        :param max_level: maximum term depth.
+        :returns: the trimmed GO DAG, list of proteins, and protein-to-function map.
+        """
+        # TODO WRITEME
+        return dag, ps, p_to_fun
 
+    @staticmethod
+    def _permute(l):
+        pi = list(np.random.permutation(len(l)))
+        return [l[pi[i]] for i in xrange(len(l))]
+
+    def _get_folds(self, pps, p_to_terms, num_folds = 10):
+        """Generates the folds.
+
+        The interactions are split into folds according to their functions.
+        No two protein-protein interactions can occur in two distinct folds.
+
+        :param pps: list of interactions.
+        :param p_to_terms: mapt between proteins and ``GOTerm``'s.
+        :param num_folds: number of folds to generate (default: ``10``).
+        :returns: a list of sets of protein pairs.
+        """
+        # Map from protein pairs to GO terms either protein is annotated with
+        pp_to_terms = {(p1,p2): (set(p_to_terms[p1]) | set(p_to_terms[p2]))
+                       for p1, p2 in pps}
+
+        # Map from GO terms to protein pairs
+        term_to_pps = {}
+        for (p1, p2), terms in pp_to_terms.iteritems():
+            for term in terms:
+                if not term in term_to_pps:
+                    term_to_pps[term] = set([(p1, p2)])
+                else:
+                    term_to_pps[term].add((p1, p2))
+        all_terms = term_to_pps.keys()
+
+        # Generate the folds
+        folds = [set() for _ in range(num_folds)]
+        while len(term_to_pps):
+            # Pick the term with the least unprocessed protein-protein pairs
+            cur_term, cur_pps = min(term_to_pps.iteritems(),
+                                    key = lambda term_pps: len(term_pps[1]))
+            print "best term: {} (num pairs = {})".format(cur_term, len(cur_pps))
+            # Evenly distribute the associated protein-protein pairs among all
+            # folds
+            folds = self._permute(folds)
+            for i, pp in enumerate(cur_pps):
+                folds[i % num_folds].add(pp)
+            # Remove the term we just processed as well as with the protein
+            # pairs annotated with it
+            new_term_to_pps = {}
+            for term in term_to_pps:
+                if term == cur_term:
+                    continue
+                new_term_pps = set(pp for pp in term_to_pps[term]
+                                   if not pp in cur_pps)
+                if len(new_term_pps) == 0:
+                    continue
+                new_term_to_pps[term] = new_term_pps
+            term_to_pps = new_term_to_pps
+
+        # Evaluate the fold quality
+        term_to_i = {term: i for i, term in enumerate(all_terms)}
+        counts = []
+        for fold in folds:
+            fold_counts = [0 for _ in len(all_terms)]
+            for pp in fold:
+                for term in pp_to_terms[pp]:
+                    fold_counts[term_to_i[term]] += 1
+            counts.append(fold_counts)
+
+        return folds
+
+    def _dump_dataset_statistics(self, ps, p_to_seq, p_to_fun, dag, prefix):
+        """Dump a few dataset statistics."""
+
+        # Draw the histogram of protein lengths
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         x = [len(p_to_seq[p]) for p in ps]
         ax.hist(x, range(min(x), max(x) + 50, 50), color = "red", alpha = 0.8)
         ax.yaxis.grid(True)
-        fig.savefig(os.path.join(self.dst, "p-length-hist.png"),
+        fig.savefig(os.path.join(self.dst, "p-{}-length-hist.png".format(prefix)),
                     bbox_inches = "tight", pad_inches = 0)
 
         # TODO: function co-occurrence
@@ -495,8 +610,6 @@ class SGDExperiment(_Experiment):
                                    "sgd_id_to_fun_propagated.pickle",
                                    p_to_fun, dag)
 
-        self._draw_dataset_statistics(ps, p_to_seq, p_to_fun)
-
         # Filter out sequences shorter than min_sequence_len residues
         filtered_ps = filter(lambda p: len(p_to_seq[p]) >= min_sequence_len, ps)
         print _cls(self), ": found {} proteins with at least {} residues" \
@@ -510,11 +623,19 @@ class SGDExperiment(_Experiment):
 
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
 
+        # Process the GO DAG
+        self._dump_dataset_statistics(ps, p_to_seq, p_to_fun, dag, "raw")
+        self._preprocess_dag(dag, filtered_ps, p_to_fun)
+        self._dump_dataset_statistics(ps, p_to_seq, p_to_fun, dag, "preproc")
+
+        # Compute the protein kernels
+        self._compute_protein_kernels(filtered_ps, p_to_feat)
+
         # Query the hq protein-protein interactions
         pp_pos_hq = self._cached(self._get_sgd_pin,
                                  "sgd_id_interactions_hq.pickle",
-                                 manual_only = True)
-        density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
+                                 ps = filtered_ps, manual_only = True)
+        density = float(len(pp_pos_hq)) / (len(filtered_ps) * (len(filtered_ps) - 1))
         print _cls(self), ": found {} hi-quality PPIs (density = {})" \
                 .format(len(pp_pos_hq), density)
         self._check_p_pp_are_sane(ps, pp_pos_hq)
@@ -522,8 +643,8 @@ class SGDExperiment(_Experiment):
         # Query the hq+lq protein-protein interactions
         pp_pos_lq = self._cached(self._get_sgd_pin,
                                  "sgd_id_interactions_lq.pickle",
-                                 manual_only = False)
-        density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
+                                 ps = filtered_ps, manual_only = False)
+        density = float(len(pp_pos_lq)) / (len(filtered_ps) * (len(filtered_ps) - 1))
         print _cls(self), ": found {} lo-quality PPIs (density = {})" \
                 .format(len(pp_pos_lq), density)
         self._check_p_pp_are_sane(ps, pp_pos_lq)
@@ -537,13 +658,9 @@ class SGDExperiment(_Experiment):
                 .format(len(pp_neg))
         self._check_p_pp_are_sane(ps, pp_neg)
 
-        # Compute the protein kernels
-        self._compute_protein_kernels(filtered_ps, p_to_feat)
+        # Create the folds
+        print _cls(self), ": computing the folds"
+        pp_folds = self._cached(self._get_folds, "folds",
+                                pp_pos_hq, p_to_fun)
 
         # TODO retrieve dom-dom and res-res interaction instances
-
-        # TODO create the folds, with redundancy reduced training sets
-        pp_folds = self._cached(self._get_folds, "folds", ps, pp_pos_hq)
-        print _cls(self), ": created the folds"
-
-
