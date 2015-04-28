@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import itertools as it
 from ocelot.services import _cls, CDHit
 from ocelot.go import GODag, GOTerm
 from ocelot.kernels import *
@@ -329,7 +330,7 @@ class SGDExperiment(_Experiment):
         No two protein-protein interactions can occur in two distinct folds.
 
         :param pps: list of interactions.
-        :param p_to_terms: mapt between proteins and ``GOTerm``'s.
+        :param p_to_terms: map between proteins and ``GOTerm``'s.
         :param num_folds: number of folds to generate (default: ``10``).
         :returns: a list of sets of protein pairs.
         """
@@ -345,7 +346,22 @@ class SGDExperiment(_Experiment):
                     term_to_pps[term] = set([(p1, p2)])
                 else:
                     term_to_pps[term].add((p1, p2))
-        all_terms = term_to_pps.keys()
+
+        # Gather all GO terms and assign them an index
+        all_pp_terms = term_to_pps.keys()
+        term_to_i = {term: i for i, term in enumerate(all_pp_terms)}
+
+        # Compute the ideal (perfect average) GO term distribution
+        average = np.zeros((len(all_pp_terms),))
+        for pp, terms in pp_to_terms.iteritems():
+            for term in terms:
+                average[term_to_i[term]] += 1
+        average *= 1.0 / num_folds
+
+        # Sanity check. Note that self-interactions are fine.
+        for term, pps in term_to_pps.iteritems():
+            for p1, p2 in pps:
+                assert (p2, p1) in pps
 
         # Generate the folds
         folds = [set() for _ in range(num_folds)]
@@ -355,16 +371,23 @@ class SGDExperiment(_Experiment):
                                     key = lambda term_pps: len(term_pps[1]))
             print "best term: {} (num pairs = {})".format(cur_term, len(cur_pps))
             # Evenly distribute the associated protein-protein pairs among all
-            # folds
+            # folds, taking into account the fact that if (p1, p2) is in
+            # cur_pps, then (p2, p1) is in cur_pps as well. Also, make sure
+            # to allow self-interactions.
+            pps_to_add = set()
+            for p1, p2 in cur_pps:
+                if not (p2, p1) in pps_to_add:
+                    pps_to_add.add((p1, p2))
             folds = self._permute(folds)
-            for i, pp in enumerate(cur_pps):
-                folds[i % num_folds].add(pp)
-            # Remove the term we just processed as well as with the protein
-            # pairs annotated with it
+            for i, (p1, p2) in enumerate(pps_to_add):
+                folds[i % num_folds].update([(p1, p2), (p2, p1)])
+            # Update term_to_pps
             new_term_to_pps = {}
             for term in term_to_pps:
+                # Skip the term we just processed
                 if term == cur_term:
                     continue
+                # Skip the protein pairs annotated with it
                 new_term_pps = set(pp for pp in term_to_pps[term]
                                    if not pp in cur_pps)
                 if len(new_term_pps) == 0:
@@ -372,15 +395,21 @@ class SGDExperiment(_Experiment):
                 new_term_to_pps[term] = new_term_pps
             term_to_pps = new_term_to_pps
 
-        # Evaluate the fold quality
-        term_to_i = {term: i for i, term in enumerate(all_terms)}
-        counts = []
+        # Sanity checks
         for fold in folds:
-            fold_counts = [0 for _ in len(all_terms)]
+            for p1, p2 in fold:
+                assert (p2, p1) in fold
+        for (k1, fold1), (k2, fold2) in it.product(enumerate(folds), enumerate(folds)):
+            assert k1 == k2 or len(fold1 & fold2) == 0
+
+        # Evaluate the fold quality
+        for k, fold in enumerate(folds):
+            counts = np.zeros((len(all_pp_terms),))
             for pp in fold:
                 for term in pp_to_terms[pp]:
-                    fold_counts[term_to_i[term]] += 1
-            counts.append(fold_counts)
+                    counts[term_to_i[term]] += 1
+            print " |fold{}| = {}, l1 distance from perfect GO term counts = {}" \
+                .format(k, len(fold), np.linalg.norm((average - counts), ord = 1))
 
         return folds
 
@@ -395,6 +424,10 @@ class SGDExperiment(_Experiment):
         ax.yaxis.grid(True)
         fig.savefig(os.path.join(self.dst, "p-{}-length-hist.png".format(prefix)),
                     bbox_inches = "tight", pad_inches = 0)
+
+        # Draw a histogram of the number of protein annotations per GO aspect
+        # XXX we should find out proteins that have only the root annotated
+        # XXX we should find out proteins with only *some* aspects
 
         # TODO: function co-occurrence
         # TODO: plot P(f|p)
