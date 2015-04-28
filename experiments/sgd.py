@@ -454,9 +454,6 @@ class SGDExperiment(_Experiment):
         self._preprocess_dag(dag, filtered_ps, p_to_fun)
         self._dump_dataset_statistics(ps, p_to_seq, p_to_fun, dag, "preproc")
 
-        # Compute the protein kernels
-        self._compute_protein_kernels(filtered_ps, p_to_feat)
-
         # Query the hq protein-protein interactions
         pp_pos_hq = self._cached(self._get_sgd_pin,
                                  "sgd_id_interactions_hq.pickle",
@@ -488,5 +485,8 @@ class SGDExperiment(_Experiment):
         print _cls(self), ": computing the folds"
         pp_folds = self._cached(self._get_folds, "folds",
                                 pp_pos_hq, p_to_fun)
+
+        # Compute the protein kernels
+        self._compute_protein_kernels(filtered_ps, p_to_feat)
 
         # TODO retrieve dom-dom and res-res interaction instances
