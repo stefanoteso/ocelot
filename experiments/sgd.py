@@ -37,7 +37,8 @@ class SGDExperiment(_Experiment):
         FROM <{default_graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
-                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF .
+                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                 ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
         }}
         """
         ids = set(bindings[u"orf"].split(".")[-1]
@@ -51,6 +52,7 @@ class SGDExperiment(_Experiment):
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                 ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
                  ocelot:sgd_id_has_sequence ?seq .
         }}
         """
@@ -67,6 +69,7 @@ class SGDExperiment(_Experiment):
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                 ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
                  ocelot:sgd_id_has_goslim ?fun .
         }}
         """
@@ -87,6 +90,7 @@ class SGDExperiment(_Experiment):
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                 ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
                  owl:sameAs ?feat .
             ?feat a ocelot:sgd_feature .
         }}
@@ -110,7 +114,8 @@ class SGDExperiment(_Experiment):
         FROM <{default_graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
-                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF .
+                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                 ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
             ?orf ocelot:sgd_id_in_chromosome ?chrom .
             ?orf ocelot:sgd_id_in_strand ?strand .
             ?orf ocelot:sgd_id_starts_at ?start .
@@ -136,9 +141,11 @@ class SGDExperiment(_Experiment):
         WHERE {{
             ?orf1 a ocelot:sgd_id ;
                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
                 owl:sameAs ?feat1 .
             ?orf2 a ocelot:sgd_id ;
                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
                 owl:sameAs ?feat2 .
             ?feat1 a ocelot:sgd_feature .
             ?feat2 a ocelot:sgd_feature .
@@ -256,6 +263,7 @@ class SGDExperiment(_Experiment):
             # Pick all SGD ORFs
             ?orf a ocelot:sgd_id ;
                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
                 owl:sameAs ?feat .
 
             # Map them to SGD feature names
