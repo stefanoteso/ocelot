@@ -61,7 +61,20 @@ class STRINGConverter(Converter):
                 triples.append((string_id, O.OWL.sameAs, db_alias_id))
 
     def _siphon_interactions(self, triples):
-        pass
+        FIELDS = ("ITEM_ID_A", "ITEM_ID_B", "MODE", "ACTION", "A_IS_ACTING",
+                  "SCORE", "SOURCES", "TRANSFERRED_SOURCES")
+        path = self._get_path("{}.protein.actions.detailed.v{}.txt") \
+            .format(self._taxon, self._version)
+        for row in iterate_csv(path, delimiter = "\t", fieldnames = FIELDS,
+                               num_skip = 1):
+            id_a, id_b = row["ITEM_ID_A"], row["ITEM_ID_B"]
+            if not (id_a.startswith("{}".format(self._taxon)) and \
+                    id_b.startswith("{}".format(self._taxon))):
+                continue
+            id_a = O.uri(O.STRING_ID, id_a.split(".", 1)[1])
+            id_b = O.uri(O.STRING_ID, id_b.split(".", 1)[1])
+            mode = O.uri(O.STRING_ACTION_MODE, row["MODE"])
+            triples.append((id_a, mode, id_b))
 
     def _siphon_cog(self, triples):
         FIELDS = ("TAXON.STRING_ID", "START", "STOP", "CLUSTER_ID", "ANNOTATION")

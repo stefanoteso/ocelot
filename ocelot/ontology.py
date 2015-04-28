@@ -159,6 +159,7 @@ STRING_ID               = OCELOT.string_id
 STRING_ID_IN_COG        = OCELOT.string_id_in_cog
 STRING_ID_IN_KOG        = OCELOT.string_id_in_kog
 STRING_ID_IN_NOG        = OCELOT.string_id_in_nog
+STRING_ACTION_MODE      = OCELOT.string_action_mode
 
 # COG
 COG_CLUSTER_ID          = OCELOT.cog_cluster_id
