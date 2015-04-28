@@ -165,6 +165,89 @@ class SGDExperiment(_Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
+    @staticmethod
+    def _get_neighbors_and_degree(ps, pps):
+        neighbors_of = { p: set() for p in ps }
+        for p, q in pps:
+            neighbors_of[p].add(q)
+            neighbors_of[q].add(p)
+        return neighbors_of
+
+    def _get_negative_pin(self, ps, pos):
+        """Samples the negative interactions from the complement graph.
+
+        Uses the sampling method described in [Yu10]_.
+        """
+        def is_candidate(p, q, neg):
+            # TODO subtract BioGRID (or even better STRING)
+            return p != q and not (p, q) in pos and not (p, q) in neg
+
+        neighbors_of = self._get_neighbors_and_degree(ps, pos)
+        ps_degree = sorted([(len(neighbors_of[p]), p) for p in ps ],
+                            reverse = True)
+
+        neg = set()
+        for i, (degree, p) in enumerate(ps_degree):
+            # Figure out all candidate negative interactions for ``p``, then
+            # pick exactly ``degree`` of them uniformly at random; if not
+            # enough negatives are available, add as many as possible.
+            candidate_neg = filter(lambda pq: is_candidate(pq[0], pq[1], neg),
+                                [(p, q) for q in ps if not q in neighbors_of[p]])
+            num_samples = min(degree, len(candidate_neg))
+            if num_samples == 0:
+                # Proteins are sorted by degree, so we can break here
+                break
+            print _cls(self), "| {}/{}, '{}: sampling {}/{} negatives (actually {})" \
+                .format(i+1, len(ps), p, degree, len(candidate_neg), num_samples)
+            if num_samples < degree:
+                print _cls(self), "| Warning: not enough negative candidates!"
+            sample = [candidate_neg[i] for i
+                      in np.random.permutation(len(candidate_neg))[:num_samples]]
+            # Make sure that the negative interactions are symmetrical
+            neg.update(sample)
+            neg.update([(q, p) for p, q in sample])
+        return neg
+
+    @staticmethod
+    def _check_p_pp_are_sane(ps, pps):
+        """Checks that the protein pairs are (i) symmetric, and (ii) entirely
+        contained in the list of proteins."""
+        assert all((p, q) in pps for (p, q) in pps), \
+            "pairs are not symmetric"
+        assert all(p in ps for p, _ in pps), \
+            "singletons and pairs do not match"
+
+    def _get_sgd_pins(self, ps):
+        """Computes the high-quality positive interactions, high+low-quality
+        positive interactions, and the negative interactions."""
+        pp_pos_hq = self._cached(self._get_sgd_pin,
+                                 "sgd_id_interactions_hq.pickle",
+                                 ps = ps, manual_only = True)
+        density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
+        print _cls(self), ": found {} hi-quality PPIs (density = {})" \
+                .format(len(pp_pos_hq), density)
+        self._check_p_pp_are_sane(ps, pp_pos_hq)
+
+        # Query all (high+low-quality) protein-protein interactions
+        pp_pos_lq = self._cached(self._get_sgd_pin,
+                                 "sgd_id_interactions_lq.pickle",
+                                 ps = ps, manual_only = False)
+        density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
+        print _cls(self), ": found {} lo-quality PPIs (density = {})" \
+                .format(len(pp_pos_lq), density)
+        self._check_p_pp_are_sane(ps, pp_pos_lq)
+
+        # Here we pass the low-quality interactions so as to get a better
+        # approximation of the negative set.
+        pp_neg = self._cached(self._get_negative_pin,
+                              "sgd_id_interactions_neg.pickle",
+                              ps, pp_pos_lq)
+        print _cls(self), ": sampled {} p-p negative interactions" \
+                .format(len(pp_neg))
+        self._check_p_pp_are_sane(ps, pp_neg)
+
+        return pp_pos_hq, pp_pos_lq, pp_neg
+
     def _get_sgd_din(self):
         query = """
         SELECT DISTINCT ?id ?family ?chain ?evalue ?complex
@@ -236,49 +319,6 @@ class SGDExperiment(_Experiment):
 #        self._cached_kernel(PSSMKernel, len(ps),
 #                            "p-profile-kernel", p_to_i, self.dst,
 #                            k = 4, threshold = 6.0)
-
-    @staticmethod
-    def _get_neighbors_and_degree(ps, pps):
-        neighbors_of = { p: set() for p in ps }
-        for p, q in pps:
-            neighbors_of[p].add(q)
-            neighbors_of[q].add(p)
-        return neighbors_of
-
-    def _get_negative_pin(self, ps, pos):
-        """Samples the negative interactions from the complement graph.
-
-        Uses the sampling method described in [Yu10]_.
-        """
-        def is_candidate(p, q, neg):
-            # TODO subtract BioGRID (or even better STRING)
-            return p != q and not (p, q) in pos and not (p, q) in neg
-
-        neighbors_of = self._get_neighbors_and_degree(ps, pos)
-        ps_degree = sorted([(len(neighbors_of[p]), p) for p in ps ],
-                            reverse = True)
-
-        neg = set()
-        for i, (degree, p) in enumerate(ps_degree):
-            # Figure out all candidate negative interactions for ``p``, then
-            # pick exactly ``degree`` of them uniformly at random; if not
-            # enough negatives are available, add as many as possible.
-            candidate_neg = filter(lambda pq: is_candidate(pq[0], pq[1], neg),
-                                [(p, q) for q in ps if not q in neighbors_of[p]])
-            num_samples = min(degree, len(candidate_neg))
-            if num_samples == 0:
-                # Proteins are sorted by degree, so we can break here
-                break
-            print _cls(self), "| {}/{}, '{}: sampling {}/{} negatives (actually {})" \
-                .format(i+1, len(ps), p, degree, len(candidate_neg), num_samples)
-            if num_samples < degree:
-                print _cls(self), "| Warning: not enough negative candidates!"
-            sample = [candidate_neg[i] for i
-                      in np.random.permutation(len(candidate_neg))[:num_samples]]
-            # Make sure that the negative interactions are symmetrical
-            neg.update(sample)
-            neg.update([(q, p) for p, q in sample])
-        return neg
 
     def _propagate_fun_on_dag(self, p_to_fun, dag):
         """WRITEME
@@ -413,6 +453,9 @@ class SGDExperiment(_Experiment):
 
         return folds
 
+    def _write_sbr_data(self, ps, p_to_fun, dag, pp_pos, pp_neg):
+        pass
+
     def _dump_dataset_statistics(self, ps, p_to_seq, p_to_fun, dag, prefix):
         """Dump a few dataset statistics."""
 
@@ -437,16 +480,12 @@ class SGDExperiment(_Experiment):
         # TODO: plot GO consistency w.r.t. mutual exclusion
         # TODO: plot GO consistency w.r.t. interactions
 
-    @staticmethod
-    def _check_p_pp_are_sane(ps, pps):
-        assert all((p, q) in pps for (p, q) in pps), \
-            "pairs are not symmetric"
-        assert all(p in ps for p, _ in pps), \
-            "singletons and pairs do not match"
-
     def run(self, min_sequence_len = 50, cdhit_threshold = 0.75):
         """Run the yeast prediction experiment."""
 
+        # Retrieve the list of protein IDs (whose order will define the
+        # structure of the kernels), and their mappings to feature IDs,
+        # sequences and GO term annotations.
         ps          = self._cached(self._get_sgd_ids,
                                    "sgd_ids.pickle")
         p_to_feat   = self._cached(self._get_sgd_id_to_feat,
@@ -462,19 +501,27 @@ class SGDExperiment(_Experiment):
             assert p in p_to_fun, "'{}' has no GO annotation".format(p)
             assert p in p_to_feat, "'{}' has no associated feature ID".format(p)
 
-        # XXX curiously enough, some SGD proteins are annotated with GO terms
-        # that are **not** part of goslim_yeast.obo... We use go-basic instead.
+        # Load the GO OBO file
         dag = GODag(os.path.join(self.src, "GO", "go-basic.obo"))
+
+        # TODO check if SGD GO annotations are GO annotations or GO slims, and
+        # if the two map 1:1 to each other --- i.e. if we can use the GO IDs as
+        # is.
+
+        # Propagate the GO annotations to the root
         p_to_fun    = self._cached(self._propagate_fun_on_dag,
                                    "sgd_id_to_fun_propagated.pickle",
                                    p_to_fun, dag)
 
-        # Filter out sequences shorter than min_sequence_len residues
+        # Dump the dataset statistics prior to any preprocessing
+        self._dump_dataset_statistics(ps, p_to_seq, p_to_fun, dag, "raw")
+
+        # Filter out sequences shorter than min_sequence_len residues, then
+        # cluster the filtered sequences with CD-HIT
         filtered_ps = filter(lambda p: len(p_to_seq[p]) >= min_sequence_len, ps)
         print _cls(self), ": found {} proteins with at least {} residues" \
                 .format(len(ps), min_sequence_len)
 
-        # Cluster sequences with CD-HIT
         filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
         _, clusters = CDHit().run(filtered_p_seq, threshold = cdhit_threshold)
         print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
@@ -482,44 +529,31 @@ class SGDExperiment(_Experiment):
 
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
 
+        # TODO preprocess the GO DAG and p_to_fun to remove (i) unwanted GO
+        # aspects, (ii) terms with too few annotations, (iii) terms too deep in
+        # the GO DAG, (iv) proteins with no annotations in the given aspects.
+
+        # Query the high-quality protein-protein interactions, restricting
+        # them to proteins in the filtered set
+        pp_pos_hq, pp_pos_lq, pp_neg = self._get_sgd_pins(filtered_ps)
+
         # Process the GO DAG
-        self._dump_dataset_statistics(ps, p_to_seq, p_to_fun, dag, "raw")
         self._preprocess_dag(dag, filtered_ps, p_to_fun)
-        self._dump_dataset_statistics(ps, p_to_seq, p_to_fun, dag, "preproc")
 
-        # Query the hq protein-protein interactions
-        pp_pos_hq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_hq.pickle",
-                                 ps = filtered_ps, manual_only = True)
-        density = float(len(pp_pos_hq)) / (len(filtered_ps) * (len(filtered_ps) - 1))
-        print _cls(self), ": found {} hi-quality PPIs (density = {})" \
-                .format(len(pp_pos_hq), density)
-        self._check_p_pp_are_sane(ps, pp_pos_hq)
-
-        # Query the hq+lq protein-protein interactions
-        pp_pos_lq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_lq.pickle",
-                                 ps = filtered_ps, manual_only = False)
-        density = float(len(pp_pos_lq)) / (len(filtered_ps) * (len(filtered_ps) - 1))
-        print _cls(self), ": found {} lo-quality PPIs (density = {})" \
-                .format(len(pp_pos_lq), density)
-        self._check_p_pp_are_sane(ps, pp_pos_lq)
-
-        # Here we pass the low-quality interactions so as to get a better
-        # approximation of the negative set.
-        pp_neg = self._cached(self._get_negative_pin,
-                              "sgd_id_interactions_neg.pickle",
-                              ps, pp_pos_lq)
-        print _cls(self), ": sampled {} p-p negative interactions" \
-                .format(len(pp_neg))
-        self._check_p_pp_are_sane(ps, pp_neg)
+        # Dump the dataset statistics after the preprocessing
+        self._dump_dataset_statistics(filtered_ps, p_to_seq, p_to_fun, dag,
+                                      "preproc")
 
         # Create the folds
         print _cls(self), ": computing the folds"
         pp_folds = self._cached(self._get_folds, "folds",
-                                pp_pos_hq, p_to_fun)
+                                pp_pos_hq | pp_neg, p_to_fun)
 
         # Compute the protein kernels
+        print _cls(self), ": computing the protein kernels"
         self._compute_protein_kernels(filtered_ps, p_to_feat)
 
-        # TODO retrieve dom-dom and res-res interaction instances
+        # Write down the SBR input files
+        print _cls(self), ": writing SBR input files"
+        sbr_folds = self._cached(self._write_sbr_data, "sbr_folds",
+                                 filtered_ps, p_to_fun, dag, pp_pos_hq, pp_neg)
