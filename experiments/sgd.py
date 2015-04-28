@@ -172,6 +172,37 @@ class SGDExperiment(_Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
+    def _get_string_pin(self, ps = None):
+        query = """
+        SELECT DISTINCT ?orf1 ?orf2
+        FROM <{default_graph}>
+        WHERE {{
+            ?orf1 a ocelot:sgd_id ;
+                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
+            ?orf2 a ocelot:sgd_id ;
+                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
+            ?id1 a ocelot:STRING_ID ;
+                owl:sameAs ?orf1 .
+            ?id2 a ocelot:STRING_ID ;
+                owl:sameAs ?orf2 .
+            ?id1 ?mode ?id2 .
+        }}"""
+        pp_pos = set()
+        for bindings in self.iterquery(query, n = 2):
+            p1 = bindings[u"orf1"].split(".")[-1]
+            p2 = bindings[u"orf2"].split(".")[-1]
+            pp_pos.update([(p1,p2), (p2,p1)])
+        if not ps is None:
+            # Filter out all pairs that do not fall in ``ps``
+            ps, filtered_pp_pos = set(ps), set()
+            for (p1, p2) in pp_pos:
+                if p1 in ps and p2 in ps:
+                    filtered_pp_pos.add((p1, p2))
+            pp_pos = filtered_pp_pos
+        return pp_pos
+
     @staticmethod
     def _get_neighbors_and_degree(ps, pps):
         neighbors_of = { p: set() for p in ps }
@@ -244,16 +275,25 @@ class SGDExperiment(_Experiment):
                 .format(len(pp_pos_lq), density)
         self._check_p_pp_are_sane(ps, pp_pos_lq)
 
+        # Query all (literally) protein-protein actions annotated in STRING
+        pp_pos_string = self._cached(self._get_string_pin,
+                                     "sgd_id_interactions_string.pickle",
+                                     ps = ps)
+        density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
+        print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
+                .format(len(pp_pos_string), density)
+        self._check_p_pp_are_sane(ps, pp_pos_string)
+
         # Here we pass the low-quality interactions so as to get a better
         # approximation of the negative set.
         pp_neg = self._cached(self._get_negative_pin,
                               "sgd_id_interactions_neg.pickle",
-                              ps, pp_pos_lq)
+                              ps, pp_pos_lq | pp_pos_string)
         print _cls(self), ": sampled {} p-p negative interactions" \
                 .format(len(pp_neg))
         self._check_p_pp_are_sane(ps, pp_neg)
 
-        return pp_pos_hq, pp_pos_lq, pp_neg
+        return pp_pos_hq, pp_pos_lq | pp_pos_string, pp_neg
 
     def _get_sgd_din(self):
         query = """
