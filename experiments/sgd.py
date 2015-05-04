@@ -259,7 +259,7 @@ class SGDExperiment(_Experiment):
         """Computes the high-quality positive interactions, high+low-quality
         positive interactions, and the negative interactions."""
         pp_pos_hq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_hq.pickle",
+                                 "sgd_id_interactions_hq",
                                  ps = ps, manual_only = True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} hi-quality PPIs (density = {})" \
@@ -268,7 +268,7 @@ class SGDExperiment(_Experiment):
 
         # Query all (high+low-quality) protein-protein interactions
         pp_pos_lq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_lq.pickle",
+                                 "sgd_id_interactions_lq",
                                  ps = ps, manual_only = False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} lo-quality PPIs (density = {})" \
@@ -277,7 +277,7 @@ class SGDExperiment(_Experiment):
 
         # Query all (literally) protein-protein actions annotated in STRING
         pp_pos_string = self._cached(self._get_string_pin,
-                                     "sgd_id_interactions_string.pickle",
+                                     "sgd_id_interactions_string",
                                      ps = ps)
         density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
@@ -328,7 +328,7 @@ class SGDExperiment(_Experiment):
 
         # Compute the gene colocalization kernel
         p_to_context = self._cached(self._get_sgd_id_to_context,
-                                    "sgd_id_to_context.pickle")
+                                    "sgd_id_to_context")
         contexts = [p_to_context[p] for p in ps]
         self._cached_kernel(ColocalizationKernel, len(ps),
                             "p-colocalization-kernel",
@@ -569,13 +569,13 @@ class SGDExperiment(_Experiment):
         # structure of the kernels), and their mappings to feature IDs,
         # sequences and GO term annotations.
         ps          = self._cached(self._get_sgd_ids,
-                                   "sgd_ids.pickle")
+                                   "sgd_ids")
         p_to_feat   = self._cached(self._get_sgd_id_to_feat,
-                                   "sgd_id_to_feat.pickle")
+                                   "sgd_id_to_feat")
         p_to_seq    = self._cached(self._get_sgd_id_to_seq,
-                                   "sgd_id_to_seq.pickle")
+                                   "sgd_id_to_seq")
         p_to_fun    = self._cached(self._get_sgd_id_to_fun,
-                                   "sgd_id_to_fun.pickle")
+                                   "sgd_id_to_fun")
         print _cls(self), ": found {} proteins".format(len(ps))
 
         for p in ps:
@@ -592,7 +592,7 @@ class SGDExperiment(_Experiment):
 
         # Propagate the GO annotations to the root
         p_to_fun    = self._cached(self._propagate_fun_on_dag,
-                                   "sgd_id_to_fun_propagated.pickle",
+                                   "sgd_id_to_fun_propagated",
                                    p_to_fun, dag)
 
         # Dump the dataset statistics prior to any preprocessing
@@ -613,7 +613,7 @@ class SGDExperiment(_Experiment):
 
         # Preprocess the GO DAG, ps and p_to_fun
         dag, filtered_ps, p_to_fun = self._cached(self._preprocess_dag,
-                                                  "preprocessed_dag_ps_p_to_fun.pickle",
+                                                  "preprocessed_dag_ps_p_to_fun",
                                                   dag, filtered_ps, p_to_fun,
                                                   aspects = ["BP", "CC", "MF"],
                                                   min_proteins_per_term = 30,

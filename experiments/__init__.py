@@ -100,10 +100,10 @@ class _Experiment(object):
     def _cached(self, f, relpath, *args, **kwargs):
         try:
             assert not self.force_update
-            y = self._depickle(relpath)
+            y = self._depickle(relpath + ".pickle")
         except Exception, e:
             y = f(*args, **kwargs)
-            self._pickle(y, relpath)
+            self._pickle(y, relpath + ".pickle")
         return y
 
     def _cached_kernel(self, K, num, relpath, *args, **kwargs):
