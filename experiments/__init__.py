@@ -98,12 +98,16 @@ class _Experiment(object):
             return pickle.load(fp)
 
     def _cached(self, f, relpath, *args, **kwargs):
+        relpath += ".pickle"
         try:
             assert not self.force_update
-            y = self._depickle(relpath + ".pickle")
+            print _cls(self), ": loading '{}'".format(relpath)
+            y = self._depickle(relpath)
         except Exception, e:
+            print _cls(self), "|", e
+            print _cls(self), ": computing '{}'".format(relpath)
             y = f(*args, **kwargs)
-            self._pickle(y, relpath + ".pickle")
+            self._pickle(y, relpath)
         return y
 
     def _cached_kernel(self, K, num, relpath, *args, **kwargs):
