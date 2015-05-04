@@ -532,8 +532,77 @@ class SGDExperiment(_Experiment):
 
         return folds
 
-    def _write_sbr_data(self, ps, pps, p_to_fun, dag, folds):
-        pass
+    @staticmethod
+    def _term_to_predicate(term):
+        assert len(term.namespace)
+        assert term.level >= 0
+        return "{}_{}_{}".format(term.namespace, term.level, term.id.replace(":", "_"))
+
+    def _to_sbr_examples(self, ps, p_to_fun, labeled_pps):
+        examples = []
+        for p1, p2, state in labeled_pps:
+            examples.append("ISPAIR({},{},{}{})".format(p1, p2, p1, p2))
+            examples.append("ISPAIR({},{},{}{})".format(p1, p2, p2, p1))
+            examples.append("BOUNDP({}{})={}".format(p1, p2, state))
+        for p in ps:
+            for term in p_to_fun[p]:
+                examples.append("{}({})=1".format(self._term_to_predicate(term), p))
+        return examples
+
+    def _write_sbr_data(self, ps, p_to_fun, dag, folds):
+        """Writes out the SBR data.
+
+        .. warning::
+
+            The interactions in the folds **must** be symmetric; this is not
+            checked here.
+
+        :param ps: list of protein IDs.
+        :param p_to_fun: map between protein IDs and the ``GOTerm``'s they are annotated with.
+        :param dag: the associated ``GODag``.
+        :param folds: list of sets of triples of the form (protein ID, protein ID, are_bound).
+        """
+        # Write out the datapoints: proteins and protein pairs
+        pos_pps = [(p1, p2) for p1, p2, state in folds if state == 1]
+        neg_pps = [(p1, p2) for p1, p2, state in folds if state == 0]
+
+        datapoints = []
+        datapoints.extend("{}:PROTEIN".format(p) for p in ps)
+        datapoints.extend("{}{}:PPAIR".format(p1, p2) for p1, p2 in (pos_pps + neg_pps))
+
+        with open(os.path.join(self.dst, "sbr-datapoints"), "wb") as fp:
+            fp.write("\n".join(datapoints))
+
+        # Write out the predicates, which include (i) the BOUNDP predicate,
+        # (ii) the ISPAIR predicate, and (iii) a predicate for each GO term.
+        predicates = []
+        predicates.append("DEF ISPAIR(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
+        predicates.append("DEF BOUNDP(PPAIR);LEARN;C")
+        predicates.extend("DEF {};LEARN;C".format(self._term_to_predicate(term))
+                          for term in dag._terms)
+
+        with open(os.path.join(self.dst, "sbr-predicates"), "wb") as fp:
+            fp.write("\n".join(predicates))
+
+        # Write out the rules
+        # WRITEME
+
+        # Write out the folds (examples)
+        all_folds = sum(folds)
+        for k, fold in enumerate(folds):
+            rest = all_folds - fold
+
+            fold_ps = set(p1 for p1, _, _ in fold) | \
+                      set(p2 for _, p2, _ in fold)
+
+            rest_ps = set(p1 for p1, _, _ in rest) | \
+                      set(p2 for _, p2, _ in rest)
+
+            with open(os.path.join(self.dst, "sbr-fold{}-examples-train".format(k)), "wb") as fp:
+                fp.write("\n".join(self._to_sbr_examples(rest_ps, p_to_fun, rest)))
+
+            with open(os.path.join(self.dst, "sbr-fold{}-examples-test".format(k)), "wb") as fp:
+                fp.write("\n".join(self._to_sbr_examples(fold_ps, p_to_fun, fold)))
 
     def _dump_dataset_statistics(self, ps, p_to_seq, p_to_fun, dag, prefix):
         """Dump a few dataset statistics."""
@@ -641,8 +710,7 @@ class SGDExperiment(_Experiment):
 
         # Write down the SBR input files
         print _cls(self), ": writing SBR input files"
-        self._write_sbr_data(filtered_ps, pp_pos_hq | pp_neg, p_to_fun, dag,
-                             folds)
+        self._write_sbr_data(filtered_ps, p_to_fun, dag, folds)
 
         # Compute the protein kernels
         print _cls(self), ": computing the protein kernels"
