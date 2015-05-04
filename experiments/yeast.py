@@ -6,7 +6,7 @@ import itertools as it
 from glob import glob
 
 from ocelot.kernels import Kernel, ProfileKernel
-from ocelot.services import _cls, iterate_csv, PCL, InterProTSV
+from ocelot.services import _cls, iterate_csv, PCL, InterProTSV, PSSM
 
 class SGDGeneExpressionKernel(Kernel):
     """A yeast-specific correlation kernel on gene expression data.
@@ -154,28 +154,28 @@ class PSSMKernel(ProfileKernel):
 
     It takes care of generating the PSSM profiles.
 
-    :param p_to_i: WRITEME
+    :param ps: WRITEME
+    :param p_to_seq: WRITEME
     :param cache_path: WRITEME
     :param num_iterations: WRITEME (default: 2)
 
     All remaining options are passed to the underlying ``ProfileKernel``.
     """
-    def __init__(self, p_to_i, cache_path, num_iterations = 2, *args, **kwargs):
+    def __init__(self, ps, p_to_seq, cache_path, num_iterations = 2, *args, **kwargs):
+        self._p_to_seq = p_to_seq
         self._cache_path = cache_path
-        super(PSSMKernel, self).__init__(p_to_i, *args, **kwargs)
+        super(PSSMKernel, self).__init__(ps, *args, **kwargs)
 
     def _get_pssm_path(self, p):
-        return os.path.join(self.cache_path, "pssm", "{}.ascii-pssm".format(p))
+        return os.path.join(self._cache_path, "pssm", "{}.f.ascii-pssm".format(p))
 
     def _compute_pssms(self):
-        raise NotImplementedError
+        pass
 
     def _compute_all(self):
-        self._compute_pssms()
-
         reader = PSSM(targets = ("residue", "nlog_condp"))
         pssms = []
-        for p, i in sorted(p_to_i.items(), key = lambda p_i: p_i[1]):
+        for p in self._entities:
             pssms.append(reader.read(self._get_pssm_path(p)))
         self._entities = pssms
         return super(PSSMKernel, self)._compute_all()
