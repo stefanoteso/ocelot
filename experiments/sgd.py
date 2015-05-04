@@ -284,16 +284,7 @@ class SGDExperiment(_Experiment):
                 .format(len(pp_pos_string), density)
         self._check_p_pp_are_sane(ps, pp_pos_string)
 
-        # Here we pass the low-quality interactions so as to get a better
-        # approximation of the negative set.
-        pp_neg = self._cached(self._get_negative_pin,
-                              "sgd_id_interactions_neg.pickle",
-                              ps, pp_pos_lq | pp_pos_string)
-        print _cls(self), ": sampled {} p-p negative interactions" \
-                .format(len(pp_neg))
-        self._check_p_pp_are_sane(ps, pp_neg)
-
-        return pp_pos_hq, pp_pos_lq | pp_pos_string, pp_neg
+        return pp_pos_hq, pp_pos_lq | pp_pos_string
 
     def _get_sgd_din(self):
         query = """
@@ -332,7 +323,7 @@ class SGDExperiment(_Experiment):
         sys.exit(1)
         return dd_pos
 
-    def _compute_protein_kernels(self, ps, p_to_feat):
+    def _compute_protein_kernels(self, ps, p_to_feat, p_to_seq):
         feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
 
         # Compute the gene colocalization kernel
@@ -363,10 +354,10 @@ class SGDExperiment(_Experiment):
                             "p-interpro-score-kernel", ps, self.dst,
                             use_evalue = True)
 
-#        # Compute the profile kernel
-#        self._cached_kernel(PSSMKernel, len(ps),
-#                            "p-profile-kernel", p_to_i, self.dst,
-#                            k = 4, threshold = 6.0)
+        # Compute the profile kernel
+        self._cached_kernel(PSSMKernel, len(ps),
+                            "p-profile-kernel", ps, p_to_seq, self.dst,
+                            k = 4, threshold = 6.0)
 
     def _propagate_fun_on_dag(self, p_to_fun, dag):
         """WRITEME
@@ -395,6 +386,15 @@ class SGDExperiment(_Experiment):
                         min_proteins_per_term = 30, max_depth = 5):
         """Processes the GO DAG by removing unwanted terms and adding bin terms.
 
+        This method does the following:
+
+        * Removes from the DAG terms in unwanted namespaces.
+        * Removes from the DAG terms with too few annotations.
+        * Removes from the DAG terms that are too deep.
+        * Adds *bin* terms.
+
+        The protein list and protein-to-function map are adjusted accordingly.
+
         :param dag: the full GO DAG.
         :param ps: list of protein IDs.
         :param p_to_fun: map from protein IDs to ``GOTerm``'s.
@@ -411,20 +411,20 @@ class SGDExperiment(_Experiment):
         pi = list(np.random.permutation(len(l)))
         return [l[pi[i]] for i in xrange(len(l))]
 
-    def _get_folds(self, pps, p_to_terms, num_folds = 10):
+    def _get_folds(self, pp_pos, p_to_terms, num_folds = 10):
         """Generates the folds.
 
         The interactions are split into folds according to their functions.
         No two protein-protein interactions can occur in two distinct folds.
 
-        :param pps: list of interactions.
+        :param pp_pos: list of interactions.
         :param p_to_terms: map between proteins and ``GOTerm``'s.
         :param num_folds: number of folds to generate (default: ``10``).
         :returns: a list of sets of protein pairs.
         """
         # Map from protein pairs to GO terms either protein is annotated with
         pp_to_terms = {(p1,p2): (set(p_to_terms[p1]) | set(p_to_terms[p2]))
-                       for p1, p2 in pps}
+                       for p1, p2 in pp_pos}
 
         # Map from GO terms to protein pairs
         term_to_pps = {}
@@ -447,9 +447,9 @@ class SGDExperiment(_Experiment):
         average *= 1.0 / num_folds
 
         # Sanity check. Note that self-interactions are fine.
-        for term, pps in term_to_pps.iteritems():
-            for p1, p2 in pps:
-                assert (p2, p1) in pps
+        for term, term_pps in term_to_pps.iteritems():
+            for p1, p2 in term_pps:
+                assert (p2, p1) in term_pps
 
         # Generate the folds
         folds = [set() for _ in range(num_folds)]
@@ -469,6 +469,7 @@ class SGDExperiment(_Experiment):
             folds = self._permute(folds)
             for i, (p1, p2) in enumerate(pps_to_add):
                 folds[i % num_folds].update([(p1, p2), (p2, p1)])
+
             # Update term_to_pps
             new_term_to_pps = {}
             for term in term_to_pps:
@@ -501,7 +502,37 @@ class SGDExperiment(_Experiment):
 
         return folds
 
-    def _write_sbr_data(self, ps, p_to_fun, dag, pp_pos, pp_neg):
+    def _add_negatives(self, pos_folds, pp_not_neg):
+        """Computes folds where negatives are randomly sampled from the
+        non-positives.
+
+        :param pos_folds: list of sets of pairs of positive interactions.
+        :param pp_not_neg: set of low-quality positive interactions (non-negatives).
+        :returns: list of sets of triples of the form (p1, p2, are_bound).
+        """
+        assert isinstance(pp_not_neg, set)
+
+        folds = []
+        for pos_fold in pos_folds:
+            # Compute the candidate negative pairs
+            fold_ps = set(p1 for p1, p2 in pos_fold) | \
+                      set(p2 for p1, p2 in pos_fold)
+            candidate_neg_pps = list(set(it.product(fold_ps, fold_ps)) - pp_not_neg)
+
+            # Randomly sample a number of negative pairs equal to the number of
+            # positives pairs
+            pi = np.random.permutation(len(pos_fold))
+            neg_fold = set(candidate_neg_pps[pi[i]] for i in xrange(len(fold_ps)))
+
+            # Assemble the fold
+            fold = set()
+            fold.update((p1, p2, 1) for p1, p2 in pos_fold)
+            fold.update((p1, p2, 0) for p1, p2 in neg_fold)
+            folds.append(fold)
+
+        return folds
+
+    def _write_sbr_data(self, ps, pps, p_to_fun, dag, folds):
         pass
 
     def _dump_dataset_statistics(self, ps, p_to_seq, p_to_fun, dag, prefix):
@@ -527,6 +558,9 @@ class SGDExperiment(_Experiment):
         # TODO: plot GO consistency w.r.t. one-path rule
         # TODO: plot GO consistency w.r.t. mutual exclusion
         # TODO: plot GO consistency w.r.t. interactions
+
+    def _dump_fold_statistics(self, folds, p_to_fun, dag):
+        pass
 
     def run(self, min_sequence_len = 50, cdhit_threshold = 0.75):
         """Run the yeast prediction experiment."""
@@ -577,31 +611,39 @@ class SGDExperiment(_Experiment):
 
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
 
-        # TODO preprocess the GO DAG and p_to_fun to remove (i) unwanted GO
-        # aspects, (ii) terms with too few annotations, (iii) terms too deep in
-        # the GO DAG, (iv) proteins with no annotations in the given aspects.
+        # Preprocess the GO DAG, ps and p_to_fun
+        dag, filtered_ps, p_to_fun = self._cached(self._preprocess_dag,
+                                                  "preprocessed_dag_ps_p_to_fun.pickle",
+                                                  dag, filtered_ps, p_to_fun,
+                                                  aspects = ["BP", "CC", "MF"],
+                                                  min_proteins_per_term = 30,
+                                                  max_depth = 3)
 
         # Query the high-quality protein-protein interactions, restricting
         # them to proteins in the filtered set
-        pp_pos_hq, pp_pos_lq, pp_neg = self._get_sgd_pins(filtered_ps)
-
-        # Process the GO DAG
-        self._preprocess_dag(dag, filtered_ps, p_to_fun)
+        pp_pos_hq, pp_pos_lq = self._get_sgd_pins(filtered_ps)
 
         # Dump the dataset statistics after the preprocessing
         self._dump_dataset_statistics(filtered_ps, p_to_seq, p_to_fun, dag,
                                       "preproc")
 
-        # Create the folds
+        # Create the folds based on function and positive interactions
         print _cls(self), ": computing the folds"
-        pp_folds = self._cached(self._get_folds, "folds",
-                                pp_pos_hq | pp_neg, p_to_fun)
+        pos_folds = self._cached(self._get_folds, "pos-folds",
+                                 pp_pos_hq, p_to_fun)
 
-        # Compute the protein kernels
-        print _cls(self), ": computing the protein kernels"
-        self._compute_protein_kernels(filtered_ps, p_to_feat)
+        # Now that we have the function-balanced folds, pour some negative
+        # interactions in
+        folds = self._cached(self._add_negatives, "folds", pos_folds, pp_pos_lq)
+
+        # Dump statistics on the actual folds
+        self._dump_fold_statistics(folds, p_to_fun, dag)
 
         # Write down the SBR input files
         print _cls(self), ": writing SBR input files"
-        sbr_folds = self._cached(self._write_sbr_data, "sbr_folds",
-                                 filtered_ps, p_to_fun, dag, pp_pos_hq, pp_neg)
+        self._write_sbr_data(filtered_ps, pp_pos_hq | pp_neg, p_to_fun, dag,
+                             folds)
+
+        # Compute the protein kernels
+        print _cls(self), ": computing the protein kernels"
+        self._compute_protein_kernels(filtered_ps, p_to_feat, p_to_seq)
