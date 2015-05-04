@@ -250,7 +250,7 @@ class SGDExperiment(_Experiment):
     def _check_p_pp_are_sane(ps, pps):
         """Checks that the protein pairs are (i) symmetric, and (ii) entirely
         contained in the list of proteins."""
-        assert all((p, q) in pps for (p, q) in pps), \
+        assert all((q, p) in pps for (p, q) in pps), \
             "pairs are not symmetric"
         assert all(p in ps for p, _ in pps), \
             "singletons and pairs do not match"
@@ -563,8 +563,10 @@ class SGDExperiment(_Experiment):
         :param folds: list of sets of triples of the form (protein ID, protein ID, are_bound).
         """
         # Write out the datapoints: proteins and protein pairs
-        pos_pps = [(p1, p2) for p1, p2, state in folds if state == 1]
-        neg_pps = [(p1, p2) for p1, p2, state in folds if state == 0]
+        pos_pps, neg_pps = [], []
+        for fold in folds:
+            pos_pps.extend((p1, p2) for p1, p2, state in fold if state == 1)
+            neg_pps.extend((p1, p2) for p1, p2, state in fold if state == 0)
 
         datapoints = []
         datapoints.extend("{}:PROTEIN".format(p) for p in ps)
@@ -575,11 +577,13 @@ class SGDExperiment(_Experiment):
 
         # Write out the predicates, which include (i) the BOUNDP predicate,
         # (ii) the ISPAIR predicate, and (iii) a predicate for each GO term.
+        dag_terms = sorted(dag._terms.values(), key = lambda term: term.name)
+
         predicates = []
         predicates.append("DEF ISPAIR(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
         predicates.append("DEF BOUNDP(PPAIR);LEARN;C")
         predicates.extend("DEF {};LEARN;C".format(self._term_to_predicate(term))
-                          for term in dag._terms)
+                          for term in dag_terms)
 
         with open(os.path.join(self.dst, "sbr-predicates"), "wb") as fp:
             fp.write("\n".join(predicates))
@@ -588,7 +592,10 @@ class SGDExperiment(_Experiment):
         # WRITEME
 
         # Write out the folds (examples)
-        all_folds = sum(folds)
+        all_folds = set()
+        for fold in folds:
+            all_folds |= fold
+
         for k, fold in enumerate(folds):
             rest = all_folds - fold
 
@@ -665,6 +672,7 @@ class SGDExperiment(_Experiment):
                                    p_to_fun, dag)
 
         # Dump the dataset statistics prior to any preprocessing
+        print _cls(self), ": dumping dataset statistics"
         self._dump_dataset_statistics(ps, p_to_seq, p_to_fun, dag, "raw")
 
         # Filter out sequences shorter than min_sequence_len residues, then
@@ -693,6 +701,7 @@ class SGDExperiment(_Experiment):
         pp_pos_hq, pp_pos_lq = self._get_sgd_pins(filtered_ps)
 
         # Dump the dataset statistics after the preprocessing
+        print _cls(self), ": dumping dataset statistics"
         self._dump_dataset_statistics(filtered_ps, p_to_seq, p_to_fun, dag,
                                       "preproc")
 
@@ -703,9 +712,11 @@ class SGDExperiment(_Experiment):
 
         # Now that we have the function-balanced folds, pour some negative
         # interactions in
+        print _cls(self), ": adding negatives"
         folds = self._cached(self._add_negatives, "folds", pos_folds, pp_pos_lq)
 
         # Dump statistics on the actual folds
+        print _cls(self), ": dumping fold statistics"
         self._dump_fold_statistics(folds, p_to_fun, dag)
 
         # Write down the SBR input files
