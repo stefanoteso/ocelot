@@ -25,7 +25,8 @@ class _Experiment(object):
     .. todo::
         Add support for SBR.
     """
-    def __init__(self, src, dst, endpoint, default_graph, force_update = False):
+    def __init__(self, src, dst, endpoint, default_graph, force_update = False,
+                 *args, **kwargs):
         try:
             os.mkdir(dst)
         except:
