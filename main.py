@@ -11,14 +11,13 @@ def _checkdir(path):
     """Checks if a path identifies a directory."""
     return path and os.path.isdir(os.path.abspath(path))
 
-def _filter_targets(ALL_TARGETS, ids):
+def _filter_targets(targets, ids):
     """Returns the targets identified by `ids`."""
     if ids == None:
-        ids = ALL_TARGETS.keys()
-    for id_ in ids:
-        if not id_ in ALL_TARGETS:
-            raise ValueError("invalid target id '{}'".format(id_))
-    return [(id_, ALL_TARGETS[id_]) for id_ in ids]
+        ids = targets.keys()
+    elif not all(id_ in targets for id_ in ids):
+        raise ValueError("invalid target id '{}'".format(id_))
+    return [(id_, targets[id_]) for id_ in ids]
 
 def _make_rdf(args):
     """Builds the RDF dataset.
