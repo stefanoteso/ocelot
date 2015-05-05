@@ -16,7 +16,6 @@ class _Experiment(object):
 
     :param src: source directory of all databases.
     :param dst: destination directory for the results.
-    :param subtargets: prediction targets.
     :param endpoint: URI of the SPARQL endpoint.
     :param default_graph: URI of the default graph.
 
@@ -26,10 +25,7 @@ class _Experiment(object):
     .. todo::
         Add support for SBR.
     """
-    def __init__(self, src, dst, subtargets,
-                 endpoint = u"http://127.0.0.1:8890/sparql",
-                 default_graph = u"http://ocelot.disi.unitn.it/graph",
-                 force_update = False):
+    def __init__(self, src, dst, endpoint, default_graph, force_update = False):
         try:
             os.mkdir(dst)
         except:
@@ -39,7 +35,7 @@ class _Experiment(object):
             raise ValueError("'{}' is not a valid directory".format(src))
         if not (dst and os.path.isdir(dst)):
             raise ValueError("'{}' is not a valid directory".format(dst))
-        self.src, self.dst, self.subtargets = src, dst, subtargets
+        self.src, self.dst = src, dst
         if not endpoint:
             raise ValueError("no endpoint given.")
         if not default_graph:

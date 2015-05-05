@@ -129,35 +129,23 @@ def _run_experiment(args):
     """Converts the RDF data into a machine-learnable dataset.
 
     :param args.target: target experiment.
-    :param args.subtargets: prediction targets.
     :param args.dst: destination directory for the results.
     :param args.endpoint: Virtuoso SPARQL endpoint.
     :param args.default_graph: URI of the default graph.
     """
-    Target = namedtuple("Target", ("Experiment", "kwargs"))
     ALL_TARGETS = {
-        "yip" : Target(experiments.YipExperiment, {}),
-        "sgd" : Target(experiments.SGDExperiment, {}),
-        "all" : Target(experiments.AllSpeciesExperiment, {}),
+        "yip" : experiments.YipExperiment,
+        "sgd" : experiments.SGDExperiment,
     }
 
-    ALL_SUBTARGETS = {
-        "ppi"   : None,
-        "ddi"   : None,
-        "rri"   : None,
-        "pf-mf" : None,
-        "pf-bp" : None,
-        "pf-cc" : None,
-    }
-    subtargets = _filter_targets(ALL_TARGETS, args.subtargets)
-
-    for id_, target in _filter_targets(ALL_TARGETS, args.targets):
-        experiment = target.Experiment(args.src, args.dst,
-                                       [st[0] for st in subtargets],
-                                       endpoint = args.endpoint,
-                                       default_graph = args.default_graph,
-                                       force_update = args.force_update,
-                                       **target.kwargs)
+    for id_, Experiment in _filter_targets(ALL_TARGETS, args.targets):
+        experiment = Experiment(args.src, args.dst,
+                                endpoint = args.endpoint,
+                                default_graph = args.default_graph,
+                                force_update = args.force_update,
+                                go_aspects = args.go_aspects,
+                                max_go_depth = args.max_go_depth,
+                                min_go_annot = args.min_go_annot)
         experiment.run()
 
 def main():
@@ -176,8 +164,6 @@ def main():
                         help="What to do, any of {}".format(COMMANDS.keys()))
     parser.add_argument("-t", "--targets", nargs="+",
                         help="command-specific targets (default: all)")
-    parser.add_argument("-y", "--subtargets", nargs="+",
-                        help="target-specific sub-targets (default: all)")
     parser.add_argument("-s", "--src", type=str,
                         help="path to the source data")
     parser.add_argument("-d", "--dst", type=str,
@@ -194,12 +180,12 @@ def main():
                         help="[all] enable debugging output")
     parser.add_argument("--seed", type=int, default=None,
                         help="[all] seed for the RNG.")
-    parser.add_argument("--go-aspects", type=list, default="BP,CC,MF",
+    parser.add_argument("--go-aspects", type=list, default=["BP","CC","MF"],
                         help="[run-experiment] restrict GO annotations/predictions to these aspects (default: 'BP,CC,MF'])")
-    parser.add_argument("--max-go-depth", type=int, default=0,
-                        help="[run-experiment] restrict GO annotations/predictions to terms with at most this depth (default: 0)")
-    parser.add_argument("--min-go-annot", type=int, default=0,
-                        help="[run-experiment] restrict GO annotations/predictions to term with at least this many annotations (default: 0)")
+    parser.add_argument("--max-go-depth", type=int, default=None,
+                        help="[run-experiment] restrict GO annotations/predictions to terms with at most this depth (default: None)")
+    parser.add_argument("--min-go-annot", type=int, default=None,
+                        help="[run-experiment] restrict GO annotations/predictions to term with at least this many annotations (default: None)")
 
     args = parser.parse_args()
 
