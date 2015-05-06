@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import sys, re
+import sys, re, copy
+from collections import defaultdict
+from ocelot.services import _cls
 
 class _GOReader(object):
     """Parse a GO OBO file.
@@ -116,7 +118,7 @@ class GOTerm(object):
         self.name = ""
         """Short description of the term."""
         self.namespace = ""
-        """Namespace of the term, one of ``["BP", "CC", "MF"]``."""
+        """Namespace of the term, one of ``["biological_process", "cellular_component", "molecular_function"]``."""
         self.parents = []
         """List of (parent term ID, relation) tuples."""
         self.children = []
@@ -200,20 +202,6 @@ class GOTerm(object):
             descendants |= dag._terms[child_id].get_descendants(dag, relations)
         return descendants
 
-#    def get_all_parent_edges(self, dag):
-#        all_parent_edges = set()
-#        for p, r in self.parents:
-#            all_parent_edges.add((self.id, dag[p].id, r))
-#            all_parent_edges |= dag[p].get_all_parent_edges(dag)
-#        return all_parent_edges
-
-#    def get_all_child_edges(self, dag):
-#        all_child_edges = set()
-#        for p, r in self.children:
-#            all_child_edges.add((dag[p].id, self.id, r))
-#            all_child_edges |= dag[p].get_all_child_edges(dag)
-#        return all_child_edges
-
 class GODag(object):
     """The GO DAG.
 
@@ -295,7 +283,32 @@ class GODag(object):
 
         return _paths_to_root(self._terms[term_id])
 
-    def add_bin_term(parent, proteins = set()):
+    def get_valid_term_ids(self, include_bins=False):
+        for id_ in self._terms.iterkeys():
+            if id_.startswith("GO:") or \
+               (include_bins and id_.startswith("BN:")):
+                yield id_
+
+    def get_valid_terms(self, include_bins=False):
+        for id_, term in self._terms.iteritems():
+            if id_.startswith("GO:") or \
+               (include_bins and id_.startswith("BN:")):
+                yield term
+
+    def get_valid_ids_terms(self, include_bins=False):
+        for id_, term in self._terms.iteritems():
+            if id_.startswith("GO:") or \
+               (include_bins and id_.startswith("BN:")):
+                yield id_, term
+
+    def get_interaspect_links(self):
+        for term in self._terms.itervalues():
+            for parent_id, relation in term.parents:
+                parent = self._terms[parent_id]
+                if term.namespace != parent.namespace:
+                    yield term, relation, parent
+
+    def add_bin_term(self, parent, proteins = set()):
         term = GOTerm()
         term.id = "BIN" + parent.id[parent_term.id.index(":"):]
         term.name = "Bin term for " + parent.name
@@ -307,63 +320,97 @@ class GODag(object):
         term.level = parent.level + 1
         return term
 
-    def get_valid_term_ids(self, include_bins=False):
-        for id_ in self._terms.iterkeys():
-            if id_.startswith("GO:") or \
-               (include_bins and id_.startswith("BN:")):
-                yield id_
+    def _fill(self, p_to_terms):
+        """Fills the DAG with proteins."""
+        for p, terms in p_to_terms.iteritems():
+            for term in terms:
+                assert term.id in self._terms, "unknown term ID '{}'".format(term.id)
+                term.proteins.add(p)
 
-    def get_valid_terms(self, include_bins=False):
-        for id_, term in self.iteritems():
-            if id_.startswith("GO:") or \
-               (include_bins and id_.startswith("BN:")):
+    def _generate_terms_by_level(self):
+        """Generates all terms according to their recorder level."""
+        level_to_terms = defaultdict(set)
+        for term in self._terms.itervalues():
+            level_to_terms[term.level].add(term)
+        levels = sorted(level_to_terms.keys())
+        for level in levels:
+            for term in level_to_terms[level]:
                 yield term
 
-    def get_valid_id(self, include_bins=False):
-        for id_, term in self.iteritems():
-            if id_.startswith("GO:") or \
-               (include_bins and id_.startswith("BN:")):
-                yield id_, term
+    def preprocess(self, p_to_terms, aspects = None, max_depth = None,
+                   min_annot = None, add_bins = True):
+        """Processes the DAG by removing unwanted terms and adding bin terms.
 
-#    def prune(self, ids_to_keep, 
-#        from copy import deepcopy
-#
-#        dag = GODag()
-#        for id_ in id_to_keep:
-#            dag._terms[id_] = deepcopy(self._terms[id_])
-#
-#        for id_, term in dag._terms.items():
-#            term.proteins = set()
-#
-#        for key, t in new_dag.items():
-#            t.proteins = set()
-#            new_children = []
-#            new_parents = []
-#            proteins_in_the_bin = set()
-#            for c, r in t.children:
-#                if c in new_dag:
-#                    new_children += [(c, r)]
-#                else:
-#                    if r == 'is_a' and c in proteins_by_go_id:
-#                        proteins_in_the_bin.update(proteins_by_go_id[c])
-#            if new_children:
-#                if proteins_in_the_bin:
-#                    bin_children = create_bin_node(t, proteins_in_the_bin if not valid_proteins else proteins_in_the_bin.intersection(valid_proteins))
-#                    new_children += [(bin_children.id, 'bin')]
-#                    new_dag[bin_children.id] = bin_children
-#            else:
-#                t.proteins = proteins_by_go_id[key] if not valid_proteins else proteins_by_go_id[key].intersection(valid_proteins)
-#
-#            t.children = new_children
-#
-#            for p, r in t.parents:
-#                if p in new_dag:
-#                    new_parents += [(p, r)]
-#            t.parents = new_parents
-#
-#        for key, t in new_dag.iteritems():
-#            if not t.children:
-#                for p in t.get_all_parents(new_dag, rel=['is_a', 'bin', 'part_of']):
-#                    new_dag[p].proteins.update(t.proteins)
-#
-#        return new_dag
+        This method does the following:
+
+        * Removes from terms in unwanted namespaces.
+        * Removes from terms with too few annotations.
+        * Removes from terms that are too deep.
+        * Adds *bin* terms.
+
+        The protein list and protein-to-function map are adjusted accordingly.
+
+        :param p_to_terms: map from protein IDs to ``GOTerm``'s.
+        :param aspects: collection of aspects to keep; valid aspects are ``"biological_process"``, ``"cellular_component"``, ``"molecular_function"``.
+        :param min_proteins_per_term: minimum number of proteins to keep a term.
+        :param max_level: maximum term depth.
+        :returns: the trimmed ``p_to_terms`` map, updates ``self``.
+        """
+        if aspects is None:
+            aspects = ["biological_process", "cellular_component", "molecular_function"]
+
+        self._fill(p_to_terms)
+
+        for term in self._terms.itervalues():
+
+            # Sanity check: check that a term has at most as many annotations
+            # as the number of annotations in all its parents (note that a term
+            # may have more than one parent, hence the sum).
+            num_parent_annot = 0
+            for parent_id, relation in term.parents:
+                parent = self._terms[parent_id]
+                if relation == "is_a":
+                    num_parent_annot += len(parent.proteins)
+            assert len(term.parents) == 0 or num_parent_annot >= len(term.proteins), \
+                "failed sanity check: {} -> parents {}".format(term, term.parents)
+
+            # Sanity check: check that a term has at least as many annotations
+            # as each of its children
+            for child_id, relation in term.children:
+                child = self._terms[child_id]
+                if relation == "is_a":
+                    assert len(term.proteins) >= len(child.proteins), \
+                        "failed sanity check: {} -> children {}".format(term, term.children)
+
+        # Do a per-level traversal of the dag, and mark the terms that satisfy
+        # all constraints. There may be cases where a term T has two child
+        # terms C1 and C2 such that C2 is a child of C1 (i.e. C2 is a child of
+        # both T and C1). DAGs be damned!
+        processed, to_keep = set(), set()
+        for term in self._generate_terms_by_level():
+            if term in processed:
+                continue
+            processed.add(term)
+
+            if not max_depth is None and term.level > max_depth:
+                print "discarding '{}', too deep ({} > {})".format(term, term.level, max_depth)
+                # Since this is a per-level traversal, we can break here
+                break
+            if not term.namespace in aspects:
+                print "discarding '{}', not in namespace".format(term)
+                continue
+            if not min_annot is None and len(term.proteins) < min_annot:
+                print "discarding '{}', too few annotations ({} < {})".format(term, len(term.proteins), min_annot)
+                continue
+            to_keep.add(term)
+
+        # Remove all terms that are not in to_keep. For each term, if the
+        # number of annotations in children terms that are marked for removal
+        # is above min_annot, then add a bin node.
+        # XXX how to deal with bin terms that are super-classes of terms that
+        # have a common children with a term that is not marked for removal?
+        raise NotImplementedError
+
+        filtered_p_to_terms = {p: term for p, term in p_to_terms.iteritems()
+                               if term in self._terms}
+        return filtered_p_to_terms
