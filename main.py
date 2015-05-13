@@ -16,7 +16,7 @@ def _filter_targets(targets, ids):
     if ids == None:
         ids = targets.keys()
     elif not all(id_ in targets for id_ in ids):
-        raise ValueError("invalid target id '{}'".format(id_))
+        raise ValueError("invalid target id")
     return [(id_, targets[id_]) for id_ in ids]
 
 def _make_rdf(args):
