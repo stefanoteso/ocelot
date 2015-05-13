@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
 
-from . import _Experiment
-
 import os
 import numpy as np
-import ocelot.ontology as O
 from ocelot.services import _cls, iterate_csv
-from ocelot.features import *
 from ocelot.kernels import *
 from ocelot.converters.yip09 import *
+from . import _Experiment
+from .yeast import *
 
 class YipExperiment(_Experiment):
     """Reproduce the experiment in [Yip09]_.
 
-    We re-use the same labels and folds as the original dataset, but use the
-    newly computed features.
+    We re-use the same labels and folds as the original dataset, but use a new
+    set of kernels (computed along the same lines as the in the original
+    dataset, plus some).
 
     :param src: source directory of all databases.
     :param dst: destination directory for the results.
@@ -42,6 +41,34 @@ class YipExperiment(_Experiment):
         p_to_seq = {binding[u"yip_p"].split(".")[-1]: binding[u"seq"]
                     for binding in self.iterquery(query, n = 2)}
         return p_to_seq
+
+    def _get_p_to_context(self):
+        query = """
+        SELECT ?p ?chrom ?strand ?start ?stop
+        FROM <{default_graph}>
+        WHERE {{
+            ?p a ocelot:yip_protein ;
+                owl:sameAs ?feat .
+            ?feat a ocelot:sgd_feature .
+            ?id a ocelot:sgd_id ;
+                owl:sameAs ?feat .
+            ?id ocelot:sgd_id_in_chromosome ?chrom .
+            ?id ocelot:sgd_id_in_strand ?strand .
+            ?id ocelot:sgd_id_starts_at ?start .
+            ?id ocelot:sgd_id_stops_at ?stop .
+        }}
+        """
+        p_to_context = {}
+        for bindings in self.iterquery(query, n = 5):
+            p       = bindings[u"p"].split(".")[-1]
+            chrom   = bindings[u"chrom"].split(".")[-1]
+            strand  = bindings[u"strand"]
+            start   = bindings[u"start"]
+            stop    = bindings[u"stop"]
+            assert strand in ("C", "W")
+            p_to_context[p] = \
+                (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
+        return p_to_context
 
     def _get_d_r_info(self):
         # Note that all positions start from 1.
@@ -234,161 +261,6 @@ class YipExperiment(_Experiment):
             np.savetxt(path, ys)
         return ys
 
-    def _get_microarray_kernel(self, p_to_i, which = None):
-        """Returns a kernel for gene expression.
-
-        The data can be obtained `here <ftp://downloads.yeastgenome.org/expression/microarray/all_spell_exprconn_pcl.tar.gz>`_.
-        """
-        from glob import glob
-        pcl = PCL()
-        num = len(p_to_i)
-        for dirname in glob(os.path.join(self.src, "yip09", "raw", "microarray", "*")):
-            if not os.path.isdir(dirname):
-                continue
-            if which != None and not os.path.basename(dirname) in which:
-                continue
-            matrix_sum = np.zeros((num, num))
-            for filename in glob(os.path.join(dirname, "*.pcl")):
-                path = os.path.join(self.src, "yip09", "raw", "microarray",
-                                    dirname, filename)
-                print _cls(self), ": reading '{}'".format(path)
-                orf_to_expression, num_conditions = pcl.read(path)
-                levels = [ [0.0]*num_conditions for _ in xrange(len(p_to_i)) ]
-                # XXX add support for bad/SGD IDs
-                num_missing = 0
-                for orf, index in p_to_i.iteritems():
-                    try:
-                        levels[index] = orf_to_expression[orf]
-                    except KeyError, key:
-                        num_missing += 1
-                if num_missing:
-                    print "Warning: no expression level for '{}/{}' proteins".format(num_missing, len(p_to_i))
-                matrix_sum += CorrelationKernel(levels).compute()
-        return DummyKernel(matrix_sum)
-
-    def _get_complex_kernel(self, p_to_i):
-        """Computes diffusion kernels for raw protein complex data.
-
-        The original experiment relies of Y2H [Ito00]_, [Uetz00]_ and TAP-MS
-        [Gavin06]_, [Krogan06]_ datasets of protein complexes. Here we make
-        use of the dataset described in [Pu08]_, which is supposed to be more
-        complete and up-to-date.
-        """
-        import itertools as it
-        # XXX use a weight matrix
-
-        # Read the map between ORFs and complexes
-        FIELDS = ("ORF", "_", "COMPLEX")
-        complex_to_orfs = {}
-        for row in iterate_csv(os.path.join(self.src, "yip09", "raw", "ppi", "CYC2008_complex.tab"),
-                               delimiter = "\t", fieldnames = FIELDS):
-            orf, cpx = row["ORF"], row["COMPLEX"]
-            if not cpx in complex_to_orfs:
-                complex_to_orfs[cpx] = set()
-            complex_to_orfs[cpx].add(orf)
-
-        # Now compute the adjacency matrix
-        adj_matrix = np.zeros((len(p_to_i), len(p_to_i)))
-        for _, orfs in complex_to_orfs.iteritems():
-            orf_indices = [p_to_i[orf] for orf in orfs if orf in p_to_i]
-            for i, j in it.product(orf_indices, orf_indices):
-                if i != j:
-                    adj_matrix[i,j] = 1
-        return DiffusionKernel(adj_matrix)
-
-    def _get_interpro_kernel(self, p_to_i, allowed_sources = None,
-                             use_evalue = False, default_score = 1.0):
-        """Computes a set kernel over InterPro domain family hits.
-
-        The InterPro files are read from:
-
-        .. ``self.src/yip09/raw/interpro/${p}.iprscan5.tsv.txt``
-
-        where ``${p}`` is the name of the protein.
-
-        :param p_to_i: map protein names -> index in the kernel.
-        :param allowed_sources: allowed InterPro sources, e.g. "Pfam"
-        :param use_evalue: use negative logarithm of the hit e-value as
-                           detection score.
-        """
-        interpro = InterProTSV()
-        hits = [ None for _ in xrange(len(p_to_i)) ]
-        for p, i in p_to_i.iteritems():
-            path = os.path.join(self.src, "yip09", "raw", "interpro",
-                                "{}.iprscan5.tsv.txt".format(p))
-            hit = interpro.read(path, allowed_sources)
-            if use_evalue:
-                # weight each hit by the negative log of its e-value
-                for k, v in hit.iteritems():
-                    if v == None or v <= 0.0:
-                        hit[k] = default_score
-                    else:
-                        hit[k] = -np.log(v)
-            else:
-                hit = set(hit.keys())
-            hits[i] = hit
-        if use_evalue:
-            return SparseLinearKernel(hits)
-        else:
-            return SetKernel(hits)
-
-    def _get_genetic_colocalization_kernel(self, p_to_i, gamma = 1e-9):
-        """We use a simple Gaussian-of-differences kernel here.
-
-        The distance between two proteins (or, rather, genes) is taken to
-        be the distance between their centroids.
-
-        Please note that we do distinguish between same-strand and
-        different-strand proteins (i.e., their distances are computed the same
-        way), while this may have a rather serious biological implications.
-
-        The idea comes from [Lee03]_."""
-        query = """
-        SELECT ?p ?chrom ?strand ?start ?stop
-        FROM <{default_graph}>
-        WHERE {{
-            ?p a ocelot:yip_protein ;
-                owl:sameAs ?feat .
-            ?feat a ocelot:sgd_feature .
-            ?id a ocelot:sgd_id ;
-                owl:sameAs ?feat .
-            ?id ocelot:sgd_id_in_chromosome ?chrom .
-            ?id ocelot:sgd_id_in_strand ?strand .
-            ?id ocelot:sgd_id_starts_at ?start .
-            ?id ocelot:sgd_id_stops_at ?stop .
-        }}
-        """
-        context = {}
-        for bindings in self.iterquery(query, n = 5):
-            p       = bindings[u"p"].split(".")[-1]
-            chrom   = bindings[u"chrom"].split(".")[-1]
-            strand  = bindings[u"strand"]
-            start   = bindings[u"start"]
-            stop    = bindings[u"stop"]
-            assert strand in ("C", "W")
-            if strand == "C":
-                # XXX not really required, here just to not forget that 'W'
-                # means increasing coords and 'C' means reverse.
-                start, stop = stop, start
-            context[p] = (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
-        matrix = np.zeros((len(p_to_i), len(p_to_i)))
-        for p, i in p_to_i.iteritems():
-            for q, j in p_to_i.iteritems():
-                if context[p][0] == context[q][0]:
-                    matrix[i,j] = np.exp(-gamma * (context[p][1] - context[q][1])**2)
-        return DummyKernel(matrix)
-
-    def _get_profile_kernel(self, p_to_i):
-        reader = PSSM(targets = ["residue", "nlog_condp"])
-        pssms = []
-        for p, i in sorted(p_to_i.iteritems(), key = lambda p_i: p_i[1]):
-            path = os.path.join(self.src, "yip09", "raw", "profiles",
-                                "{}.ascii-pssm".format(p))
-            print "loading {}".format(path)
-            pssm = reader.read(path)
-            pssms.append(pssm)
-        return ProfileKernel(pssms, k = 4, threshold = 6.0)
-
     def _get_domain_ptcorr_kernel(self):
         # TODO: for each pfam pair, compute the phylogenetic tree correlation,
         #       giving a real matrix; empirical kernel map
@@ -424,33 +296,51 @@ class YipExperiment(_Experiment):
                 converter.get_kernels()
         return self.yip_p_kernel, self.yip_d_kernel, self.yip_r_kernel
 
-    def _get_p_kernels(self, ps, pps, p_to_i):
+    def _get_p_kernels(self, ps, pps, p_to_i, p_to_seq):
         """Computes all the kernels and pairwise kernels for proteins.
 
         The order in which objects are passed in is preserved.
 
-        :param ps: list of protein identifiers
-        :param pps: list of pairs of protein identifiers
-        :param p_to_i: map from protein ID to protein index
+        :param ps: list of protein IDs.
+        :param pps: list of pairs of protein IDs.
+        :param p_to_i: map from protein ID to protein index.
+        :param p_to_seq: map from protein ID to protein sequence.
         """
-        INFOS = (
-            ("p-kernel-colocalization",
-                lambda: self._get_genetic_colocalization_kernel(p_to_i)),
-            ("p-kernel-microarray",
-                lambda: self._get_microarray_kernel(p_to_i,
-                            which = ["Gasch_2000_PMID_11102521",
-                                     "Spellman_1998_PMID_9843569"])),
-            ("p-kernel-complex",
-                lambda: self._get_complex_kernel(p_to_i)),
-            ("p-kernel-interpro-match-all",
-                lambda: self._get_interpro_kernel(p_to_i, use_evalue = False)),
-            ("p-kernel-interpro-weighted",
-                lambda: self._get_interpro_kernel(p_to_i, use_evalue = True)),
-            ("p-kernel-profile",
-                lambda: self._get_profile_kernel(p_to_i)),
-            ("p-kernel-yip",
-                lambda: self._get_yip_kernels()[0]),
-        )
+        # Compute the gene colocalization kernel
+        p_to_context = self._cached(self._get_p_to_context,
+                                    "p_to_context")
+        contexts = [p_to_context[p] for p in ps]
+        self._cached_kernel(ColocalizationKernel, len(ps),
+                            "p-colocalization-kernel",
+                            contexts, gamma = 1.0)
+
+        # Compute the gene expression kernel
+        self._cached_kernel(SGDGeneExpressionKernel, len(ps),
+                            "p-gene-expression-kernel",
+                            p_to_i, self.src,
+                            ["Gasch_2000_PMID_11102521",
+                             "Spellman_1998_PMID_9843569"])
+
+        # Compute the protein complex kernel
+        self._cached_kernel(YeastProteinComplexKernel, len(ps),
+                            "p-complex-kernel",
+                            p_to_i, self.src)
+
+        # Compute the InterPro domain kernel
+        self._cached_kernel(InterProKernel, len(ps),
+                            "p-interpro-kernel",
+                            ps, self.dst, use_evalue = False)
+        self._cached_kernel(InterProKernel, len(ps),
+                            "p-interpro-score-kernel",
+                            ps, self.dst, use_evalue = True)
+
+        # Compute the profile kernel
+        self._cached_kernel(PSSMKernel, len(ps),
+                            "p-profile-kernel",
+                            ps, p_to_seq, self.dst, k = 4, threshold = 6.0)
+
+        raise NotImplementedError
+
         return self._compute_kernels(INFOS, ps, pps)
 
     def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
@@ -542,7 +432,7 @@ class YipExperiment(_Experiment):
         d_to_pos, r_to_pos, d_to_pfam = self._get_d_r_info()
 
         # Compute the protein kernels
-        p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i)
+        p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i, p_to_seq)
         d_kernels, dd_kernels = self._get_d_kernels(ds, dds, d_to_i, p_to_seq, d_to_pos, d_to_pfam)
         r_kernels, rr_kernels = self._get_r_kernels(rs, rrs, r_to_i, p_to_seq, r_to_pos)
 
