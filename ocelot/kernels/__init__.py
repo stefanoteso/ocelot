@@ -29,7 +29,11 @@ class Kernel(object):
             `\hat{k}_{ij} = k_{ij} / \sqrt{k_ii k_jj}`
         """
         ones = np.ones((1, matrix.shape[1]))
-        invd = np.divide(ones, np.sqrt(matrix.diagonal()))
+        diag = matrix.diagonal()
+        num_zero_diag_entries = np.where(diag == 0)[0].shape[0]
+        if num_zero_diag_entries:
+            print "Warning: found zero-valued diagonal entries during normalization, will fix up INF to zeros."
+        invd = np.divide(ones, np.sqrt(diag))
         # We may get infinities if the diagonal is zero; in that case we
         # *assume* that the corresponding non-diagonal entries are also zero,
         # which implies that it is safe to turn the infinities to 1, as doing
