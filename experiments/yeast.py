@@ -5,7 +5,7 @@ import numpy as np
 import itertools as it
 from glob import glob
 
-from ocelot.kernels import Kernel, CorrelationKernel, ProfileKernel
+from ocelot.kernels import *
 from ocelot.services import _cls, iterate_csv, PCL, InterProTSV, PSSM
 
 class SGDGeneExpressionKernel(Kernel):
@@ -53,7 +53,6 @@ class SGDGeneExpressionKernel(Kernel):
                  print _cls(self), ": '{}' has no measurements for '{}/{}' proteins" \
                                     .format(path, num_missing, len(self))
             matrix += CorrelationKernel(exp_levels, do_normalize = self._do_normalize).compute()
-            break
         return matrix
 
 class YeastProteinComplexKernel(Kernel):
