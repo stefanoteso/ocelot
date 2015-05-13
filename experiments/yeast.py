@@ -5,7 +5,7 @@ import numpy as np
 import itertools as it
 from glob import glob
 
-from ocelot.kernels import Kernel, ProfileKernel
+from ocelot.kernels import Kernel, CorrelationKernel, ProfileKernel
 from ocelot.services import _cls, iterate_csv, PCL, InterProTSV, PSSM
 
 class SGDGeneExpressionKernel(Kernel):
