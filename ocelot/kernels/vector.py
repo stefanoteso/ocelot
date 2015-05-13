@@ -70,7 +70,16 @@ class SetKernel(Kernel):
         return matrix
 
 class ColocalizationKernel(Kernel):
-    """An exponential kernel over genetic contexts.
+    """An exponential (gaussian-of-differences) kernel over genetic contexts.
+
+    The distance between two proteins (or, rather, genes) is taken to
+    be the distance between their centroids.
+
+    Please note that we do distinguish between same-strand and
+    different-strand proteins (i.e., their distances are computed the same
+    way), while this may have a rather serious biological implications.
+
+    The idea comes from [Lee03]_.
 
     :param contexts: a sequence of tuples of the form ``(chromosome, position)``.
     """
