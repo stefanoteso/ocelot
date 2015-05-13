@@ -97,8 +97,8 @@ class _Experiment(object):
     def _cached(self, f, relpath, *args, **kwargs):
         relpath += ".pickle"
         try:
-            assert not self.force_update
             print _cls(self), ": loading '{}'".format(relpath)
+            assert not self.force_update, "update forced by user"
             y = self._depickle(relpath)
         except Exception, e:
             print _cls(self), "|", e
@@ -110,8 +110,8 @@ class _Experiment(object):
     def _cached_kernel(self, K, num, relpath, *args, **kwargs):
         path = os.path.join(self.dst, relpath)
         try:
-            assert not self.force_update
             print _cls(self), ": loading '{}'".format(path)
+            assert not self.force_update, "update forced by user"
             kernel = DummyKernel(path + ".txt", num = num, check_psd = True)
         except Exception, e:
             print _cls(self), "|", e
