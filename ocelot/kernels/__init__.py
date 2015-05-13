@@ -67,7 +67,8 @@ class Kernel(object):
             assert ls[0] < threshold, "matrix is too non-PSD: minimum eigenvalue is '{}'".format(ls[0])
             print _cls(self), ": preconditioning by 10*(ls[0] = '{}')".format(ls[0])
             matrix += np.identity(matrix.shape[0]) * -10.0 * ls[0]
-            assert np.linalg.eigvalsh(matrix)[0] >= 0, "the gods are playful today"
+            eigvals = np.linalg.eigvalsh(matrix)
+            assert eigvals[0] > -threshold, "eigenvalues are too non-negative, even after preconditioning: {}".format(eigvals)
 
     def draw(self, path):
         """Draws the kernel matrix to a file."""
