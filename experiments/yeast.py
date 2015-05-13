@@ -113,7 +113,7 @@ class InterProKernel(Kernel):
 
     def _path(self, p):
         return os.path.join(self._cache_path, "interpro",
-                            "{}.f.tsv.txt".format(p))
+                            "{}.tsv.txt".format(p))
 
     def _compute_iprscan_hits(self):
         # WRITEME
@@ -170,7 +170,7 @@ class PSSMKernel(ProfileKernel):
         super(PSSMKernel, self).__init__(ps, *args, **kwargs)
 
     def _get_pssm_path(self, p):
-        return os.path.join(self._cache_path, "pssm", "{}.f.ascii-pssm".format(p))
+        return os.path.join(self._cache_path, "pssm", "{}.ascii-pssm".format(p))
 
     def _compute_pssms(self):
         pass
