@@ -15,6 +15,10 @@ class SGDGeneExpressionKernel(Kernel):
 
         $src/yeast/microarray/*.pcl
 
+    The data can be obtained from:
+
+        `<ftp://downloads.yeastgenome.org/expression/microarray/all_spell_exprconn_pcl.tar.gz>`_
+
     :param p_to_i: map between ORF feature names to indices in the kernel matrix.
     :param src: path to the data source directory.
     :param experiments: list of microarray experiments to use.
