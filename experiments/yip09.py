@@ -306,42 +306,45 @@ class YipExperiment(_Experiment):
         :param p_to_i: map from protein ID to protein index.
         :param p_to_seq: map from protein ID to protein sequence.
         """
-        # Compute the gene colocalization kernel
+        p_to_i = {p: i for i, p in enumerate(ps)}
+        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in pps]
+
         p_to_context = self._cached(self._get_p_to_context,
                                     "p_to_context")
         contexts = [p_to_context[p] for p in ps]
         self._cached_kernel(ColocalizationKernel, len(ps),
                             "p-colocalization-kernel",
-                            contexts, gamma = 1.0)
+                            contexts, gamma = 1.0,
+                            do_pairwise = True, pairs = pp_indices)
 
-        # Compute the gene expression kernel
         self._cached_kernel(SGDGeneExpressionKernel, len(ps),
                             "p-gene-expression-kernel",
                             p_to_i, self.src,
                             ["Gasch_2000_PMID_11102521",
-                             "Spellman_1998_PMID_9843569"])
+                             "Spellman_1998_PMID_9843569"],
+                            do_pairwise = True, pairs = pp_indices)
 
-        # Compute the protein complex kernel
         self._cached_kernel(YeastProteinComplexKernel, len(ps),
                             "p-complex-kernel",
-                            p_to_i, self.src)
+                            p_to_i, self.src,
+                            do_pairwise = True, pairs = pp_indices)
 
-        # Compute the InterPro domain kernel
         self._cached_kernel(InterProKernel, len(ps),
                             "p-interpro-kernel",
-                            ps, self.dst, use_evalue = False)
+                            ps, self.dst, use_evalue = False,
+                            do_pairwise = True, pairs = pp_indices)
+
         self._cached_kernel(InterProKernel, len(ps),
                             "p-interpro-score-kernel",
-                            ps, self.dst, use_evalue = True)
+                            ps, self.dst, use_evalue = True,
+                            do_pairwise = True, pairs = pp_indices)
 
-        # Compute the profile kernel
         self._cached_kernel(PSSMKernel, len(ps),
                             "p-profile-kernel",
-                            ps, p_to_seq, self.dst, k = 4, threshold = 6.0)
+                            ps, p_to_seq, self.dst, k = 4, threshold = 6.0,
+                            do_pairwise = True, pairs = pp_indices)
 
         raise NotImplementedError
-
-        return self._compute_kernels(INFOS, ps, pps)
 
     def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
         """Computes all the kernels and pairwise kernels for domains.
