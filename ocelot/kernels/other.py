@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from . import Kernel
+from . import Kernel, DummyKernel
 
 class EmpiricalKernelMap(Kernel):
     """Empirical kernel map over an underlying kernel[1].
@@ -34,22 +34,23 @@ class PairwiseKernel(Kernel):
 
     :param indices: indices of the elements to combine.
     :param subkernel: a `Kernel` instance.
-    :param op: either ``"tensor"`` or ``"sum"``.
+    :param op: either ``"product"`` or ``"sum"``.
     """
-    def __init__(self, pairs, subkernel, op = "tensor", **kwargs):
+    def __init__(self, pairs, subkernel, op = "product", **kwargs):
         super(PairwiseKernel, self).__init__(pairs, **kwargs)
-        self.subkernel = subkernel
-        if op == "tensor":
+        self._subkernel = subkernel
+        if op == "product":
             self.op = lambda kin, kjm, kim, kjn: kin * kjm + kim * kjn
         elif op == "sum":
             self.op = lambda kin, kjm, kim, kjn: kin + kjm + kim + kjn
         else:
             raise ValueError, "invalid op '{}'".format(op)
+
     def _compute_all(self):
-        submatrix = self.subkernel.compute()
+        submatrix = self._subkernel.compute()
         matrix = np.zeros((len(self), len(self)))
-        for out_i, (i, j) in enumerate(self._entities):
-            for out_j, (n, m) in enumerate(self._entities):
+        for out_i, (i, j) in enumerate(self._entities): # pairs
+            for out_j, (n, m) in enumerate(self._entities): # pairs
                 kin, kim = submatrix[i,n], submatrix[i,m]
                 kjn, kjm = submatrix[j,n], submatrix[j,m]
                 matrix[out_i, out_j] = self.op(kin, kjm, kim, kjn)
