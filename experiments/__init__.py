@@ -109,6 +109,7 @@ class _Experiment(object):
 
     def _cached_kernel(self, K, num, relpath, *args, **kwargs):
         path = os.path.join(self.dst, relpath)
+        force_update = False
         try:
             print _cls(self), ": loading '{}'".format(path)
             assert not self.force_update, "update forced by user"
@@ -117,57 +118,33 @@ class _Experiment(object):
             print _cls(self), "|", e
             print _cls(self), ": computing '{}'".format(path)
             kernel = K(*args, **kwargs)
-            assert not kernel is None
             kernel.check_and_fixup(kwargs.get("tol", 1e-10))
             kernel.save(path + ".txt")
             kernel.draw(path + ".png")
-        return kernel
+            force_update = True
 
-    def _compute_kernels(self, infos, xs, xxs, tolerance = 1e-10):
-        """Helper for computing kernels."""
-        x_to_i = {x: i for i, x in enumerate(xs)}
-        xx_indices = [(x_to_i[x1], x_to_i[x2]) for x1, x2 in xxs]
+        do_pairwise = kwargs.get("do_pairwise", False)
+        if not do_pairwise:
+            return kernel
 
-        for path, compute in infos:
-            path = os.path.join(self.dst, path)
-            try:
-                print _cls(self), ": loading '{}'".format(path)
-                kernel = DummyKernel(path + ".txt", num = len(xs),
-                                     check_psd = True)
-            except Exception, e:
-                print _cls(self), "|", e
-                print _cls(self), ": computing '{}'".format(path)
-                kernel = compute()
-                assert not kernel is None
-                kernel.check_and_fixup(tolerance)
-                kernel.save(path + ".txt")
-                kernel.draw(path + ".png")
+        pairs, pairwise_method = kwargs.get("pairs"), kwargs.get("pairwise_method")
+        assert not pairs is None
 
-            path += "-pairwise"
-            try:
-                print _cls(self), ": loading '{}".format(path)
-                pairwise_kernel = DummyKernel(path + ".txt", num = len(xxs),
-                                              check_psd = True)
-            except Exception, e:
-                print _cls(self), "|", e
-                print _cls(self), ": computing '{}'".format(path)
-                pairwise_kernel = PairwiseKernel(xx_indices, kernel)
-                pairwise_kernel.check_and_fixup(tolerance) 
-                pairwise_kernel.save(path + ".txt")
-                pairwise_kernel.draw(path + ".png")
+        pairwise_path = path + "-pairwise"
+        try:
+            print _cls(self), ": loading '{}'".format(pairwise_path)
+            assert not self.force_update, "update forced by user"
+            assert not force_update, "sub-kernel updated, forcing update"
+            pairwise_kernel = DummyKernel(pairwise_path + ".txt", check_psd = True)
+        except Exception, e:
+            print _cls(self), "|", e
+            print _cls(self), ": computing '{}'".format(pairwise_path)
+            pairwise_kernel = PairwiseKernel(kernel, pairs, op = pairwise_method)
+            pairwise_kernel.check_and_fixup(kwargs.get("tol", 1e-10))
+            pairwise_kernel.save(pairwise_path + ".txt")
+            pairwise_kernel.draw(pairwise_path + ".png")
 
-            del kernel
-            del pairwise_kernel
-
-        kernels, pairwise_kernels = [], []
-        for path, compute_kernel in infos:
-            path = os.path.join(self.dst, path)
-            print _cls(self), ": loading '{}".format(path)
-            kernels.append(DummyKernel(path + ".txt", num = len(xs)))
-            path += "-pairwise"
-            print _cls(self), ": loading '{}".format(path)
-            pairwise_kernels.append(DummyKernel(path + ".txt", num = len(xxs)))
-        return kernels, pairwise_kernels
+        return kernel, pairwise_kernel
 
     @staticmethod
     def _split_vector(ys, tr_indices, ts_indices):
