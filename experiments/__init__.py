@@ -108,6 +108,16 @@ class _Experiment(object):
         return y
 
     def _cached_kernel(self, K, num, relpath, *args, **kwargs):
+        """Loads a kernel from disk, or computes it if necessary.
+
+        :param K: kernel class.
+        :param num: number of entities.
+        :param relpath: path to the Gram matrix relative to the experiment destination directory.
+        :param tol: non-PSD tolerance (default: ``1e-10``).
+        :param do_pairwise: whether to compute the corresponding pairwise kernel (default: ``False).
+        :param pairs: indices of pairs to compute the pairwise kernel for.
+        :param pairwise_op: pairwise operation to performn (default: ``"product"``).
+        """
         path = os.path.join(self.dst, relpath)
         force_update = False
         try:
@@ -127,9 +137,6 @@ class _Experiment(object):
         if not do_pairwise:
             return kernel
 
-        pairs, pairwise_method = kwargs.get("pairs"), kwargs.get("pairwise_method")
-        assert not pairs is None
-
         pairwise_path = path + "-pairwise"
         try:
             print _cls(self), ": loading '{}'".format(pairwise_path)
@@ -139,7 +146,8 @@ class _Experiment(object):
         except Exception, e:
             print _cls(self), "|", e
             print _cls(self), ": computing '{}'".format(pairwise_path)
-            pairwise_kernel = PairwiseKernel(kernel, pairs, op = pairwise_method)
+            pairwise_kernel = PairwiseKernel(kwargs.get("pairs"), kernel,
+                                             op = kwargs.get("pairwise_op", "product"))
             pairwise_kernel.check_and_fixup(kwargs.get("tol", 1e-10))
             pairwise_kernel.save(pairwise_path + ".txt")
             pairwise_kernel.draw(pairwise_path + ".png")
