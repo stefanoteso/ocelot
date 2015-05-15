@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ..services import _cls, AMINOACIDS, BACKGROUND_AA_FREQ
+from ..services import _cls
 
 class Kernel(object):
     """Base kernel class.
