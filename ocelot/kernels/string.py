@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy import sparse
-from ocelot.services import AMINOACIDS
+from ocelot.services import AMINOACIDS, PSSM
 
 from . import Kernel
 
@@ -286,6 +286,37 @@ class ProfileKernel(_RecursivePrefixStringKernel):
     def _to_instance(self, i, offset):
         # The third element is the total score of the mutations so far
         return (i, offset, 0.0)
+
+class PSSMKernel(ProfileKernel):
+    """A simple wrapper around the profile kernel for strings [Kuang04]_.
+
+    It takes care of generating the PSSM profiles.
+
+    :param ps: WRITEME
+    :param p_to_seq: WRITEME
+    :param cache_path: WRITEME
+    :param num_iterations: WRITEME (default: 2)
+
+    All remaining options are passed to the underlying ``ProfileKernel``.
+    """
+    def __init__(self, ps, p_to_seq, cache_path, num_iterations = 2, *args, **kwargs):
+        self._p_to_seq = p_to_seq
+        self._cache_path = cache_path
+        super(PSSMKernel, self).__init__(ps, *args, **kwargs)
+
+    def _get_pssm_path(self, p):
+        return os.path.join(self._cache_path, "pssm", "{}.ascii-pssm".format(p))
+
+    def _compute_pssms(self):
+        pass
+
+    def _compute_all(self):
+        reader = PSSM(targets = ("residue", "nlog_condp"))
+        pssms = []
+        for p in self._entities:
+            pssms.append(reader.read(self._get_pssm_path(p)))
+        self._entities = pssms
+        return super(PSSMKernel, self)._compute_all()
 
 class _TestRecursivePrefixStringKernel(object):
     def test_k_too_small(self):
