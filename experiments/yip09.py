@@ -8,6 +8,16 @@ from ocelot.converters.yip09 import *
 from . import _Experiment
 from .yeast import *
 
+_KERNEL_RELPATHS_PAIRWISE = (
+    "p-colocalization-kernel-pairwise",
+    "p-gene-expression-kernel-pairwise",
+    "p-complex-kernel-pairwise",
+    "p-interpro-kernel-pairwise",
+    "p-interpro-score-kernel-pairwise",
+    "p-profile-kernel-pairwise",
+    "p-random-kernel-pairwise",
+)
+
 class YipExperiment(_Experiment):
     """Reproduce the experiment in [Yip09]_.
 
@@ -349,6 +359,13 @@ class YipExperiment(_Experiment):
                             ps, self.dst,
                             do_pairwise = True, pairs = pp_indices)
 
+        print _cls(self), ": computing average kernel"
+        avg_matrix = self._compute_average_kernel(_KERNEL_RELPATHS_PAIRWISE[:-1])
+        kernel = DummyKernel(avg_matrix)
+        kernel.check_and_fixup(1e-10)
+        kernel.save(os.path.join(self.dst, "p-average-kernel-pairwise.txt"))
+        kernel.draw(os.path.join(self.dst, "p-average-kernel-pairwise.png"))
+
     def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
         """Computes all the kernels and pairwise kernels for domains.
 
@@ -398,17 +415,8 @@ class YipExperiment(_Experiment):
 
     def _test_pp_kernels(self, folds, ys):
         from pprint import pprint
-        KERNEL_RELPATHS = (
-            "p-colocalization-kernel-pairwise",
-            "p-gene-expression-kernel-pairwise",
-            "p-complex-kernel-pairwise",
-            "p-interpro-kernel-pairwise",
-            "p-interpro-score-kernel-pairwise",
-            "p-profile-kernel-pairwise",
-            "p-random-kernel-pairwise",
-        )
         CS = 10.0**np.linspace(-4, 4, 3)
-        for relpath in KERNEL_RELPATHS:
+        for relpath in _KERNEL_RELPATHS_PAIRWISE:
             gram = self._load_kernel(relpath)
             for c in CS:
                 results = self.eval_svm(folds, ys, gram, c = c)
