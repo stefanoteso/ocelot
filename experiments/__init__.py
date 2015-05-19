@@ -6,6 +6,7 @@ import numpy as np
 from SPARQLWrapper import SPARQLWrapper, JSON
 from modshogun import CombinedKernel, CustomKernel
 from modshogun import BinaryLabels, MKLClassification
+from sklearn.svm import SVC
 from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
 
 import ocelot.ontology as O
@@ -175,79 +176,33 @@ class _Experiment(object):
         return k_tr, k_ts
 
     @staticmethod
-    def _get_class_costs(ys):
-        num_pos = float(len(filter(lambda y: y >= 0, ys)))
-        return (len(ys) - num_pos) / len(ys), num_pos / len(ys)
+    def _eval_perf(test_ys, pred_ys):
+        fpr, tpr, _ = roc_curve(test_ys, pred_ys)
+        pr, rc, f1, sup = precision_recall_fscore_support(test_ys, pred_ys)
+        return sup, f1, pr, rc, auc(fpr, tpr)
 
-    @staticmethod
-    def _combine_matrices(matrices):
-        combined_kernel = CombinedKernel()
-        for matrix in matrices:
-            combined_kernel.append_kernel(CustomKernel(matrix))
-        return combined_kernel
-
-    def _train_test_mkl(self, ys_tr, k_tr, ys_ts, k_ts, norm = 1.0, c = 1.0, class_costs = [0.5, 0.5]):
-        """Run a single training/test round with MKL."""
-        print _cls(self), ": running MKL (norm={} C={} costs={})" \
-                            .format(norm, c, class_costs)
-
-        # Create the model
-        model = MKLClassification()
-        model.set_C_mkl(c)
-        model.set_mkl_norm(norm)
-        model.set_C(*class_costs)
-
-        # Learn the model
-        model.set_kernel(k_tr)
-        model.set_labels(BinaryLabels(ys_tr))
-        model.train()
-
-        # Infer
-        k_ts.set_subkernel_weights(k_tr.get_subkernel_weights())
-        model.set_kernel(k_ts)
-        ys_pr = model.apply().get_labels()
-
-        # Compute the results
-        fpr, tpr, _ = roc_curve(ys_ts, ys_pr)
-        pr_rc_f1_sup = precision_recall_fscore_support(ys_ts, ys_pr)
-        return pr_rc_f1_sup + ( auc(fpr, tpr), )
-
-    def _crossvalidate_mkl(self, folds, ys, kernels, **hyperparams):
-        """Perform a k-fold coross-validation with MKL."""
+    def eval_svm(self, folds, ys, kernel, c = 1.0):
         results = []
-        for i, (ts_indices, tr_indices) in enumerate(folds):
+        for k, (test_indices, train_indices) in enumerate(folds):
+            gram = kernel.compute()
+
             # Split the labels between training and test, and compute the
             # per-class costs on the training labels
-            ys_tr, ys_ts = self._split_vector(ys, tr_indices, ts_indices)
-            costs = self._get_class_costs(ys_tr)
-
-            # Split the kernels between training and test
-            matrices_tr, matrices_ts = [], []
-            for kernel in kernels:
-                matrix = kernel.compute()
-                matrix_tr, matrix_ts = \
-                    self._split_matrix(matrix, tr_indices, ts_indices)
-                matrices_tr.append(matrix_tr)
-                matrices_ts.append(matrix_ts)
-
-            # Build the combined train/test kernels
-            k_tr = self._combine_matrices(matrices_tr)
-            k_ts = self._combine_matrices(matrices_ts)
-
-            # Evaluate MKL
-            result = self._train_test_mkl(ys_tr, k_tr, ys_ts, k_ts,
-                                          class_costs = costs,
-                                          **hyperparams)
-            results.append(results)
+            train_ys, test_ys = self._split_vector(ys,
+                                                   train_indices,
+                                                   test_indices)
+            train_gram, test_gram = self._split_matrix(gram,
+                                                       train_indices,
+                                                       test_indices,
+                                                       mode = "sklearn")
+            model = SVC(C = c, kernel = "precomputed", class_weight = "auto")
+            model.fit(train_gram, train_ys)
+            pred_ys = model.predict(test_gram)
+            results.append(self._eval_perf(test_ys, pred_ys))
         return results
 
-    def _run_mkl(self, ys, kernels, folds):
-        c_to_results = {}
-        for c in (1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3, 1e4):
-            c_to_results[c] = self._crossvalidate_mkl(folds, ys, kernels,
-                                                      c = c, norm = 1.0)
-        from pprint import pprint
-        pprint(c_to_results)
+    def eval_mkl(self, folds, ys, kernels, c = 1.0):
+        raise NotImplementedError
 
     def run(self):
         raise NotImplementedError
