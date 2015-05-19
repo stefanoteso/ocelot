@@ -160,6 +160,12 @@ class _Experiment(object):
         print _cls(self), ": loading '{}'".format(path)
         return DummyKernel(path + ".txt", num = num, check_psd = False)
 
+    def _compute_average_kernel(self, relpaths):
+        matrix = self._load_kernel(relpaths[0]).compute()
+        for relpath in relpaths[1:]:
+            matrix += self._load_kernel(relpath).compute()
+        return matrix * (1.0 / len(relpaths))
+
     @staticmethod
     def _split_vector(ys, tr_indices, ts_indices):
         return ys[np.ix_(tr_indices)], ys[np.ix_(ts_indices)]
