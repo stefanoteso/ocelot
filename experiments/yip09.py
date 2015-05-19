@@ -344,7 +344,10 @@ class YipExperiment(_Experiment):
                             ps, p_to_seq, self.dst, k = 4, threshold = 6.0,
                             do_pairwise = True, pairs = pp_indices)
 
-        raise NotImplementedError
+        self._cached_kernel(RandomKernel, len(ps),
+                            "p-random-kernel",
+                            ps, self.dst,
+                            do_pairwise = True, pairs = pp_indices)
 
     def _get_d_kernels(self, ds, dds, d_to_i, d_to_pos, d_to_pfam):
         """Computes all the kernels and pairwise kernels for domains.
@@ -393,6 +396,25 @@ class YipExperiment(_Experiment):
         )
         return self._compute_kernels(INFOS, rs, rrs)
 
+    def _test_pp_kernels(self, folds, ys):
+        from pprint import pprint
+        KERNEL_RELPATHS = (
+            "p-colocalization-kernel-pairwise",
+            "p-gene-expression-kernel-pairwise",
+            "p-complex-kernel-pairwise",
+            "p-interpro-kernel-pairwise",
+            "p-interpro-score-kernel-pairwise",
+            "p-profile-kernel-pairwise",
+            "p-random-kernel-pairwise",
+        )
+        CS = 10.0**np.linspace(-4, 4, 3)
+        for relpath in KERNEL_RELPATHS:
+            gram = self._load_kernel(relpath)
+            for c in CS:
+                results = self.eval_svm(folds, ys, gram, c = c)
+                for sup, f1, pr, rc, auc in results:
+                    print "{} -> {} : F1={} Pr={} Rc={} AUC={}".format(c, sup, f1, pr, rc, auc)
+
     def run(self):
         """Run the Yip et al. experiment replica."""
 
@@ -435,21 +457,21 @@ class YipExperiment(_Experiment):
         d_to_pos, r_to_pos, d_to_pfam = self._get_d_r_info()
 
         # Compute the protein kernels
-        p_kernels, pp_kernels = self._get_p_kernels(ps, pps, p_to_i, p_to_seq)
-        d_kernels, dd_kernels = self._get_d_kernels(ds, dds, d_to_i, p_to_seq, d_to_pos, d_to_pfam)
-        r_kernels, rr_kernels = self._get_r_kernels(rs, rrs, r_to_i, p_to_seq, r_to_pos)
+        self._get_p_kernels(ps, pps, p_to_i, p_to_seq)
+        self._get_d_kernels(ds, dds, d_to_i, p_to_seq, d_to_pos, d_to_pfam)
+        self._get_r_kernels(rs, rrs, r_to_i, p_to_seq, r_to_pos)
 
         # Get the original fold splits and convert them to indices
-        pp_ts_ids, dd_ts_ids, rr_ts_ids = converter.get_test_sets()
+        pp_folds, dd_folds, rr_folds = converter.get_test_sets()
 
-        pp_folds = []
-        for ids in pp_ts_ids:
-            ts_indices = [pp_to_i[(p1, p2)] for p1, p2 in ids]
-            # XXX is this actually correct???
-            tr_indices = sorted(set(range(len(pps))) - set(ts_indices))
-            pp_folds.append((ts_indices, tr_indices))
+        pp_folds_i = []
+        for k in xrange(len(pp_folds)):
+            pp_test_indices = [pp_to_i[(p1,p2)] for p1,p2 in pp_folds[k]]
+            pp_train_indices = []
+            for l in xrange(len(pp_folds)):
+                pp_train_indices.extend([pp_to_i[(p1,p2)] for p1,p2 in pp_folds[k]
+                                         if k != l])
+            pp_folds_i.append((pp_test_indices, pp_train_indices))
 
-        # Run the experiment
-        print _cls(self), ": running"
-        self._run_mkl(pp_ys, pp_kernels, pp_folds)
-
+        # Test each kernel independently using an SVM
+        self._test_pp_kernels(pp_folds_i, pp_ys)
