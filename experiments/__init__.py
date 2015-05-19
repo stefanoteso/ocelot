@@ -154,6 +154,11 @@ class _Experiment(object):
 
         return kernel, pairwise_kernel
 
+    def _load_kernel(self, relpath, num = None, force_update = False):
+        path = os.path.join(self.dst, relpath)
+        print _cls(self), ": loading '{}'".format(path)
+        return DummyKernel(path + ".txt", num = num, check_psd = False)
+
     @staticmethod
     def _split_vector(ys, tr_indices, ts_indices):
         return ys[np.ix_(tr_indices)], ys[np.ix_(ts_indices)]
