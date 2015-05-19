@@ -24,6 +24,10 @@ class Kernel(object):
     def _normalize(matrix):
         """Returns the normalized kernel matrix.
 
+        NOTE: zero-valued diagonal elements are gracefully dealt with; but
+        negative diagonal elements will lead to NaNs (and asymmetric matrices
+        due to the NaN comparison rules).
+
         .. math::
 
             `\hat{k}_{ij} = k_{ij} / \sqrt{k_ii k_jj}`
@@ -39,7 +43,8 @@ class Kernel(object):
         # which implies that it is safe to turn the infinities to 1, as doing
         # so retains the zeros on the non-diagonal entries.
         invd[np.isinf(invd)] = 1.0
-        return np.multiply(matrix, np.dot(invd.T, invd))
+        matrix = np.multiply(matrix, np.dot(invd.T, invd))
+        return matrix
 
     def compute(self):
         """Computes the kernel matrix.

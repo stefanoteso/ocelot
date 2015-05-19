@@ -14,6 +14,14 @@ class LinearKernel(Kernel):
         phis = np.array(self._entities)
         return np.dot(phis, phis.T)
 
+class RandomKernel(LinearKernel):
+    """A linear kernel over random normally distributed features.
+
+    For debugging only."""
+    def _compute_all(self):
+        phis = np.random.normal(0, 1, size = (len(self), 10))
+        return np.dot(phis, phis.T)
+
 class CorrelationKernel(Kernel):
     """An explicit dot product kernel over z-scores.
 
