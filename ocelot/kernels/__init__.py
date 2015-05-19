@@ -10,7 +10,7 @@ class Kernel(object):
     :param entities: list of arbitrary data entries.
     :param do_normalize: normalize the Gram matrix.
     """
-    def __init__(self, entities, **kwargs):
+    def __init__(self, entities, *args, **kwargs):
         self._entities = entities
         if not (len(self._entities) >= 2):
             raise ValueError("kernels need at least two entities.")
