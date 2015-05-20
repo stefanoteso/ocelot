@@ -36,7 +36,7 @@ def _cls(obj):
     return type(obj).__name__
 
 def _filter_targets(all_targets, targets):
-    if targets == None:
+    if targets is None:
         targets = all_targets
     else:
         for target in targets:
@@ -75,7 +75,7 @@ class FASTA(object):
                 if len(line) == 0:
                     continue
                 elif line[0] == ">":
-                    if header != None:
+                    if not header is None:
                         assert(sequence)
                         yield header, sequence.rstrip("*")
                     header = line[1:]
@@ -222,7 +222,7 @@ class CDHit(object):
             members = None
             for line in fp:
                 if line.startswith(">"):
-                    if members != None:
+                    if not members is None:
                         clusters.append(members)
                     members = set()
                 else:
@@ -425,7 +425,7 @@ class ReProfOutput(object):
         for row in iterate_csv(path, delimiter = "\t", fieldnames = fields,
                                num_skip = 18): # XXX very fragile
             pos = int(row["NO"]) - 1
-            assert old_pos == None or pos == (old_pos + 1)
+            assert old_pos is None or pos == (old_pos + 1)
             old_pos = pos
             results.append([op(row[field]) for field, op in filtered_ops ])
         return results
