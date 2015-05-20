@@ -68,7 +68,7 @@ class CompositionFeatures(object):
     :param targets: list of target composition features (strings).
     """
     def __init__(self, targets = None):
-        if targets == None:
+        if targets is None:
             targets = _COMPOSITION_TARGETS
         self._targets = targets
     def compute(self, sequence):
