@@ -111,7 +111,7 @@ class ColocalizationKernel(Kernel):
                 if i <= j:
                     continue
                 d = np.abs(pos_i - pos_j)
-                if d > max_d or max_d == None:
+                if d > max_d or max_d is None:
                     max_d = d
             # Compute the kernel matrix
             for (i, pos_i), (j, pos_j) in it.product(contexts, contexts):
