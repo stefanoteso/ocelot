@@ -13,7 +13,7 @@ def _checkdir(path):
 
 def _filter_targets(targets, ids):
     """Returns the targets identified by `ids`."""
-    if ids == None:
+    if ids is None:
         ids = targets.keys()
     elif not all(id_ in targets for id_ in ids):
         raise ValueError("invalid target id")
@@ -85,7 +85,7 @@ def _upload_rdf(args):
 
     if not _checkdir(args.src):
         raise ValueError("RDF directory '{}' does not exist".format(args.src))
-    if args.default_graph == None:
+    if args.default_graph is None:
         raise ValueError("upload-rdf requires a valid graph IRI")
 
     print "Uploading contents of '{}' into named graph <{}>".format(args.src, args.default_graph)
@@ -114,7 +114,7 @@ def _clear_graph(args):
 
     :param args.default_graph: default graph IRI.
     """
-    if args.default_graph == None:
+    if args.default_graph is None:
         raise ValueError("clear-rdf requires a valid graph IRI")
 
     with open("ocelot.isql", "wt") as fp:
