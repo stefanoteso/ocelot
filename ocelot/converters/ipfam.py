@@ -113,7 +113,7 @@ class IPfamConverter(Converter):
 
             pfam_acc = O.uri(O.PFAM_ID, row["FAMILY_ACC"])
             triples.append((pfam_acc, O.RDF.type, O.PFAM_ID))
-            if row["FAMILY_TYPE"] == None:
+            if row["FAMILY_TYPE"] is None:
                 continue
             if row["FAMILY_TYPE"]:
                 pfam_type = O.uri(O.PFAM_TYPE, row["FAMILY_TYPE"])
