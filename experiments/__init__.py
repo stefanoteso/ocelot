@@ -83,7 +83,7 @@ class _Experiment(object):
         assert ans and len(ans) and "results" in ans
         for bindings in ans["results"]["bindings"]:
             bindings = { k: self._cast(v) for k, v in bindings.iteritems() }
-            if n != None:
+            if not n is None:
                 assert len(bindings) == n, bindings
             yield bindings
 
