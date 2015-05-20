@@ -51,7 +51,7 @@ class Kernel(object):
 
         Relies on `self._compute_all`.
         """
-        if self._matrix == None:
+        if self._matrix is None:
             self._matrix = self._compute_all()
             if self._do_normalize:
                 self._matrix = self._normalize(self._matrix)
@@ -112,7 +112,7 @@ class DummyKernel(Kernel):
             matrix = arg
         if matrix.shape[0] != matrix.shape[1]:
             raise ValueError("matrix is not symmetric '{}'".format(matrix.shape))
-        if num != None and matrix.shape != (num, num):
+        if not num is None and matrix.shape != (num, num):
             raise ValueError("matrix has invalid shape '{}', was expecting ({},{})".format(matrix.shape, num, num))
         super(DummyKernel, self).__init__(range(matrix.shape[0]),
                                           **kwargs)
