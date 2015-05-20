@@ -128,7 +128,7 @@ class PsiMiTabConverter(CSVConverter):
         :param string: the PSI-MI string list object(s).
         :param unique: checks that the string list has length 1.
         """
-        if string == None:
+        if string is None:
             return
         parts = self._get_parts(string)
         if unique:
@@ -154,7 +154,7 @@ class PsiMiTabConverter(CSVConverter):
 
     def _siphon_bool(self, triples, s, p, string,
                      skip_true = False, skip_false = False):
-        if string == None:
+        if string is None:
             return
         o = { "true" : True, "false" : False }[string]
         if o == True and skip_true:
