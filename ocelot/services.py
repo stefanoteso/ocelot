@@ -3,6 +3,7 @@
 import os, errno, hashlib
 import numpy as np
 import multiprocessing as mp
+import itertools as it
 
 # The amino acid alphabet (sorted lexicographically).
 AMINOACIDS = ("A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P",
@@ -43,6 +44,10 @@ def _filter_targets(all_targets, targets):
             if not target in all_targets:
                 raise ValueError("invalid target '{}'".format(target))
     return targets
+
+def powerset(iterable):
+    l = list(iterable)
+    return it.chain(from_iterable(it.combinations(l, r) for r in xrange(len(l) + 1)))
 
 def iterate_csv(path, num_skip = 0, **kwargs):
     """Thin wrapper around ``csv.DictReader`` with a couple more options."""
