@@ -22,6 +22,24 @@ class RandomKernel(LinearKernel):
         phis = np.random.normal(0, 1, size = (len(self), 10))
         return np.dot(phis, phis.T)
 
+class IntersectionKernel(Kernel):
+    """An explicit intersection kernel.
+
+    .. note::
+
+        SVM implementations optimized for the intersection kernel and other
+        additive kernels (e.g. the chi-square kernel) can run circles around
+        this naive implementation.
+
+    :param entities: list of real-valued vectors (e.g. histograms)."""
+    def _compute_all(self):
+        k = np.zeros((num, num))
+        phis = np.array(self._entities)
+        for i in xrange(phis.shape[0]):
+            for j in xrange(i, phis.shape[0]):
+                k[i,j] = np.sum(np.minimum(phi[i], phi[j]))
+        return k
+
 class CorrelationKernel(Kernel):
     """An explicit dot product kernel over z-scores.
 
