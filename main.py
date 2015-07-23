@@ -145,7 +145,8 @@ def _run_experiment(args):
                                 force_update = args.force_update,
                                 go_aspects = args.go_aspects,
                                 max_go_depth = args.max_go_depth,
-                                min_go_annot = args.min_go_annot)
+                                min_go_annot = args.min_go_annot,
+                                dump_stats = args.dump_stats)
         experiment.run()
 
 def main():
@@ -186,6 +187,8 @@ def main():
                         help="[run-experiment] restrict GO annotations/predictions to terms with at most this depth (default: None)")
     parser.add_argument("--min-go-annot", type=int, default=None,
                         help="[run-experiment] restrict GO annotations/predictions to term with at least this many annotations (default: None)")
+    parser.add_argument("-S", "--dump-stats", action="store_true",
+                        help="[run-experiment] dump statistics along the way (default: False)")
 
     args = parser.parse_args()
 
