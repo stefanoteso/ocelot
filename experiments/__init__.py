@@ -98,12 +98,15 @@ class _Experiment(object):
     def _cached(self, f, relpath, *args, **kwargs):
         relpath += ".pickle"
         try:
-            assert not self.force_update, "updating '{}'".format(relpath)
+            assert not self.force_update, "forced update"
             print _cls(self), ": loading '{}'".format(relpath)
             y = self._depickle(relpath)
         except Exception, e:
-            print _cls(self), ":", e
-            y = f(*args, **kwargs)
+            print _cls(self), ": computing '{}' ({})".format(relpath, e)
+            if callable(f):
+                y = f(*args, **kwargs)
+            else:
+                y = f
             self._pickle(y, relpath)
         return y
 
