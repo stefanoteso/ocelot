@@ -255,11 +255,11 @@ class _Experiment(object):
 
             # Resolve the dependencies
             print _cls(self), ": checking for {}".format(stage.inputs)
-            for input_ in stage.inputs:
-                if not input_ in context:
+            for target in stage.inputs:
+                if not target in context:
 
                     # Resolve the current dependency
-                    outputs = resolve(target_to_stage, input_, context, force_update)
+                    outputs = resolve(target_to_stage, target, context, force_update)
 
                     # Update the context
                     for target in outputs:
@@ -268,23 +268,23 @@ class _Experiment(object):
 
             # Now that all dependencies are satisfied, compute the target
             print _cls(self), ": about to run {}".format(stage.f)
-            results = stage.f(*[context[input_] for input_ in stage.inputs])
+            results = stage.f(*[context[target] for target in stage.inputs])
             assert len(results) == len(stage.outputs), \
                    "declared and actual outputs differ: {} vs {}".format(len(results), len(stage.outputs))
 
             # Prepare the results dictionary and cache them
             ret = {}
-            for output, result in zip(stage.outputs, results):
-                relpath = output + ".pickle"
+            for target, result in zip(stage.outputs, results):
+                relpath = target + ".pickle"
                 print _cls(self), ": saving '{}'".format(relpath)
                 self._pickle(result, relpath)
-                ret[output] = result
+                ret[target] = result
 
             return ret
 
         # Resolve for all targets
         for target in targets:
-            context[target] = resolve(target_to_stage, target, context, self.force_update)
+            resolve(target_to_stage, target, context, self.force_update)
         return context
 
     def run(self):
