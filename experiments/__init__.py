@@ -8,9 +8,12 @@ from modshogun import CombinedKernel, CustomKernel
 from modshogun import BinaryLabels, MKLClassification
 from sklearn.svm import SVC
 from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
+from collections import namedtuple
 
 import ocelot.ontology as O
 from ocelot.services import _cls
+
+Stage = namedtuple("Stage", ["f", "inputs", "outputs"])
 
 class _Experiment(object):
     """Base class for all experiments.
@@ -19,6 +22,7 @@ class _Experiment(object):
     :param dst: destination directory for the results.
     :param endpoint: URI of the SPARQL endpoint.
     :param default_graph: URI of the default graph.
+    :param force_update: whether to discard the cache contents (default: ``False``).
 
     .. todo::
         Add support for standard SVM.
@@ -95,78 +99,78 @@ class _Experiment(object):
         with open(os.path.join(self.dst, path), "rb") as fp:
             return pickle.load(fp)
 
-    def _cached(self, f, relpath, *args, **kwargs):
-        relpath += ".pickle"
-        try:
-            assert not self.force_update, "forced update"
-            print _cls(self), ": loading '{}'".format(relpath)
-            y = self._depickle(relpath)
-        except Exception, e:
-            print _cls(self), ": computing '{}' ({})".format(relpath, e)
-            if callable(f):
-                y = f(*args, **kwargs)
-            else:
-                y = f
-            self._pickle(y, relpath)
-        return y
-
-    def _cached_kernel(self, K, num, relpath, *args, **kwargs):
-        """Loads a kernel from disk, or computes it if necessary.
-
-        :param K: kernel class.
-        :param num: number of entities.
-        :param relpath: path to the Gram matrix relative to the experiment destination directory.
-        :param tol: non-PSD tolerance (default: ``1e-10``).
-        :param do_pairwise: whether to compute the corresponding pairwise kernel (default: ``False).
-        :param pairs: indices of pairs to compute the pairwise kernel for.
-        :param pairwise_op: pairwise operation to performn (default: ``"product"``).
-        """
-        path = os.path.join(self.dst, relpath)
-        force_update = False
-        try:
-            print _cls(self), ": loading '{}'".format(path)
-            assert not self.force_update, "update forced by user"
-            kernel = DummyKernel(path + ".txt", num = num, check_psd = True)
-        except Exception, e:
-            print _cls(self), "|", e
-            print _cls(self), ": computing '{}'".format(path)
-            kernel = K(*args, **kwargs)
-            kernel.check_and_fixup(kwargs.get("tol", 1e-10))
-            kernel.save(path + ".txt")
-            kernel.draw(path + ".png")
-            force_update = True
-
-        do_pairwise = kwargs.get("do_pairwise", False)
-        if not do_pairwise:
-            return kernel
-
-        pairwise_path = path + "-pairwise"
-        try:
-            print _cls(self), ": loading '{}'".format(pairwise_path)
-            assert not self.force_update, "update forced by user"
-            assert not force_update, "sub-kernel updated, forcing update"
-            pairwise_kernel = DummyKernel(pairwise_path + ".txt", check_psd = True)
-        except Exception, e:
-            print _cls(self), "|", e
-            print _cls(self), ": computing '{}'".format(pairwise_path)
-            pairwise_kernel = PairwiseKernel(kwargs.get("pairs"), kernel,
-                                             op = kwargs.get("pairwise_op", "product"))
-            pairwise_kernel.check_and_fixup(kwargs.get("tol", 1e-10))
-            pairwise_kernel.save(pairwise_path + ".txt")
-            pairwise_kernel.draw(pairwise_path + ".png")
-
-        return kernel, pairwise_kernel
-
-    def _load_kernel(self, relpath, num = None, force_update = False):
-        path = os.path.join(self.dst, relpath)
-        print _cls(self), ": loading '{}'".format(path)
-        return DummyKernel(path + ".txt", num = num, check_psd = False)
-
-    def _compute_average_kernel(self, relpaths):
-        matrix = self._load_kernel(relpaths[0]).compute()
-        for relpath in relpaths[1:]:
-            matrix += self._load_kernel(relpath).compute()
-        return matrix * (1.0 / len(relpaths))
+#    def _cached(self, f, relpath, *args, **kwargs):
+#        relpath += ".pickle"
+#        try:
+#            assert not self.force_update, "forced update"
+#            print _cls(self), ": loading '{}'".format(relpath)
+#            y = self._depickle(relpath)
+#        except Exception, e:
+#            print _cls(self), ": computing '{}' ({})".format(relpath, e)
+#            if callable(f):
+#                y = f(*args, **kwargs)
+#            else:
+#                y = f
+#            self._pickle(y, relpath)
+#        return y
+#
+#    def _cached_kernel(self, K, num, relpath, *args, **kwargs):
+#        """Loads a kernel from disk, or computes it if necessary.
+#
+#        :param K: kernel class.
+#        :param num: number of entities.
+#        :param relpath: path to the Gram matrix relative to the experiment destination directory.
+#        :param tol: non-PSD tolerance (default: ``1e-10``).
+#        :param do_pairwise: whether to compute the corresponding pairwise kernel (default: ``False).
+#        :param pairs: indices of pairs to compute the pairwise kernel for.
+#        :param pairwise_op: pairwise operation to performn (default: ``"product"``).
+#        """
+#        path = os.path.join(self.dst, relpath)
+#        force_update = False
+#        try:
+#            print _cls(self), ": loading '{}'".format(path)
+#            assert not self.force_update, "update forced by user"
+#            kernel = DummyKernel(path + ".txt", num = num, check_psd = True)
+#        except Exception, e:
+#            print _cls(self), "|", e
+#            print _cls(self), ": computing '{}'".format(path)
+#            kernel = K(*args, **kwargs)
+#            kernel.check_and_fixup(kwargs.get("tol", 1e-10))
+#            kernel.save(path + ".txt")
+#            kernel.draw(path + ".png")
+#            force_update = True
+#
+#        do_pairwise = kwargs.get("do_pairwise", False)
+#        if not do_pairwise:
+#            return kernel
+#
+#        pairwise_path = path + "-pairwise"
+#        try:
+#            print _cls(self), ": loading '{}'".format(pairwise_path)
+#            assert not self.force_update, "update forced by user"
+#            assert not force_update, "sub-kernel updated, forcing update"
+#            pairwise_kernel = DummyKernel(pairwise_path + ".txt", check_psd = True)
+#        except Exception, e:
+#            print _cls(self), "|", e
+#            print _cls(self), ": computing '{}'".format(pairwise_path)
+#            pairwise_kernel = PairwiseKernel(kwargs.get("pairs"), kernel,
+#                                             op = kwargs.get("pairwise_op", "product"))
+#            pairwise_kernel.check_and_fixup(kwargs.get("tol", 1e-10))
+#            pairwise_kernel.save(pairwise_path + ".txt")
+#            pairwise_kernel.draw(pairwise_path + ".png")
+#
+#        return kernel, pairwise_kernel
+#
+#    def _load_kernel(self, relpath, num = None, force_update = False):
+#        path = os.path.join(self.dst, relpath)
+#        print _cls(self), ": loading '{}'".format(path)
+#        return DummyKernel(path + ".txt", num = num, check_psd = False)
+#
+#    def _compute_average_kernel(self, relpaths):
+#        matrix = self._load_kernel(relpaths[0]).compute()
+#        for relpath in relpaths[1:]:
+#            matrix += self._load_kernel(relpath).compute()
+#        return matrix * (1.0 / len(relpaths))
 
     @staticmethod
     def _split_vector(ys, tr_indices, ts_indices):
@@ -212,8 +216,74 @@ class _Experiment(object):
     def eval_mkl(self, folds, ys, kernels, c = 1.0):
         raise NotImplementedError
 
+    def _make(self, stages, targets, context={}):
+        """Make-like functionality based on "stages"."""
+
+        # Map dependencies to stages
+        target_to_stage = {}
+        for stage in stages:
+            for target in stage.outputs:
+                assert not target in target_to_stage, \
+                       "two stages produce the same target '{}'".format(target)
+                target_to_stage[target] = stage
+
+        def resolve(target_to_stage, target, context, force_update):
+            stage = target_to_stage[target]
+
+            # Try to load from the cache (avoids to recur deeper in the
+            # dependency graph if all dependencies are satisfied)
+            ret, loaded_all = {}, True
+            for target in stage.outputs:
+                relpath = target + ".pickle"
+                try:
+                    assert not force_update, "forced update"
+                    print _cls(self), ": loading '{}'".format(relpath)
+                    ret[target] = self._depickle(relpath)
+                except Exception, e:
+                    print _cls(self), ": failed to load '{}' ({}), recursing deeper...".format(relpath, e)
+                    loaded_all = False
+                    break
+
+            if loaded_all:
+                return ret
+            del ret
+
+            # Resolve the dependencies
+            print _cls(self), ": checking for {}".format(stage.inputs)
+            for input_ in stage.inputs:
+                if not input_ in context:
+
+                    # Resolve the current dependency
+                    outputs = resolve(target_to_stage, input_, context, force_update)
+
+                    # Update the context
+                    for target in outputs:
+                        assert not target in context
+                    context.update(outputs)
+
+            # Now that all dependencies are satisfied, compute the target
+            print _cls(self), ": about to run {}".format(stage.f)
+            results = stage.f(*[context[input_] for input_ in stage.inputs])
+            assert len(results) == len(stage.outputs), \
+                   "declared and actual outputs differ: {} vs {}".format(len(results), len(stage.outputs))
+
+            # Prepare the results dictionary and cache them
+            ret = {}
+            for output, result in zip(stage.outputs, results):
+                relpath = output + ".pickle"
+                print _cls(self), ": saving '{}'".format(relpath)
+                self._pickle(result, relpath)
+                ret[output] = result
+
+            return ret
+
+        # Resolve for all targets
+        for target in targets:
+            context[target] = resolve(target_to_stage, target, context, self.force_update)
+        return context
+
     def run(self):
-        raise NotImplementedError
+        raise NotImplementedError()
 
 from yip09 import *
 from sgd import *
