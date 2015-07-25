@@ -216,6 +216,11 @@ class _Experiment(object):
     def eval_mkl(self, folds, ys, kernels, c = 1.0):
         raise NotImplementedError
 
+    def _compute_kernel(self, Kernel, *args, **kwargs):
+        kernel = Kernel(*args, **kwargs)
+        kernel.check_and_fixup(kwargs.get("tol", 1e-10))
+        return kernel.compute(),
+
     def _make(self, stages, targets, context={}):
         """Make-like functionality based on "stages"."""
 
