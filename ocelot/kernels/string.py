@@ -1,5 +1,6 @@
 # -*- coding: utf8 -*-
 
+import os
 import numpy as np
 from scipy import sparse
 from ocelot.services import AMINOACIDS, PSSM
