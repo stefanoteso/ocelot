@@ -91,14 +91,14 @@ class _Experiment(object):
                 assert len(bindings) == n, bindings
             yield bindings
 
-    def _pickle(self, what, path):
-        with open(os.path.join(self.dst, path), "wb") as fp:
-            pickle.dump(what, fp)
-
-    def _depickle(self, path):
-        with open(os.path.join(self.dst, path), "rb") as fp:
-            return pickle.load(fp)
-
+#    def _pickle(self, what, path):
+#        with open(os.path.join(self.dst, path), "wb") as fp:
+#            pickle.dump(what, fp)
+#
+#    def _depickle(self, path):
+#        with open(os.path.join(self.dst, path), "rb") as fp:
+#            return pickle.load(fp)
+#
 #    def _cached(self, f, relpath, *args, **kwargs):
 #        relpath += ".pickle"
 #        try:
@@ -221,6 +221,82 @@ class _Experiment(object):
         kernel.check_and_fixup(kwargs.get("tol", 1e-10))
         return kernel.compute(),
 
+    def _resolve_save(self, basename, what):
+        relpath = os.path.join(self.dst, basename)
+        print _cls(self), ": saving '{}'".format(relpath)
+        try:
+            what.dump(relpath + ".npy")
+            return
+        except:
+            # Not a numpy object
+            pass
+        try:
+            with open(relpath + ".pickle", "wb") as fp:
+                pickle.dump(what, fp)
+            return
+        except:
+            pass
+        raise IOError("can not save '{}'".format(relpath))
+
+    def _resolve_load(self, basename):
+        relpath = os.path.join(self.dst, basename)
+        # Try to load a pickled file
+        try:
+            with open(relpath + ".pickle", "rb") as fp:
+                return pickle.load(fp)
+        except:
+            pass
+        # Try to load a numpy array
+        try:
+            with open(relpath + ".npy", "rb") as fp:
+                return pickle.load(fp)
+        except:
+            pass
+        raise IOError("can not load '{}'".format(relpath))
+
+    def _resolve(self, target_to_stage, target, context, force_update):
+        stage = target_to_stage[target]
+
+        # Try to load from the cache: if all dependencies are cached, we
+        # do not want to recurse deeper in the dependency graph
+        if not force_update:
+            ret, loaded_all = {}, True
+            for output in stage.outputs:
+                try:
+                    ret[output] = self._resolve_load(output)
+                except Exception, e:
+                    print _cls(self), ": failed to load dependency ({}), recursing".format(e)
+                    loaded_all = False
+            if loaded_all:
+                return ret
+
+        # Resolve the dependencies
+        print _cls(self), ": resolving dependencies for {}".format(target)
+        for input_ in stage.inputs:
+            if not input_ in context:
+
+                # Resolve the current dependency
+                outputs = self._resolve(target_to_stage, input_, context, force_update)
+
+                # Update the context
+                for input_ in outputs:
+                    assert not input_ in context
+                context.update(outputs)
+
+        # Now that all dependencies are satisfied, compute the target
+        print _cls(self), ": about to run {}".format(stage.f)
+        results = stage.f(*[context[input_] for input_ in stage.inputs])
+        assert len(results) == len(stage.outputs), \
+               "declared and actual outputs differ: {} vs {}".format(len(results), len(stage.outputs))
+
+        # Prepare the results dictionary and cache them
+        ret = {}
+        for output, result in zip(stage.outputs, results):
+            self._resolve_save(output, result)
+            ret[output] = result
+
+        return ret
+
     def _make(self, stages, targets, context={}):
         """Make-like functionality based on "stages"."""
 
@@ -232,59 +308,9 @@ class _Experiment(object):
                        "two stages produce the same target '{}'".format(target)
                 target_to_stage[target] = stage
 
-        def resolve(target_to_stage, target, context, force_update):
-            stage = target_to_stage[target]
-
-            # Try to load from the cache (avoids to recur deeper in the
-            # dependency graph if all dependencies are satisfied)
-            ret, loaded_all = {}, True
-            for target in stage.outputs:
-                relpath = target + ".pickle"
-                try:
-                    assert not force_update, "forced update"
-                    print _cls(self), ": loading '{}'".format(relpath)
-                    ret[target] = self._depickle(relpath)
-                except Exception, e:
-                    print _cls(self), ": failed to load '{}' ({}), recursing deeper...".format(relpath, e)
-                    loaded_all = False
-                    break
-
-            if loaded_all:
-                return ret
-            del ret
-
-            # Resolve the dependencies
-            print _cls(self), ": checking for {}".format(stage.inputs)
-            for target in stage.inputs:
-                if not target in context:
-
-                    # Resolve the current dependency
-                    outputs = resolve(target_to_stage, target, context, force_update)
-
-                    # Update the context
-                    for target in outputs:
-                        assert not target in context
-                    context.update(outputs)
-
-            # Now that all dependencies are satisfied, compute the target
-            print _cls(self), ": about to run {}".format(stage.f)
-            results = stage.f(*[context[target] for target in stage.inputs])
-            assert len(results) == len(stage.outputs), \
-                   "declared and actual outputs differ: {} vs {}".format(len(results), len(stage.outputs))
-
-            # Prepare the results dictionary and cache them
-            ret = {}
-            for target, result in zip(stage.outputs, results):
-                relpath = target + ".pickle"
-                print _cls(self), ": saving '{}'".format(relpath)
-                self._pickle(result, relpath)
-                ret[target] = result
-
-            return ret
-
         # Resolve for all targets
         for target in targets:
-            resolve(target_to_stage, target, context, self.force_update)
+            self._resolve(target_to_stage, target, context, self.force_update)
         return context
 
     def run(self):
