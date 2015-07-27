@@ -2,6 +2,7 @@
 
 import numpy as np
 import itertools as it
+from collections import defaultdict
 
 from . import Kernel
 
@@ -115,10 +116,8 @@ class ColocalizationKernel(Kernel):
 
     def _compute_all(self):
         # Group the contexts by chromosome
-        chromosome_to_contexts = {}
+        chromosome_to_contexts = defaultdict(list)
         for i, (chromosome, pos) in enumerate(self._entities):
-            if not chromosome in chromosome_to_contexts:
-                chromosome_to_contexts[chromosome] = []
             chromosome_to_contexts[chromosome].append((i, pos))
 
         matrix = np.zeros((len(self), len(self)))
@@ -131,6 +130,7 @@ class ColocalizationKernel(Kernel):
                 d = np.abs(pos_i - pos_j)
                 if d > max_d or max_d is None:
                     max_d = d
+            assert not max_d is None, "can not determine max distance between contexts"
             # Compute the kernel matrix
             for (i, pos_i), (j, pos_j) in it.product(contexts, contexts):
                 if i < j:
