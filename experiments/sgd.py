@@ -357,21 +357,25 @@ class SGDExperiment(_Experiment):
         pi = list(np.random.permutation(len(l)))
         return [l[pi[i]] for i in xrange(len(l))]
 
-    def _get_folds(self, pp_pos, p_to_terms, num_folds = 10):
+    def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_terms, num_folds=10):
         """Generates the folds.
 
         The interactions are split into folds according to their functions.
         No two protein-protein interactions can occur in two distinct folds.
 
-        :param pp_pos: list of interactions.
+        :param pp_pos_hq: high-quality positive interactions.
+        :param pp_pos_lq: low-quality positive interactions, if any.
         :param p_to_terms: map between proteins and ``GOTerm``'s.
         :param num_folds: number of folds to generate (default: ``10``).
         :returns: a list of sets of protein pairs.
         """
+        assert isinstance(pp_pos_hq, set)
+        assert isinstance(pp_pos_lq, set)
+
         # Map from protein pairs to the GO terms that either protein is
         # annotated with
         pp_to_terms = {(p1,p2): (set(p_to_terms[p1]) | set(p_to_terms[p2]))
-                       for p1, p2 in pp_pos}
+                       for p1, p2 in pp_pos_hq}
 
         # Map from GO terms to protein pairs
         term_to_pps = {}
@@ -415,7 +419,7 @@ class SGDExperiment(_Experiment):
                     pps_to_add.add((p1, p2))
             folds = self._permute(folds)
             for i, (p1, p2) in enumerate(pps_to_add):
-                folds[i % num_folds].update([(p1, p2), (p2, p1)])
+                folds[i % num_folds].update([(p1, p2, True), (p2, p1, True)])
 
             # Update term_to_pps
             new_term_to_pps = {}
@@ -431,10 +435,12 @@ class SGDExperiment(_Experiment):
                 new_term_to_pps[term] = new_term_pps
             term_to_pps = new_term_to_pps
 
-        # Sanity checks
+        # Check that interactions are symmetric
         for fold in folds:
-            for p1, p2 in fold:
+            for p1, p2, _ in fold:
                 assert (p2, p1) in fold
+
+        # Check that no pair occurs in distinct folds
         for (k1, fold1), (k2, fold2) in it.product(enumerate(folds), enumerate(folds)):
             assert k1 == k2 or len(fold1 & fold2) == 0
 
@@ -447,35 +453,21 @@ class SGDExperiment(_Experiment):
             print " |fold{}| = {}, l1 distance from perfect GO term counts = {}" \
                 .format(k, len(fold), np.linalg.norm((average - counts), ord = 1))
 
-        return folds
+        # Now that we partitioned all interactions into folds, let's add the
+        # negatives interactions -- by sampling them at random
+        for fold in folds:
+            ps_in_fold = set(p for p, _ in fold) | set(p for _, p in fold)
 
-    def _add_negatives(self, pos_folds, pp_not_neg):
-        """Computes folds where negatives are randomly sampled from the
-        non-positives.
-
-        :param pos_folds: list of sets of pairs of positive interactions.
-        :param pp_not_neg: set of low-quality positive interactions (non-negatives).
-        :returns: list of sets of triples of the form (p1, p2, are_bound).
-        """
-        assert isinstance(pp_not_neg, set)
-
-        folds = []
-        for pos_fold in pos_folds:
             # Compute the candidate negative pairs
-            fold_ps = set(p1 for p1, p2 in pos_fold) | \
-                      set(p2 for p1, p2 in pos_fold)
-            candidate_neg_pps = list(set(it.product(fold_ps, fold_ps)) - pp_not_neg)
+            candidate_neg_pps = list(set(it.product(ps_in_fold, ps_in_fold)) - pp_pos_lq)
 
             # Randomly sample a number of negative pairs equal to the number of
             # positives pairs
-            pi = np.random.permutation(len(pos_fold))
-            neg_fold = set(candidate_neg_pps[pi[i]] for i in xrange(len(fold_ps)))
+            pi = np.random.permutation(len(fold))
+            sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(fold))
 
             # Assemble the fold
-            fold = set()
-            fold.update((p1, p2, 1) for p1, p2 in pos_fold)
-            fold.update((p1, p2, 0) for p1, p2 in neg_fold)
-            folds.append(fold)
+            fold.update((p1, p2, False) for p1, p2 in neg_fold)
 
         return folds
 
@@ -767,11 +759,8 @@ class SGDExperiment(_Experiment):
             Stage(self._get_sgd_pins,
                   ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
 
-            Stage(self._get_folds,
-                  ['pp_pos_hq', 'filtered_p_to_term_ids'], ['pos_folds']),
-
-            Stage(self._add_negatives,
-                  ['pos_folds', 'pp_pos_lq'], ['folds']),
+            Stage(self._compute_folds,
+                  ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'], ['folds']),
         )
 
         TARGETS = (
