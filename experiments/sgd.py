@@ -357,6 +357,39 @@ class SGDExperiment(_Experiment):
         pi = list(np.random.permutation(len(l)))
         return [l[pi[i]] for i in xrange(len(l))]
 
+    @staticmethod
+    def _check_folds_are_sane(folds):
+
+        # Check that interactions are symmetric
+        for fold in folds:
+            for p1, p2, state in fold:
+                assert (p2, p1, state) in fold
+
+        # Check that folds do not overlap
+        for (k1, fold1), (k2, fold2) in it.product(enumerate(folds), enumerate(folds)):
+            if k1 == k2:
+                continue
+            for p1, p2, state in fold1:
+                for q1, q2, state in fold2:
+                    assert (p1, p2) != (q1, q2)
+
+        # Check that no pair occurs in both states
+        interactions = set()
+        for fold in folds:
+            interactions.update(fold)
+        for p1, p2, state in interactions:
+            assert not (p1, p2, not state) in interactions
+
+    def _print_fold_quality(self, folds, pp_to_terms, all_pp_terms, average):
+        # Evaluate the fold quality
+        for k, fold in enumerate(folds):
+            counts = np.zeros((len(all_pp_terms),))
+            for pp in fold:
+                for term in pp_to_terms[pp]:
+                    counts[term_to_i[term]] += 1
+            print _cls(self), " |fold{}| = {}, L1 distance from average term counts = {}" \
+                .format(k, len(fold), np.linalg.norm((average - counts), ord = 1))
+
     def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_terms, num_folds=10):
         """Generates the folds.
 
@@ -408,7 +441,7 @@ class SGDExperiment(_Experiment):
             # Pick the term with the least unprocessed protein-protein pairs
             cur_term, cur_pps = min(term_to_pps.iteritems(),
                                     key = lambda term_pps: len(term_pps[1]))
-            print "best term: {} (num pairs = {})".format(cur_term, len(cur_pps))
+            print _cls(self), "best term: {} (num pairs = {})".format(cur_term, len(cur_pps))
             # Evenly distribute the associated protein-protein pairs among all
             # folds, taking into account the fact that if (p1, p2) is in
             # cur_pps, then (p2, p1) is in cur_pps as well. Also, make sure
@@ -435,23 +468,10 @@ class SGDExperiment(_Experiment):
                 new_term_to_pps[term] = new_term_pps
             term_to_pps = new_term_to_pps
 
-        # Check that interactions are symmetric
-        for fold in folds:
-            for p1, p2, _ in fold:
-                assert (p2, p1) in fold
+        self._check_folds_are_sane(folds)
 
-        # Check that no pair occurs in distinct folds
-        for (k1, fold1), (k2, fold2) in it.product(enumerate(folds), enumerate(folds)):
-            assert k1 == k2 or len(fold1 & fold2) == 0
-
-        # Evaluate the fold quality
-        for k, fold in enumerate(folds):
-            counts = np.zeros((len(all_pp_terms),))
-            for pp in fold:
-                for term in pp_to_terms[pp]:
-                    counts[term_to_i[term]] += 1
-            print " |fold{}| = {}, l1 distance from perfect GO term counts = {}" \
-                .format(k, len(fold), np.linalg.norm((average - counts), ord = 1))
+        print _cls(self), ": fold quality (positives only):"
+        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, average)
 
         # Now that we partitioned all interactions into folds, let's add the
         # negatives interactions -- by sampling them at random
@@ -468,6 +488,11 @@ class SGDExperiment(_Experiment):
 
             # Assemble the fold
             fold.update((p1, p2, False) for p1, p2 in neg_fold)
+
+        self._check_folds_are_sane(folds)
+
+        print _cls(self), ": fold quality:"
+        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, average)
 
         return folds
 
