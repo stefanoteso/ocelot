@@ -677,34 +677,6 @@ class SGDExperiment(_Experiment):
 
         return ps, p_to_feat, p_to_seq, p_to_term_ids
 
-    def _load_go_dag_and_propagate(self, p_to_term_ids):
-        # Load the GO OBO file
-        dag = GODag(os.path.join(self.src, "GO", "go-basic.obo"))
-
-        # Fill in the GO data structure with the protein annotations and
-        # propagate them to the root
-        propagated_p_to_term_ids = self._cached(dag.annotate,
-                                               "sgd_id_to_fun_propagated",
-                                                p_to_term_ids,
-                                                propagate=True)
-
-        dag = self._cached(dag, "dag_propagated")
-
-        print _cls(self), ": '{}' annotations in the DAG" \
-                            .format(sum(len(dag._id_to_term[term_id].proteins)
-                                        for term_id in dag._id_to_term.iterkeys()))
-        tot_increase = 0.0
-        for p in p_to_term_ids:
-            tot_increase += len(propagated_p_to_term_ids[p]) / float(len(p_to_term_ids[p]))
-
-        print _cls(self), ": propagated GO annotations, average increase is '{}'" \
-                            .format(tot_increase / len(p_to_term_ids))
-
-        aspect_to_ps = dag.get_proteins_by_aspect()
-        print _cls(self), ": annotations by aspect: {}".format([(aspect, len(ps)) for aspect, ps in aspect_to_ps.iteritems()])
-
-        return dag, propagated_p_to_term_ids
-
     def _filter_ps(self, ps, p_to_seq, min_sequence_len, cdhit_threshold):
         """Filter out short sequences and cluster them with CD-HIT."""
 
@@ -725,15 +697,34 @@ class SGDExperiment(_Experiment):
 
         return filtered_ps,
 
-    def _filter_dag(self, propagated_dag, propagated_p_to_term_ids, filtered_ps):
-        """Filter out unwanted GO terms."""
+    def _load_go_and_filter(self, filtered_ps, p_to_term_ids):
+        """Load the GO OBO file, fill it in, and prune it."""
 
-        filtered_p_to_term_ids = self._cached(propagated_dag.preprocess,
-                                              "filtered_p_to_term_ids",
-                                              filtered_ps,
-                                              aspects = self._go_aspects,
-                                              min_annot = self._min_go_annot,
-                                              max_depth = self._max_go_depth)
+        # Load the GO OBO file
+        dag = GODag(os.path.join(self.src, "GO", "go-basic.obo"))
+
+        # Fill in the GO data structure with the protein annotations and
+        # propagate them to the root
+        propagated_p_to_term_ids = dag.annotate(p_to_term_ids, propagate=True)
+
+        print _cls(self), ": '{}' annotations in the DAG" \
+                            .format(sum(len(dag._id_to_term[term_id].proteins)
+                                        for term_id in dag._id_to_term.iterkeys()))
+        tot_increase = 0.0
+        for p in p_to_term_ids:
+            tot_increase += len(propagated_p_to_term_ids[p]) / float(len(p_to_term_ids[p]))
+
+        print _cls(self), ": propagated GO annotations, average increase is '{}'" \
+                            .format(tot_increase / len(p_to_term_ids))
+
+        aspect_to_ps = dag.get_proteins_by_aspect()
+        print _cls(self), ": annotations by aspect: {}".format([(aspect, len(ps)) for aspect, ps in aspect_to_ps.iteritems()])
+
+        filtered_p_to_term_ids = dag.preprocess(filtered_ps,
+                                                aspects = self._go_aspects,
+                                                min_annot = self._min_go_annot,
+                                                max_depth = self._max_go_depth)
+
         return dag, filtered_p_to_term_ids
 
     def run(self, min_sequence_len=50, cdhit_threshold=0.75, dump_stats=False):
@@ -767,12 +758,8 @@ class SGDExperiment(_Experiment):
             Stage(self._compute_p_pssm_kernel,
                   ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
 
-            Stage(self._load_go_dag_and_propagate,
-                  ['p_to_term_ids'],
-                  ['propagated_dag', 'propagated_p_to_term_ids']),
-
-            Stage(self._filter_dag,
-                  ['propagated_dag', 'propagated_p_to_term_ids', 'filtered_ps'],
+            Stage(self._load_go_and_filter,
+                  ['filtered_ps', 'p_to_term_ids'],
                   ['filtered_dag', 'filtered_p_to_term_ids']),
 
             Stage(self._get_sgd_pins,
@@ -787,7 +774,7 @@ class SGDExperiment(_Experiment):
         )
 
         TARGETS = (
-            'pp_pos_hq', 'pp_pos_lq'
+            'folds',
         )
 
         context = {
