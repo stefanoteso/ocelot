@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import itertools as it
+from collections import defaultdict
 from ocelot.services import _cls, CDHit
 from ocelot.go import GODag, GOTerm
 from ocelot.kernels import *
@@ -374,12 +375,12 @@ class SGDExperiment(_Experiment):
         for p1, p2, state in interactions:
             assert not (p1, p2, not state) in interactions
 
-    def _print_fold_quality(self, folds, pp_to_terms, all_pp_terms, average):
+    def _print_fold_quality(self, folds, pp_to_terms, all_pp_terms, term_to_i, average):
         # Evaluate the fold quality
         for k, fold in enumerate(folds):
             counts = np.zeros((len(all_pp_terms),))
-            for pp in fold:
-                for term in pp_to_terms[pp]:
+            for p1, p2, _ in fold:
+                for term in pp_to_terms[(p1, p2)]:
                     counts[term_to_i[term]] += 1
             print _cls(self), " |fold{}| = {}, L1 distance from average term counts = {}" \
                 .format(k, len(fold), np.linalg.norm((average - counts), ord = 1))
@@ -399,19 +400,15 @@ class SGDExperiment(_Experiment):
         assert isinstance(pp_pos_hq, set)
         assert isinstance(pp_pos_lq, set)
 
-        # Map from protein pairs to the GO terms that either protein is
-        # annotated with
+        # Map from protein *pairs* to the GO terms that either protein is
+        # annotated with, and vice-versa
         pp_to_terms = {(p1,p2): (set(p_to_terms[p1]) | set(p_to_terms[p2]))
                        for p1, p2 in pp_pos_hq}
 
-        # Map from GO terms to protein pairs
-        term_to_pps = {}
-        for (p1, p2), terms in pp_to_terms.iteritems():
+        term_to_pps = defaultdict(set)
+        for pp, terms in pp_to_terms.iteritems():
             for term in terms:
-                if not term in term_to_pps:
-                    term_to_pps[term] = set([(p1, p2)])
-                else:
-                    term_to_pps[term].add((p1, p2))
+                term_to_pps[term].add(pp)
 
         # Gather all GO terms and assign them an index
         all_pp_terms = term_to_pps.keys()
@@ -435,7 +432,8 @@ class SGDExperiment(_Experiment):
             # Pick the term with the least unprocessed protein-protein pairs
             cur_term, cur_pps = min(term_to_pps.iteritems(),
                                     key = lambda term_pps: len(term_pps[1]))
-            print _cls(self), "best term: {} (num pairs = {})".format(cur_term, len(cur_pps))
+            print _cls(self), ": best term: {} (num pairs = {})".format(cur_term, len(cur_pps))
+
             # Evenly distribute the associated protein-protein pairs among all
             # folds, taking into account the fact that if (p1, p2) is in
             # cur_pps, then (p2, p1) is in cur_pps as well. Also, make sure
@@ -465,12 +463,12 @@ class SGDExperiment(_Experiment):
         self._check_folds_are_sane(folds)
 
         print _cls(self), ": fold quality (positives only):"
-        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, average)
+        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, term_to_i, average)
 
         # Now that we partitioned all interactions into folds, let's add the
         # negatives interactions -- by sampling them at random
         for fold in folds:
-            ps_in_fold = set(p for p, _ in fold) | set(p for _, p in fold)
+            ps_in_fold = set(p for p, _, _ in fold) | set(p for _, p, _ in fold)
 
             # Compute the candidate negative pairs
             candidate_neg_pps = list(set(it.product(ps_in_fold, ps_in_fold)) - pp_pos_lq)
@@ -481,12 +479,13 @@ class SGDExperiment(_Experiment):
             sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(fold)))
 
             # Assemble the fold
-            fold.update((p1, p2, False) for p1, p2 in neg_fold)
+            fold.update((p1, p2, False) for p1, p2 in sampled_neg_pps)
+            fold.update((p2, p1, False) for p1, p2 in sampled_neg_pps)
 
         self._check_folds_are_sane(folds)
 
         print _cls(self), ": fold quality:"
-        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, average)
+        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, term_to_i, average)
 
         return folds
 
