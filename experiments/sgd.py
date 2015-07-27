@@ -705,9 +705,12 @@ class SGDExperiment(_Experiment):
         # Cluster the filtered sequences with CD-HIT
         filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
         _, clusters = CDHit().run(filtered_p_seq, threshold = cdhit_threshold)
-        filtered_ps = [list(cluster)[0][0] for cluster in clusters]
         print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
                 .format(len(clusters), cdhit_threshold)
+
+        # Take one protein from each cluster
+        filtered_ps = [list(cluster)[0][0] for cluster in clusters]
+        print _cls(self), ": there are {} filtered proteins".format(len(filtered_ps))
 
         return filtered_ps,
 
