@@ -8,7 +8,7 @@ import itertools as it
 from ocelot.services import _cls, CDHit
 from ocelot.go import GODag, GOTerm
 from ocelot.kernels import *
-from . import _Experiment
+from . import _Experiment, Stage
 from .yeast import *
 
 class SGDExperiment(_Experiment):
@@ -66,7 +66,7 @@ class SGDExperiment(_Experiment):
             sgd_id_to_seq[sgd_id] = bindings[u"seq"]
         return sgd_id_to_seq
 
-    def _get_sgd_id_to_fun(self):
+    def _get_sgd_id_to_term_ids(self):
         query = """
         SELECT ?orf ?fun
         FROM <{default_graph}>
@@ -327,60 +327,30 @@ class SGDExperiment(_Experiment):
         sys.exit(1)
         return dd_pos
 
-    def _compute_protein_kernels(self, ps, p_to_feat, p_to_seq, folds):
-        """Computes all the kernels and pairwise kernels for proteins.
-
-        The order in which objects are passed in is preserved.
-
-        :param ps: list of protein ORF IDs.
-        :param p_to_feat: map from protein ORF ID to protein feature ID.
-        :param p_to_seq: map from protein ORF ID to protein sequence.
-        :param folds: list of folds, each a list (p1, p2, label) pairs.
-        """
-        pps = set()
-        for fold in folds:
-            pps.update((p1, p2) for p1, p2, _ in fold)
-        pps = sorted(pps)
-
-        p_to_i = {p: i for i, p in enumerate(ps)}
-        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in pps]
-        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
-
-        p_to_context = self._cached(self._get_sgd_id_to_context,
-                                    "sgd_id_to_context")
+    def _compute_p_colocalization_kernel(self, ps):
+        p_to_context = self._get_sgd_id_to_context()
         contexts = [p_to_context[p] for p in ps]
+        return self._compute_kernel(ColocalizationKernel, contexts, gamma=1.0)
 
-        self._cached_kernel(ColocalizationKernel, len(ps),
-                            "p-colocalization-kernel",
-                            contexts, gamma = 1.0,
-                            do_pairwise = True, pairs = pp_indices)
+    def _compute_p_gene_expression_kernel(self, ps, p_to_feat):
+        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
+        return self._compute_kernel(SGDGeneExpressionKernel,
+                                    feat_to_i, self.src, 
+                                    ["Gasch_2000_PMID_11102521",
+                                     "Spellman_1998_PMID_9843569"])
 
-        self._cached_kernel(SGDGeneExpressionKernel, len(ps),
-                            "p-gene-expression-kernel",
-                            feat_to_i, self.src,
-                            ["Gasch_2000_PMID_11102521",
-                             "Spellman_1998_PMID_9843569"],
-                            do_pairwise = True, pairs = pp_indices)
+    def _compute_p_complex_kernel(self, ps, p_to_feat):
+        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
+        return self._compute_kernel(YeastProteinComplexKernel,
+                                    feat_to_i, self.src)
 
-        self._cached_kernel(YeastProteinComplexKernel, len(ps),
-                            "p-complex-kernel",
-                            feat_to_i, self.src,
-                            do_pairwise = True, pairs = pp_indices)
+    def _compute_p_interpro_kernel(self, ps):
+        return self._compute_kernel(InterProKernel, ps, self.dst,
+                                    use_evalue=False)
 
-        self._cached_kernel(InterProKernel, len(ps),
-                            "p-interpro-kernel", ps, self.dst,
-                            use_evalue = False,
-                            do_pairwise = True, pairs = pp_indices)
-
-        self._cached_kernel(InterProKernel, len(ps),
-                            "p-interpro-score-kernel", ps, self.dst,
-                            use_evalue = True,
-                            do_pairwise = True, pairs = pp_indices)
-
-        self._cached_kernel(PSSMKernel, len(ps),
-                            "p-profile-kernel", ps, p_to_seq, self.dst,
-                            k = 4, threshold = 6.0,
-                            do_pairwise = True, pairs = pp_indices)
+    def _compute_p_pssm_kernel(self, ps, p_to_seq):
+        return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
+                                    k=4, threshold=6.0)
 
     @staticmethod
     def _permute(l):
@@ -671,29 +641,32 @@ class SGDExperiment(_Experiment):
 
         # TODO: plot GO consistency w.r.t. interactions
 
-    def run(self, min_sequence_len = 50, cdhit_threshold = 0.75):
-        """Run the yeast prediction experiment."""
+    def _load_sgd_resources(self):
+        """Retrieves all SGD-derived resources.
 
-        # Retrieve the list of protein IDs (whose order will define the
-        # structure of the kernels), and their mappings to feature IDs,
-        # sequences and GO term annotations.
-        ps          = self._cached(self._get_sgd_ids,
-                                   "sgd_ids")
-        p_to_feat   = self._cached(self._get_sgd_id_to_feat,
-                                   "sgd_id_to_feat")
-        p_to_seq    = self._cached(self._get_sgd_id_to_seq,
-                                   "sgd_id_to_seq")
-        p_to_term_ids = self._cached(self._get_sgd_id_to_fun,
-                                   "sgd_id_to_fun")
+        Namely:
+
+        - the list of protein (validated ORF) IDs.
+        - the ID -> yeast protein name map.
+        - the ID -> sequence map.
+        - the ID -> GO term annotations map.
+
+        :returns: the four items above.
+        """
+        ps              = self._get_sgd_ids()
+        p_to_feat       = self._get_sgd_id_to_feat()
+        p_to_seq        = self._get_sgd_id_to_seq()
+        p_to_term_ids   = self._get_sgd_id_to_term_ids()
+
         print _cls(self), ": found {} proteins".format(len(ps))
-
         for p in ps:
             assert p in p_to_seq, "'{}' has no sequence".format(p)
             assert p in p_to_term_ids, "'{}' has no GO annotation".format(p)
             assert p in p_to_feat, "'{}' has no associated feature ID".format(p)
 
+        return ps, p_to_feat, p_to_seq, p_to_term_ids
 
-
+    def _load_go_dag_and_propagate(self, p_to_term_ids):
         # Load the GO OBO file
         dag = GODag(os.path.join(self.src, "GO", "go-basic.obo"))
 
@@ -702,7 +675,9 @@ class SGDExperiment(_Experiment):
         propagated_p_to_term_ids = self._cached(dag.annotate,
                                                "sgd_id_to_fun_propagated",
                                                 p_to_term_ids,
-                                                propagate = True)
+                                                propagate=True)
+
+        dag = self._cached(dag, "dag_propagated")
 
         print _cls(self), ": '{}' annotations in the DAG" \
                             .format(sum(len(dag._id_to_term[term_id].proteins)
@@ -717,59 +692,96 @@ class SGDExperiment(_Experiment):
         aspect_to_ps = dag.get_proteins_by_aspect()
         print _cls(self), ": annotations by aspect: {}".format([(aspect, len(ps)) for aspect, ps in aspect_to_ps.iteritems()])
 
-        # Dump the dataset statistics prior to any preprocessing
-        print _cls(self), ": dumping dataset statistics"
-        self._dump_dataset_statistics(ps, p_to_seq, p_to_term_ids, dag, "raw")
+        return dag, propagated_p_to_term_ids
 
+    def _filter_ps(self, ps, p_to_seq, min_sequence_len, cdhit_threshold):
+        """Filter out short sequences and cluster them with CD-HIT."""
 
-
-        # Filter out sequences shorter than min_sequence_len residues, then
-        # cluster the filtered sequences with CD-HIT
+        # Filter out sequences shorter than min_sequence_len residues
         filtered_ps = filter(lambda p: len(p_to_seq[p]) >= min_sequence_len, ps)
         print _cls(self), ": found {} proteins with at least {} residues" \
                 .format(len(ps), min_sequence_len)
 
+        # Cluster the filtered sequences with CD-HIT
         filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
         _, clusters = CDHit().run(filtered_p_seq, threshold = cdhit_threshold)
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
         print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
                 .format(len(clusters), cdhit_threshold)
 
-        # Preprocess the GO DAG
-        filtered_p_to_term_ids = self._cached(dag.preprocess,
+        return filtered_ps,
+
+    def _filter_dag(self, propagated_dag, propagated_p_to_term_ids, filtered_ps):
+        """Filter out unwanted GO terms."""
+
+        filtered_p_to_term_ids = self._cached(propagated_dag.preprocess,
                                               "filtered_p_to_term_ids",
                                               filtered_ps,
                                               aspects = self._go_aspects,
                                               min_annot = self._min_go_annot,
                                               max_depth = self._max_go_depth)
+        return dag, filtered_p_to_term_ids
 
-        # Dump the dataset statistics after the preprocessing
-        print _cls(self), ": dumping dataset statistics"
-        self._dump_dataset_statistics(filtered_ps, p_to_seq, filtered_p_to_term_ids,
-                                      dag, "preproc")
+    def run(self, min_sequence_len=50, cdhit_threshold=0.75, dump_stats=False):
+        """Run the yeast prediction experiment.
 
+        :param min_sequence_len: minimum sequence length (default: ``50``).
+        :param cdhit_threshold: CD-HIT threshold (default: ``0.75``).
+        :param dump_stats: whether to dump statistics (default: ``False``).
+        """
+        STAGES = (
 
+            Stage(self._load_sgd_resources,
+                  [], ['ps', 'p_to_feat', 'p_to_seq', 'p_to_term_ids']),
 
-        # Query the high-quality protein-protein interactions, restricting
-        # them to proteins in the filtered set
-        pp_pos_hq, pp_pos_lq = self._get_sgd_pins(filtered_ps)
+            Stage(self._filter_ps,
+                  ['ps', 'p_to_seq', 'min_sequence_len', 'cdhit_threshold'],
+                  ['filtered_ps']),
 
-        # Create the folds based on function and positive interactions
-        print _cls(self), ": computing the folds"
-        pos_folds = self._cached(self._get_folds, "pos-folds",
-                                 pp_pos_hq, filtered_p_to_term_ids)
+            Stage(self._compute_p_colocalization_kernel,
+                  ['filtered_ps'], ['p_colocalization_kernel']),
 
-        # Now that we have the function-balanced folds, pour some negative
-        # interactions in
-        print _cls(self), ": adding negatives"
-        folds = self._cached(self._add_negatives, "folds", pos_folds, pp_pos_lq)
+            Stage(self._compute_p_gene_expression_kernel,
+                  ['filtered_ps', 'p_to_feat'], ['p_gene_expression_kernel']),
 
+            Stage(self._compute_p_complex_kernel,
+                  ['filtered_ps', 'p_to_feat'], ['p_complex_kernel']),
 
+            Stage(self._compute_p_interpro_kernel,
+                  ['filtered_ps'], ['p_interpro_kernel']),
 
-        # Write down the SBR input files
-        # print _cls(self), ": writing SBR input files"
-        # self._write_sbr_data(filtered_ps, filtered_p_to_term_ids, dag, folds)
+            Stage(self._compute_p_pssm_kernel,
+                  ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
 
-        # Compute the protein kernels
-        print _cls(self), ": computing the protein kernels"
-        self._compute_protein_kernels(filtered_ps, p_to_feat, p_to_seq, folds)
+            Stage(self._load_go_dag_and_propagate,
+                  ['p_to_term_ids'],
+                  ['propagated_dag', 'propagated_p_to_term_ids']),
+
+            Stage(self._filter_dag,
+                  ['propagated_dag', 'propagated_p_to_term_ids', 'filtered_ps'],
+                  ['filtered_dag', 'filtered_p_to_term_ids']),
+
+            Stage(self._get_sgd_pins,
+                  ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
+
+            Stage(self._get_folds,
+                  ['pp_pos_hq', 'filtered_p_to_term_ids'], ['pos_folds']),
+
+            Stage(self._add_negatives,
+                  ['pos_folds', 'pp_pos_lq'], ['folds']),
+        )
+
+        TARGETS = (
+            'p_colocalization_kernel',
+            'p_gene_expression_kernel',
+            'p_complex_kernel',
+            'p_interpro_kernel',
+            'p_pssm_kernel',
+        )
+
+        context = {
+            "min_sequence_len": min_sequence_len,
+            "cdhit_threshold": cdhit_threshold,
+            "dump_states": dump_stats,
+        }
+        self._make(STAGES, TARGETS, context=context)
