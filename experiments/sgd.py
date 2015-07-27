@@ -262,27 +262,21 @@ class SGDExperiment(_Experiment):
     def _get_sgd_pins(self, ps):
         """Computes the high-quality positive interactions, high+low-quality
         positive interactions, and the negative interactions."""
-        pp_pos_hq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_hq",
-                                 ps = ps, manual_only = True)
+        pp_pos_hq = self._get_sgd_pin(ps=ps, manual_only=True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} hi-quality PPIs (density = {})" \
                 .format(len(pp_pos_hq), density)
         self._check_p_pp_are_sane(ps, pp_pos_hq)
 
         # Query all (high+low-quality) protein-protein interactions
-        pp_pos_lq = self._cached(self._get_sgd_pin,
-                                 "sgd_id_interactions_lq",
-                                 ps = ps, manual_only = False)
+        pp_pos_lq = self._get_sgd_pin(ps=ps, manual_only=False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} lo-quality PPIs (density = {})" \
                 .format(len(pp_pos_lq), density)
         self._check_p_pp_are_sane(ps, pp_pos_lq)
 
         # Query all (literally) protein-protein actions annotated in STRING
-        pp_pos_string = self._cached(self._get_string_pin,
-                                     "sgd_id_interactions_string",
-                                     ps = ps)
+        pp_pos_string = self._get_string_pin(ps=ps)
         density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
                 .format(len(pp_pos_string), density)
@@ -484,7 +478,7 @@ class SGDExperiment(_Experiment):
             # Randomly sample a number of negative pairs equal to the number of
             # positives pairs
             pi = np.random.permutation(len(fold))
-            sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(fold))
+            sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(fold)))
 
             # Assemble the fold
             fold.update((p1, p2, False) for p1, p2 in neg_fold)
@@ -786,14 +780,14 @@ class SGDExperiment(_Experiment):
 
             Stage(self._compute_folds,
                   ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'], ['folds']),
+
+            Stage(self._write_sbr_data,
+                  ['filtered_ps', 'filtered_p_to_term_ids', 'filtered_dag' 'folds'],
+                  ['phony_sbr_data'])
         )
 
         TARGETS = (
-            'p_colocalization_kernel',
-            'p_gene_expression_kernel',
-            'p_complex_kernel',
-            'p_interpro_kernel',
-            'p_pssm_kernel',
+            'pp_pos_hq', 'pp_pos_lq'
         )
 
         context = {
