@@ -33,7 +33,7 @@ class PairwiseKernel(Kernel):
         k[(i,j),(n,m)] := k[i,n] + k[j,m] + k[i,m] + k[j,n]
 
     :param indices: indices of the elements to combine.
-    :param subkernel: a `Kernel` instance.
+    :param subkernel: a `Kernel` instance or an ``numpy.ndarray``.
     :param op: either ``"product"`` or ``"sum"``.
     """
     def __init__(self, pairs, subkernel, op = "product", **kwargs):
@@ -47,8 +47,11 @@ class PairwiseKernel(Kernel):
             raise ValueError, "invalid op '{}'".format(op)
 
     def _compute_all(self):
-        submatrix = self._subkernel.compute()
-        matrix = np.zeros((len(self), len(self)))
+        try:
+            submatrix = self._subkernel.compute()
+        except AttributeError, e:
+            submatrix = self._subkernel
+        matrix = np.zeros((len(self), len(self)), dtype=np.float32)
         for out_i, (i, j) in enumerate(self._entities): # pairs
             for out_j, (n, m) in enumerate(self._entities): # pairs
                 kin, kim = submatrix[i,n], submatrix[i,m]
