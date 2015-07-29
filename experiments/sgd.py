@@ -356,24 +356,23 @@ class SGDExperiment(_Experiment):
     def _check_folds_are_sane(folds):
 
         # Check that interactions are symmetric
-        for fold in folds:
-            for p1, p2, state in fold:
-                assert (p2, p1, state) in fold
+        for k, fold in enumerate(folds):
+            assert all((q, p, state) in fold for (p, q, state) in fold), "fold {} is not symmetric".format(k)
 
         # Check that folds do not overlap
         for (k1, fold1), (k2, fold2) in it.product(enumerate(folds), enumerate(folds)):
-            if k1 == k2:
+            if k1 >= k2:
                 continue
-            for p1, p2, state in fold1:
-                for q1, q2, state in fold2:
-                    assert (p1, p2) != (q1, q2)
+            for p1, p2, state1 in fold1:
+                for q1, q2, state2 in fold2:
+                    assert (p1, p2) != (q1, q2), "folds {} and {} overlap ({} overlaps with {})".format(k1, k2, (p1, p2, state1), (q1, q2, state2))
 
         # Check that no pair occurs in both states
         interactions = set()
         for fold in folds:
             interactions.update(fold)
         for p1, p2, state in interactions:
-            assert not (p1, p2, not state) in interactions
+            assert not (p1, p2, not state) in interactions, "folds are inconsistent"
 
     def _print_fold_quality(self, folds, pp_to_terms, all_pp_terms, term_to_i, average):
         # Evaluate the fold quality
@@ -382,8 +381,8 @@ class SGDExperiment(_Experiment):
             for p1, p2, _ in fold:
                 for term in pp_to_terms[(p1, p2)]:
                     counts[term_to_i[term]] += 1
-            print _cls(self), " |fold{}| = {}, L1 distance from average term counts = {}" \
-                .format(k, len(fold), np.linalg.norm((average - counts), ord = 1))
+            print _cls(self), " fold{}: {} pairs, L1 distance from average term counts = {}" \
+                .format(k, len(fold), np.linalg.norm((average - counts) / len(all_pp_terms), ord = 1))
 
     def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_terms, num_folds=10):
         """Generates the folds.
@@ -427,6 +426,8 @@ class SGDExperiment(_Experiment):
                 assert (p2, p1) in term_pps
 
         # Generate the folds
+        print _cls(self), ": generating the folds..."
+
         folds = [set() for _ in range(num_folds)]
         while len(term_to_pps):
             # Pick the term with the least unprocessed protein-protein pairs
@@ -460,6 +461,7 @@ class SGDExperiment(_Experiment):
                 new_term_to_pps[term] = new_term_pps
             term_to_pps = new_term_to_pps
 
+        print _cls(self), ": checking fold sanity..."
         self._check_folds_are_sane(folds)
 
         print _cls(self), ": fold quality (positives only):"
@@ -467,106 +469,56 @@ class SGDExperiment(_Experiment):
 
         # Now that we partitioned all interactions into folds, let's add the
         # negatives interactions -- by sampling them at random
+        print _cls(self), ": adding negative interactions..."
+
+        candidate_pos_pps = {(p1, p2) for p1, p2 in pp_pos_hq | pp_pos_lq} | \
+                            {(p2, p1) for p1, p2 in pp_pos_hq | pp_pos_lq}
+
+        # All candadate negative pairs sampled so far, so that we do not sample
+        # the same negative twice
+        all_candidate_neg_pps = set()
+
         for fold in folds:
             ps_in_fold = set(p for p, _, _ in fold) | set(p for _, p, _ in fold)
 
-            # Compute the candidate negative pairs
-            candidate_neg_pps = list(set(it.product(ps_in_fold, ps_in_fold)) - pp_pos_lq)
+            # Compute the candidate negative pairs by subtracting the candidate
+            # positive pairs from the complement of the pairs in the fold
+            candidate_neg_pps = set(it.product(ps_in_fold, ps_in_fold)) - candidate_pos_pps - all_candidate_neg_pps
+
+            # De-symmetrize the candidate negative pairs
+            temp = set()
+            for p1, p2 in candidate_neg_pps:
+                if not (p2, p1) in temp:
+                    temp.add((p1, p2))
+            candidate_neg_pps = list(temp)
+
+            # De-symmetrize the positive fold
+            temp = set()
+            for p1, p2, _ in fold:
+                if not (p2, p1) in temp:
+                    temp.add((p1, p2))
 
             # Randomly sample a number of negative pairs equal to the number of
-            # positives pairs
-            pi = np.random.permutation(len(fold))
-            sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(fold)))
+            # positives pairs (actually only half of that; we symmetrize the
+            # negatives later)
+            pi = np.random.permutation(len(candidate_neg_pps))
+            sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(temp)))
+
+            # Update with the sampled negative pairs
+            all_candidate_neg_pps.update((p1, p2) for p1, p2 in sampled_neg_pps)
+            all_candidate_neg_pps.update((p2, p1) for p1, p2 in sampled_neg_pps)
 
             # Assemble the fold
             fold.update((p1, p2, False) for p1, p2 in sampled_neg_pps)
             fold.update((p2, p1, False) for p1, p2 in sampled_neg_pps)
 
+        print _cls(self), ": checking fold sanity..."
         self._check_folds_are_sane(folds)
 
-        print _cls(self), ": fold quality:"
-        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, term_to_i, average)
+        # XXX pp_to_terms is not updated at this point, do not bother printing
+        # the fold quality...
 
-        return folds
-
-    @staticmethod
-    def _term_to_predicate(term):
-        assert len(term.namespace)
-        level = term.level if term.level >= 0 else None
-        return "{}_{}_{}".format(term.namespace, term.level, term.id.replace(":", "_"))
-
-    def _to_sbr_examples(self, ps, p_to_fun, labeled_pps):
-        examples = []
-        for p1, p2, state in labeled_pps:
-            examples.append("ISPAIR({},{},{}{})".format(p1, p2, p1, p2))
-            examples.append("ISPAIR({},{},{}{})".format(p1, p2, p2, p1))
-            examples.append("BOUNDP({}{})={}".format(p1, p2, state))
-        for p in ps:
-            for term in p_to_fun[p]:
-                examples.append("{}({})=1".format(self._term_to_predicate(term), p))
-        return examples
-
-    def _write_sbr_data(self, ps, p_to_fun, dag, folds):
-        """Writes out the SBR data.
-
-        .. warning::
-
-            The interactions in the folds **must** be symmetric; this is not
-            checked here.
-
-        :param ps: list of protein IDs.
-        :param p_to_fun: map between protein IDs and the ``GOTerm``'s they are annotated with.
-        :param dag: the associated ``GODag``.
-        :param folds: list of sets of triples of the form (protein ID, protein ID, are_bound).
-        """
-        # Write out the datapoints: proteins and protein pairs
-        pos_pps, neg_pps = [], []
-        for fold in folds:
-            pos_pps.extend((p1, p2) for p1, p2, state in fold if state == 1)
-            neg_pps.extend((p1, p2) for p1, p2, state in fold if state == 0)
-
-        datapoints = []
-        datapoints.extend("{}:PROTEIN".format(p) for p in ps)
-        datapoints.extend("{}{}:PPAIR".format(p1, p2) for p1, p2 in (pos_pps + neg_pps))
-
-        with open(os.path.join(self.dst, "sbr-datapoints"), "wb") as fp:
-            fp.write("\n".join(datapoints))
-
-        # Write out the predicates, which include (i) the BOUNDP predicate,
-        # (ii) the ISPAIR predicate, and (iii) a predicate for each GO term.
-        dag_terms = sorted(dag._id_to_term.values(), key = lambda term: term.name)
-
-        predicates = []
-        predicates.append("DEF ISPAIR(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
-        predicates.append("DEF BOUNDP(PPAIR);LEARN;C")
-        predicates.extend("DEF {};LEARN;C".format(self._term_to_predicate(term))
-                          for term in dag_terms)
-
-        with open(os.path.join(self.dst, "sbr-predicates"), "wb") as fp:
-            fp.write("\n".join(predicates))
-
-        # Write out the rules
-        # WRITEME
-
-        # Write out the folds (examples)
-        all_folds = set()
-        for fold in folds:
-            all_folds |= fold
-
-        for k, fold in enumerate(folds):
-            rest = all_folds - fold
-
-            fold_ps = set(p1 for p1, _, _ in fold) | \
-                      set(p2 for _, p2, _ in fold)
-
-            rest_ps = set(p1 for p1, _, _ in rest) | \
-                      set(p2 for _, p2, _ in rest)
-
-            with open(os.path.join(self.dst, "sbr-fold{}-examples-train".format(k)), "wb") as fp:
-                fp.write("\n".join(self._to_sbr_examples(rest_ps, p_to_fun, rest)))
-
-            with open(os.path.join(self.dst, "sbr-fold{}-examples-test".format(k)), "wb") as fp:
-                fp.write("\n".join(self._to_sbr_examples(fold_ps, p_to_fun, fold)))
+        return folds,
 
     def _dump_dataset_statistics(self, ps, p_to_seq, p_to_term_ids, dag, prefix):
         """Dump a few dataset statistics."""
@@ -766,10 +718,6 @@ class SGDExperiment(_Experiment):
 
             Stage(self._compute_folds,
                   ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'], ['folds']),
-
-            Stage(self._write_sbr_data,
-                  ['filtered_ps', 'filtered_p_to_term_ids', 'filtered_dag' 'folds'],
-                  ['phony_sbr_data'])
         )
 
         TARGETS = (
