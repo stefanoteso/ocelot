@@ -245,7 +245,7 @@ class SGDExperiment(_Experiment):
             if num_samples < degree:
                 print _cls(self), "| Warning: not enough negative candidates!"
             sample = [candidate_neg[i] for i
-                      in np.random.permutation(len(candidate_neg))[:num_samples]]
+                      in self._rng.permutation(len(candidate_neg))[:num_samples]]
             # Make sure that the negative interactions are symmetrical
             neg.update(sample)
             neg.update([(q, p) for p, q in sample])
@@ -358,9 +358,8 @@ class SGDExperiment(_Experiment):
         pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in pps]
         return self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
 
-    @staticmethod
-    def _permute(l):
-        pi = list(np.random.permutation(len(l)))
+    def _permute(self, l):
+        pi = list(self._rng.permutation(len(l)))
         return [l[pi[i]] for i in xrange(len(l))]
 
     @staticmethod
@@ -512,7 +511,7 @@ class SGDExperiment(_Experiment):
             # Randomly sample a number of negative pairs equal to the number of
             # positives pairs (actually only half of that; we symmetrize the
             # negatives later)
-            pi = np.random.permutation(len(candidate_neg_pps))
+            pi = self._rng.permutation(len(candidate_neg_pps))
             sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(temp)))
 
             # Update with the sampled negative pairs
