@@ -347,6 +347,17 @@ class SGDExperiment(_Experiment):
         return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
                                     k=4, threshold=6.0)
 
+    def _compute_pp_kernel(self, ps, folds, submatrix):
+        p_to_i = {p: i for i, p in enumerate(ps)}
+
+        pps = set()
+        for fold in folds:
+            pps.update((p1, p2) for p1, p2, _ in fold)
+        pps = sorted(pps)
+
+        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in pps]
+        return self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
+
     @staticmethod
     def _permute(l):
         pi = list(np.random.permutation(len(l)))
@@ -718,10 +729,34 @@ class SGDExperiment(_Experiment):
 
             Stage(self._compute_folds,
                   ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'], ['folds']),
+
+            Stage(self._compute_pp_kernel,
+                  ['filtered_ps', 'folds', 'p_colocalization_kernel'],
+                  ['pp_colocalization_kernel']),
+
+            Stage(self._compute_pp_kernel,
+                  ['filtered_ps', 'folds', 'p_gene_expression_kernel'],
+                  ['pp_gene_expression_kernel']),
+
+            Stage(self._compute_pp_kernel,
+                  ['filtered_ps', 'folds', 'p_complex_kernel'],
+                  ['pp_complex_kernel']),
+
+            Stage(self._compute_pp_kernel,
+                  ['filtered_ps', 'folds', 'p_interpro_kernel'],
+                  ['pp_interpro_kernel']),
+
+            Stage(self._compute_pp_kernel,
+                  ['filtered_ps', 'folds', 'p_pssm_kernel'],
+                  ['pp_pssm_kernel']),
+
+            Stage(lambda *args, **kwargs: None,
+                  ['pp_colocalization_kernel'],
+                  ['pp_kernels']),
         )
 
         TARGETS = (
-            'folds',
+            'pp_kernels',
         )
 
         context = {
