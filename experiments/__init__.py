@@ -6,6 +6,7 @@ import numpy as np
 from SPARQLWrapper import SPARQLWrapper, JSON
 from modshogun import CombinedKernel, CustomKernel
 from modshogun import BinaryLabels, MKLClassification
+from sklearn.utils import check_random_state
 from sklearn.svm import SVC
 from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
 from collections import namedtuple
@@ -23,6 +24,7 @@ class _Experiment(object):
     :param endpoint: URI of the SPARQL endpoint.
     :param default_graph: URI of the default graph.
     :param force_update: whether to discard the cache contents (default: ``False``).
+    :param seed: the random seed (default: ``None``).
 
     .. todo::
         Add support for standard SVM.
@@ -31,7 +33,8 @@ class _Experiment(object):
         Add support for SBR.
     """
     def __init__(self, src, dst, endpoint, default_graph, force_update = False,
-                 *args, **kwargs):
+                 seed = None, *args, **kwargs):
+        self._rng = check_random_state(seed)
         try:
             os.mkdir(dst)
         except:
