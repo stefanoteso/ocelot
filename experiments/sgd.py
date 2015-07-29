@@ -285,6 +285,43 @@ class SGDExperiment(_Experiment):
 
         return pp_pos_hq, pp_pos_lq | pp_pos_string
 
+    def _compute_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
+
+        print _cls(self), ": computing the complement of the positive PIN"
+
+        # Take the complement of the symmetrical positives, subtract the known
+        # positives (both high-quality and low-quality, just to be sure); the
+        # complement will be symmetrical, since the HQ and LQ interactions are
+        pp_neg = list(set(it.product(ps, ps)) - pp_pos_lq - pp_pos_hq)
+
+        print _cls(self), ": sampling the negatives out of the complement"
+
+        # Sample a permutation of the candidate negatives
+        pi = self._rng.permutation(len(pp_neg))
+
+        # De-symmetrize the positive interactions
+        pp_pos = set()
+        for p, q in pp_pos_hq:
+            if not (q, p) in pp_pos:
+                pp_pos.add((p, q))
+
+        # Sample the negative interactions from the complement
+        pp_neg_half, i = set(), 0
+        while len(pp_neg_half) < len(pp_pos) and i < len(pi):
+            p, q = pp_neg[pi[i]]
+            if not (q, p) in pp_neg_half:
+                pp_neg_half.add((p, q))
+                i += 1
+
+        assert len(pp_neg_half) == len(pp_pos), "something went wrong, yo"
+
+        # Symmetrize the negatives
+        pp_neg = pp_neg_half | set((q, p) for p, q in pp_neg_half)
+
+        _check_p_pp_are_sane(ps, pp_neg)
+
+        return pp_neg,
+
     def _get_sgd_din(self):
         query = """
         SELECT DISTINCT ?id ?family ?chain ?evalue ?complex
@@ -726,6 +763,10 @@ class SGDExperiment(_Experiment):
             Stage(self._get_sgd_pins,
                   ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
 
+            Stage(self._compute_negative_pin,
+                  ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
+                  ['pp_neg']),
+
             Stage(self._compute_folds,
                   ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'], ['folds']),
 
@@ -755,7 +796,7 @@ class SGDExperiment(_Experiment):
         )
 
         TARGETS = (
-            'pp_kernels',
+            'pp_neg',
         )
 
         context = {
