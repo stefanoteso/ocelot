@@ -138,6 +138,8 @@ def _run_experiment(args):
         "sgd" : experiments.SGDExperiment,
     }
 
+    rng = np.random.RandomState(args.seed)
+
     for id_, Experiment in _filter_targets(ALL_TARGETS, args.targets):
         experiment = Experiment(args.src, args.dst,
                                 endpoint = args.endpoint,
@@ -146,7 +148,8 @@ def _run_experiment(args):
                                 go_aspects = args.go_aspects,
                                 max_go_depth = args.max_go_depth,
                                 min_go_annot = args.min_go_annot,
-                                dump_stats = args.dump_stats)
+                                dump_stats = args.dump_stats,
+                                seed = rng)
         experiment.run()
 
 def main():
@@ -191,10 +194,6 @@ def main():
                         help="[run-experiment] dump statistics along the way (default: False)")
 
     args = parser.parse_args()
-
-    if not args.seed is None:
-        random.seed(args.seed)
-        np.random.seed(args.seed)
 
     command = COMMANDS.get(args.command)
     if not command:
