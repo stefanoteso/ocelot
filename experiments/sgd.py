@@ -250,39 +250,43 @@ class SGDExperiment(_Experiment):
 
         return pp_pos_hq, pp_pos_lq | pp_pos_string
 
-    def _compute_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
+    @staticmethod
+    def _desymmetrize(pairs):
+        pairs_asymm = set()
+        for p, q in pairs:
+            if not (q, p) in pairs:
+                pairs_asymm.add((p, q))
+        return pairs_asymm
 
-        print _cls(self), ": computing the complement of the positive PIN"
+    @staticmethod
+    def _symmetrize(pairs):
+        return set(pairs) | set((q, p) for p, q in pairs)
+
+    def _compute_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
 
         # Take the complement of the symmetrical positives, subtract the known
         # positives (both high-quality and low-quality, just to be sure); the
         # complement will be symmetrical, since the HQ and LQ interactions are
-        pp_neg = list(set(it.product(ps, ps)) - pp_pos_lq - pp_pos_hq)
+        print _cls(self), ": computing the complement of the positive PIN"
+        pp_neg_all = set(it.product(ps, ps)) - (pp_pos_lq | pp_pos_hq)
 
-        print _cls(self), ": sampling the negatives out of the complement"
+        print _cls(self), ": computing asymmetric negative PIN"
+        pp_neg_asymm = list(self._desymmetrize(pp_neg_all))
 
-        # Sample a permutation of the candidate negatives
-        pi = self._rng.permutation(len(pp_neg))
+        print _cls(self), ": computing asymmetric positive PIN"
+        pp_pos_asymm = self._desymmetrize(pp_pos_hq)
 
-        # De-symmetrize the positive interactions
-        pp_pos = set()
-        for p, q in pp_pos_hq:
-            if not (q, p) in pp_pos:
-                pp_pos.add((p, q))
+        del pp_pos_hq
+        del pp_pos_lq
+        del pp_neg_all
 
         # Sample the negative interactions from the complement
-        pp_neg_half, i = set(), 0
-        while len(pp_neg_half) < len(pp_pos) and i < len(pi):
-            p, q = pp_neg[pi[i]]
-            if not (q, p) in pp_neg_half:
-                pp_neg_half.add((p, q))
-                i += 1
-
-        assert len(pp_neg_half) == len(pp_pos), "something went wrong, yo"
+        print _cls(self), ": sampling the negative PIN"
+        pi = self._rng.permutation(len(pp_neg_asymm))
+        pp_neg_half = set(pp_neg_asymm[pi[i]] for i in xrange(len(pp_pos_asymm)))
 
         # Symmetrize the negatives
-        pp_neg = pp_neg_half | set((q, p) for p, q in pp_neg_half)
-
+        pp_neg = self._symmetrize(pp_neg_half)
         _check_p_pp_are_sane(ps, pp_neg)
 
         return pp_neg,
