@@ -216,41 +216,6 @@ class SGDExperiment(_Experiment):
             neighbors_of[q].add(p)
         return neighbors_of
 
-    def _get_negative_pin(self, ps, pos):
-        """Samples the negative interactions from the complement graph.
-
-        Uses the sampling method described in [Yu10]_.
-        """
-        def is_candidate(p, q, neg):
-            # TODO subtract BioGRID (or even better STRING)
-            return p != q and not (p, q) in pos and not (p, q) in neg
-
-        neighbors_of = self._get_neighbors_and_degree(ps, pos)
-        ps_degree = sorted([(len(neighbors_of[p]), p) for p in ps ],
-                            reverse = True)
-
-        neg = set()
-        for i, (degree, p) in enumerate(ps_degree):
-            # Figure out all candidate negative interactions for ``p``, then
-            # pick exactly ``degree`` of them uniformly at random; if not
-            # enough negatives are available, add as many as possible.
-            candidate_neg = filter(lambda pq: is_candidate(pq[0], pq[1], neg),
-                                [(p, q) for q in ps if not q in neighbors_of[p]])
-            num_samples = min(degree, len(candidate_neg))
-            if num_samples == 0:
-                # Proteins are sorted by degree, so we can break here
-                break
-            print _cls(self), "| {}/{}, '{}: sampling {}/{} negatives (actually {})" \
-                .format(i+1, len(ps), p, degree, len(candidate_neg), num_samples)
-            if num_samples < degree:
-                print _cls(self), "| Warning: not enough negative candidates!"
-            sample = [candidate_neg[i] for i
-                      in self._rng.permutation(len(candidate_neg))[:num_samples]]
-            # Make sure that the negative interactions are symmetrical
-            neg.update(sample)
-            neg.update([(q, p) for p, q in sample])
-        return neg
-
     @staticmethod
     def _check_p_pp_are_sane(ps, pps):
         """Checks that the protein pairs are (i) symmetric, and (ii) entirely
