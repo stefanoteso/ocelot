@@ -287,7 +287,7 @@ class SGDExperiment(_Experiment):
 
         # Symmetrize the negatives
         pp_neg = self._symmetrize(pp_neg_half)
-        _check_p_pp_are_sane(ps, pp_neg)
+        self._check_p_pp_are_sane(ps, pp_neg)
 
         return pp_neg,
 
