@@ -253,7 +253,7 @@ class SGDExperiment(_Experiment):
     @staticmethod
     def _desymmetrize(pairs):
         pairs_asymm = set()
-        for p, q in pairs:
+        for p, q in pairs_asymm:
             if not (q, p) in pairs:
                 pairs_asymm.add((p, q))
         return pairs_asymm
