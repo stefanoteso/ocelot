@@ -171,7 +171,7 @@ class _Experiment(object):
         # Try to load a numpy array
         try:
             with open(relpath + ".npy", "rb") as fp:
-                return pickle.load(fp)
+                return np.load(fp)
         except:
             pass
         raise IOError("can not load '{}'".format(relpath))
