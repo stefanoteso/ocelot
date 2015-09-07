@@ -725,6 +725,17 @@ class SGDExperiment(_Experiment):
             Stage(self._compute_p_pssm_kernel,
                   ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
 
+            Stage(lambda *args, **kwargs: None, # XXX implemented externally
+                  ['p_colocalization_kernel', 'p_gene_expression_kernel',
+                   'p_complex_kernel', 'p_interpro_kernel', 'p_pssm_kernel'],
+                  ['p_average_kernel']),
+
+            Stage(lambda *args, **kwargs: None,
+                  ['p_colocalization_kernel', 'p_gene_expression_kernel',
+                   'p_complex_kernel', 'p_interpro_kernel', 'p_pssm_kernel',
+                   'p_average_kernel'],
+                  ['p_kernels']),
+
             Stage(self._load_go_and_filter,
                   ['filtered_ps', 'p_to_term_ids'],
                   ['filtered_dag', 'filtered_p_to_term_ids']),
@@ -765,7 +776,7 @@ class SGDExperiment(_Experiment):
         )
 
         TARGETS = (
-            'pp_neg',
+            'p_average_kernel',
         )
 
         context = {
