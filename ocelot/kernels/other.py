@@ -51,14 +51,14 @@ class PairwiseKernel(Kernel):
             raise ValueError, "invalid op '{}'".format(op)
         self._op = op
 
-    def _compute_range_product(self, matrix, indices1, indices2):
+    def _compute_range_product(self, matrix, submatrix, indices1, indices2):
         for s, (i, j) in indices1:
             for t, (n, m) in indices2:
                 kin, kim = submatrix[i,n], submatrix[i,m]
                 kjn, kjm = submatrix[j,n], submatrix[j,m]
                 matrix[s, t] = kin * kjm + kim * kjn
 
-    def _compute_range_sum(self, matrix, indices1, indices2):
+    def _compute_range_sum(self, matrix, submatrix, indices1, indices2):
         for s, (i, j) in indices1:
             for t, (n, m) in indices2:
                 kin, kim = submatrix[i,n], submatrix[i,m]
@@ -74,9 +74,9 @@ class PairwiseKernel(Kernel):
             submatrix = self._subkernel
         matrix = np.zeros((len(self), len(self)), dtype=submatrix.dtype)
         if self._op == "product":
-            self._compute_range_product(matrix, indices, indices)
+            self._compute_range_product(matrix, submatrix, indices, indices)
         else:
-            self._compute_range_sum(matrix, indices, indices)
+            self._compute_range_sum(matrix, submatrix, indices, indices)
         return matrix
 
 class _TestPairwiseKernel(object):
