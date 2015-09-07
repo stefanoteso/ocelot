@@ -36,19 +36,34 @@ class PairwiseKernel(Kernel):
     The pairwise kernel matrix will have the same ``dtype`` as the Gram matrix
     of the given subkernel.
 
+    .. todo::
+
+        Implement block-by-block computation.
+
     :param indices: indices of the elements to combine.
     :param subkernel: a `Kernel` instance or an ``numpy.ndarray``.
-    :param op: either ``"product"`` or ``"sum"``.
+    :param op: either ``"product"`` or ``"sum"`` (default: ``"product"``).
     """
-    def __init__(self, pairs, subkernel, op = "product", **kwargs):
+    def __init__(self, pairs, subkernel, op="product", **kwargs):
         super(PairwiseKernel, self).__init__(pairs, **kwargs)
         self._subkernel = subkernel
-        if op == "product":
-            self.op = lambda kin, kjm, kim, kjn: kin * kjm + kim * kjn
-        elif op == "sum":
-            self.op = lambda kin, kjm, kim, kjn: kin + kjm + kim + kjn
-        else:
+        if not op in ("product", "sum"):
             raise ValueError, "invalid op '{}'".format(op)
+        self._op = op
+
+    def _compute_range_product(self, matrix, indices1, indices2):
+        for s, (i, j) in indices1:
+            for t, (n, m) in indices2:
+                kin, kim = submatrix[i,n], submatrix[i,m]
+                kjn, kjm = submatrix[j,n], submatrix[j,m]
+                matrix[s, t] = kin * kjm + kim * kjn
+
+    def _compute_range_sum(self, matrix, indices1, indices2):
+        for s, (i, j) in indices1:
+            for t, (n, m) in indices2:
+                kin, kim = submatrix[i,n], submatrix[i,m]
+                kjn, kjm = submatrix[j,n], submatrix[j,m]
+                matrix[s, t] = kin + kjm + kim + kjn
 
     def _compute_all(self):
         indices = list(enumerate(self._entities))
@@ -58,11 +73,10 @@ class PairwiseKernel(Kernel):
         except AttributeError, e:
             submatrix = self._subkernel
         matrix = np.zeros((len(self), len(self)), dtype=submatrix.dtype)
-        for out_i, (i, j) in indices:
-            for out_j, (n, m) in indices:
-                kin, kim = submatrix[i,n], submatrix[i,m]
-                kjn, kjm = submatrix[j,n], submatrix[j,m]
-                matrix[out_i, out_j] = self.op(kin, kjm, kim, kjn)
+        if self._op == "product":
+            self._compute_range_product(matrix, indices, indices)
+        else:
+            self._compute_range_sum(matrix, indices, indices)
         return matrix
 
 class _TestPairwiseKernel(object):
