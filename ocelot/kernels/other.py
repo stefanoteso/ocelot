@@ -36,6 +36,10 @@ class PairwiseKernel(Kernel):
     The pairwise kernel matrix will have the same ``dtype`` as the Gram matrix
     of the given subkernel.
 
+    .. warning::
+
+        Make sure not to be affected by `https://github.com/numpy/numpy/issues/2396`.
+
     .. todo::
 
         Implement block-by-block computation.
