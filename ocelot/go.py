@@ -67,7 +67,7 @@ class GOTerm(object):
         for parent_id, relation in self.parents:
             if not relation in relations:
                 continue
-            parents.add((dag[parent_id], relation))
+            parents.add((dag._id_to_term[parent_id], relation))
         return parents
 
     def get_children(self, dag, relations=set(["is_a"])):
@@ -76,7 +76,7 @@ class GOTerm(object):
         for child_id, relation in self.children:
             if not relation in relations:
                 continue
-            children.add((dag[child_id], relation))
+            children.add((dag._id_to_term[child_id], relation))
         return children
 
     def get_ancestors(self, dag, relations=set(["is_a"])):
