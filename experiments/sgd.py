@@ -619,6 +619,85 @@ class SGDExperiment(_Experiment):
 
         # TODO: plot GO consistency w.r.t. interactions
 
+    @staticmethod
+    def _term_to_predicate(term):
+        assert len(term.namespace)
+        assert term.level >= 0
+        return "{}_lvl{}_{}_{}".format(term.namespace, term.level, term.id.replace(":", "_"), term.name.replace(" ", "_"))
+
+    def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
+        """Writes the SBR dataset.
+
+        .. todo::
+
+            Add support for the pairwise setting.
+        """
+
+        # Write the datapoints, including proteins and protein pairs
+        lines = []
+        lines.extend("{}:PROTEIN;1:1".format(p) for p in ps)
+        with open(os.path.join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
+            fp.write("\n".join(lines))
+
+        # Write the predicates, including BOUNDP, ISPAIR and per-term predicates
+        lines = []
+        lines.extend("DEF {};LEARN;C".format(self._term_to_predicate(term))
+                     for term_id, term in dag._id_to_term.iteritems())
+        with open(os.path.join(self.dst, "sbr-predicates.txt"), "wb") as fp:
+            fp.write("\n".join(lines))
+
+        # Write the rules
+        for aspect in ("biological_process", "cellular_component", "molecular_function"):
+
+            # Parents imply the OR of the children
+            lines = []
+            for term in dag._id_to_term.itervalues():
+                if term.namespace != aspect:
+                    continue
+                children = [child for child, _ in term.get_children(dag)]
+                if not len(children):
+                    continue
+                children_or = " OR ".join(map(self._term_to_predicate, children))
+                lines.append("forall p [{} => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), children_or))
+            with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_or_of_children.txt".format(aspect)), "wb") as fp:
+                fp.write("\n".join(lines))
+
+            # Children imply their parents
+            lines = []
+            for term in dag._id_to_term.itervalues():
+                if term.namespace != aspect:
+                    continue
+                parents = [parent for parent, _ in term.get_parents(dag)]
+                if not len(parents):
+                    continue
+                parents_and = " AND ".join(map(self._term_to_predicate, parents))
+                lines.append("forall p[{} => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), parents_and))
+            with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
+                fp.write("\n".join(lines))
+
+        # Write the examples for each fold
+        for k, fold in enumerate(folds):
+            ps_in_fold = set(p1 for p1, _, _ in fold) | \
+                         set(p2 for _, p2, _ in fold)
+
+            # Write out the test examples
+            lines = []
+            for p in ps_in_fold:
+                for term_id in dag._id_to_term.iterkeys():
+                    lines.append("{}({})={}".format(term_id, p, {True:"1", False:"0"}[term_id in p_to_term_ids[p]]))
+            with open(os.path.join(self.dst, "sbr-fold{}-testset.txt".format(k)), "wb") as fp:
+                fp.write("\n".join(lines))
+
+            # Write out the training examples
+            lines = []
+            for p in sorted(set(ps) - ps_in_fold):
+                for term_id in dag._id_to_term.iterkeys():
+                    lines.append("{}({})={}".format(term_id, p, {True:"1", False:"0"}[term_id in p_to_term_ids[p]]))
+            with open(os.path.join(self.dst, "sbr-fold{}-trainset.txt".format(k)), "wb") as fp:
+                fp.write("\n".join(lines))
+
+        return True,
+
     def _load_sgd_resources(self):
         """Retrieves all SGD-derived resources.
 
@@ -773,10 +852,14 @@ class SGDExperiment(_Experiment):
             Stage(lambda *args, **kwargs: None,
                   ['pp_colocalization_kernel'],
                   ['pp_kernels']),
+
+            Stage(self._write_sbr_dataset,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids', 'folds'],
+                  ['sbr_dataset']),
         )
 
         TARGETS = (
-            'p_average_kernel',
+            'sbr_dataset',
         )
 
         context = {
