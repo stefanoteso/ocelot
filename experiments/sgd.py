@@ -623,7 +623,7 @@ class SGDExperiment(_Experiment):
     def _term_to_predicate(term):
         assert len(term.namespace)
         assert term.level >= 0
-        return "{}_lvl{}_{}_{}".format(term.namespace, term.level, term.id.replace(":", "_"), term.name.replace(" ", "_"))
+        return "{}_lvl{}_{}_{}".format(term.namespace, term.level, term.id.replace(":", "_"), term.name.replace(" ", "_").replace("-", "_").replace(":", "_").replace(",", ""))
 
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
         """Writes the SBR dataset.
@@ -635,7 +635,7 @@ class SGDExperiment(_Experiment):
 
         # Write the datapoints, including proteins and protein pairs
         lines = []
-        lines.extend("{}:PROTEIN;1:1".format(p) for p in ps)
+        lines.extend("{};PROTEIN;1:1".format(p) for p in ps)
         with open(os.path.join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
@@ -657,8 +657,8 @@ class SGDExperiment(_Experiment):
                 children = [child for child, _ in term.get_children(dag)]
                 if not len(children):
                     continue
-                children_or = " OR ".join(map(self._term_to_predicate, children))
-                lines.append("forall p [{} => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), children_or))
+                children_or = " OR ".join(self._term_to_predicate(child) + "(p)" for child in children)
+                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), children_or))
             with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_or_of_children.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
@@ -670,8 +670,8 @@ class SGDExperiment(_Experiment):
                 parents = [parent for parent, _ in term.get_parents(dag)]
                 if not len(parents):
                     continue
-                parents_and = " AND ".join(map(self._term_to_predicate, parents))
-                lines.append("forall p[{} => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), parents_and))
+                parents_and = " AND ".join(self._term_to_predicate(parent) + "(p)" for parent in parents)
+                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), parents_and))
             with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
@@ -683,16 +683,16 @@ class SGDExperiment(_Experiment):
             # Write out the test examples
             lines = []
             for p in ps_in_fold:
-                for term_id in dag._id_to_term.iterkeys():
-                    lines.append("{}({})={}".format(term_id, p, {True:"1", False:"0"}[term_id in p_to_term_ids[p]]))
+                for term in dag._id_to_term.itervalues():
+                    lines.append("{}({})={}".format(self._term_to_predicate(term), p, {True:"1", False:"0"}[term.id in p_to_term_ids[p]]))
             with open(os.path.join(self.dst, "sbr-fold{}-testset.txt".format(k)), "wb") as fp:
                 fp.write("\n".join(lines))
 
             # Write out the training examples
             lines = []
             for p in sorted(set(ps) - ps_in_fold):
-                for term_id in dag._id_to_term.iterkeys():
-                    lines.append("{}({})={}".format(term_id, p, {True:"1", False:"0"}[term_id in p_to_term_ids[p]]))
+                for term in dag._id_to_term.itervalues():
+                    lines.append("{}({})={}".format(self._term_to_predicate(term), p, {True:"1", False:"0"}[term.id in p_to_term_ids[p]]))
             with open(os.path.join(self.dst, "sbr-fold{}-trainset.txt".format(k)), "wb") as fp:
                 fp.write("\n".join(lines))
 
