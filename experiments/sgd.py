@@ -675,26 +675,27 @@ class SGDExperiment(_Experiment):
             with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
+        def fold_to_ps(fold):
+            return set(p for p, _, _ in fold) | set(q for _, q, _ in fold)
+
+        def write_example_file(path, ps, dag):
+            lines = []
+            for p in ps:
+                for term in dag._id_to_term.itervalues():
+                    state = {True:"1", False:"0"}[term.id in p_to_term_ids[p]]
+                    lines.append("{}({})={}".format(self._term_to_predicate(term), p, state))
+            with open(path, "wb") as fp:
+                fp.write("\n".join(lines))
+
         # Write the examples for each fold
         for k, fold in enumerate(folds):
-            ps_in_fold = set(p1 for p1, _, _ in fold) | \
-                         set(p2 for _, p2, _ in fold)
+            ps_in_test_set = fold_to_ps(fold)
+            ps_in_validation_set = fold_to_ps(folds[(k + 1) % len(folds)])
+            ps_in_training_set = set(ps) - (ps_in_test_set | ps_in_validation_set)
 
-            # Write out the test examples
-            lines = []
-            for p in ps_in_fold:
-                for term in dag._id_to_term.itervalues():
-                    lines.append("{}({})={}".format(self._term_to_predicate(term), p, {True:"1", False:"0"}[term.id in p_to_term_ids[p]]))
-            with open(os.path.join(self.dst, "sbr-fold{}-testset.txt".format(k)), "wb") as fp:
-                fp.write("\n".join(lines))
-
-            # Write out the training examples
-            lines = []
-            for p in sorted(set(ps) - ps_in_fold):
-                for term in dag._id_to_term.itervalues():
-                    lines.append("{}({})={}".format(self._term_to_predicate(term), p, {True:"1", False:"0"}[term.id in p_to_term_ids[p]]))
-            with open(os.path.join(self.dst, "sbr-fold{}-trainset.txt".format(k)), "wb") as fp:
-                fp.write("\n".join(lines))
+            write_example_file(os.path.join(self.dst, "sbr-fold{}-testset.txt".format(k)), ps_in_test_set, dag)
+            write_example_file(os.path.join(self.dst, "sbr-fold{}-validset.txt".format(k)), ps_in_validation_set, dag)
+            write_example_file(os.path.join(self.dst, "sbr-fold{}-trainset.txt".format(k)), ps_in_training_set, dag)
 
         return True,
 
