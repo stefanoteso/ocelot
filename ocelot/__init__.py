@@ -1,4 +1,5 @@
 from services import *
+from scheduler import *
 from converters import *
 from features import *
 from kernels import *

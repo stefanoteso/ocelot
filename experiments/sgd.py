@@ -9,7 +9,8 @@ from collections import defaultdict
 from ocelot.services import _cls, CDHit
 from ocelot.go import GODag, GOTerm
 from ocelot.kernels import *
-from . import _Experiment, Stage
+from ocelot.scheduler import Stage
+from . import _Experiment
 from .yeast import *
 
 class SGDExperiment(_Experiment):
@@ -868,4 +869,4 @@ class SGDExperiment(_Experiment):
             "cdhit_threshold": cdhit_threshold,
             "dump_states": dump_stats,
         }
-        self._make(STAGES, TARGETS, context=context)
+        self._scheduler.run(STAGES, TARGETS, context=context)

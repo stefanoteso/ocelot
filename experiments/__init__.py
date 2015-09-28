@@ -1,20 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import os
-import cPickle as pickle
 import numpy as np
 from SPARQLWrapper import SPARQLWrapper, JSON
-from modshogun import CombinedKernel, CustomKernel
-from modshogun import BinaryLabels, MKLClassification
 from sklearn.utils import check_random_state
 from sklearn.svm import SVC
 from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
-from collections import namedtuple
 
 import ocelot.ontology as O
-from ocelot.services import _cls
-
-Stage = namedtuple("Stage", ["f", "inputs", "outputs"])
+from ocelot.scheduler import Scheduler
 
 class _Experiment(object):
     """Base class for all experiments.
@@ -54,6 +48,8 @@ class _Experiment(object):
         if not self._check_graph(default_graph):
             raise ValueError("no graph '{}' at endpoint '{}'".format(default_graph, endpoint))
         self.force_update = force_update
+
+        self._scheduler = Scheduler(self.dst)
 
     def _check_graph(self, graph):
         """Checks whether a graph exists."""
@@ -142,98 +138,6 @@ class _Experiment(object):
         kernel = Kernel(*args, **kwargs)
         kernel.check_and_fixup(kwargs.get("tol", 1e-10))
         return kernel.compute(),
-
-    def _resolve_save(self, basename, what):
-        relpath = os.path.join(self.dst, basename)
-        print _cls(self), ": saving '{}'".format(relpath)
-        try:
-            what.dump(relpath + ".npy")
-            return
-        except:
-            # Not a numpy object
-            pass
-        try:
-            with open(relpath + ".pickle", "wb") as fp:
-                pickle.dump(what, fp)
-            return
-        except:
-            pass
-        raise IOError("can not save '{}'".format(relpath))
-
-    def _resolve_load(self, basename):
-        relpath = os.path.join(self.dst, basename)
-        # Try to load a pickled file
-        try:
-            with open(relpath + ".pickle", "rb") as fp:
-                return pickle.load(fp)
-        except:
-            pass
-        # Try to load a numpy array
-        try:
-            with open(relpath + ".npy", "rb") as fp:
-                return np.load(fp)
-        except:
-            pass
-        raise IOError("can not load '{}'".format(relpath))
-
-    def _resolve(self, target_to_stage, target, context, force_update):
-        stage = target_to_stage[target]
-
-        # Try to load from the cache: if all dependencies are cached, we
-        # do not want to recurse deeper in the dependency graph
-        if not force_update:
-            ret, loaded_all = {}, True
-            for output in stage.outputs:
-                try:
-                    ret[output] = self._resolve_load(output)
-                except Exception, e:
-                    print _cls(self), ": failed to load dependency ({}), recursing".format(e)
-                    loaded_all = False
-            if loaded_all:
-                return ret
-
-        # Resolve the dependencies
-        print _cls(self), ": resolving dependencies for {}".format(target)
-        for input_ in stage.inputs:
-            if not input_ in context:
-
-                # Resolve the current dependency
-                outputs = self._resolve(target_to_stage, input_, context, force_update)
-
-                # Update the context
-                for input_ in outputs:
-                    assert not input_ in context
-                context.update(outputs)
-
-        # Now that all dependencies are satisfied, compute the target
-        print _cls(self), ": about to run {}".format(stage.f)
-        results = stage.f(*[context[input_] for input_ in stage.inputs])
-        assert len(results) == len(stage.outputs), \
-               "declared and actual outputs differ: {} vs {}".format(len(results), len(stage.outputs))
-
-        # Prepare the results dictionary and cache them
-        ret = {}
-        for output, result in zip(stage.outputs, results):
-            self._resolve_save(output, result)
-            ret[output] = result
-
-        return ret
-
-    def _make(self, stages, targets, context={}):
-        """Make-like functionality based on "stages"."""
-
-        # Map dependencies to stages
-        target_to_stage = {}
-        for stage in stages:
-            for target in stage.outputs:
-                assert not target in target_to_stage, \
-                       "two stages produce the same target '{}'".format(target)
-                target_to_stage[target] = stage
-
-        # Resolve for all targets
-        for target in targets:
-            self._resolve(target_to_stage, target, context, self.force_update)
-        return context
 
     def run(self):
         raise NotImplementedError()
