@@ -348,7 +348,11 @@ class SGDExperiment(_Experiment):
 
     def _compute_p_interpro_kernel(self, ps):
         return self._compute_kernel(InterProKernel, ps, self.dst,
-                                    use_evalue=False)
+                                    mode="match")
+
+    def _compute_p_interpro_count_kernel(self, ps):
+        return self._compute_kernel(InterProHistogramKernel, ps, self.dst,
+                                    mode="count")
 
     def _compute_p_pssm_kernel(self, ps, p_to_seq):
         return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
@@ -803,6 +807,9 @@ class SGDExperiment(_Experiment):
             Stage(self._compute_p_interpro_kernel,
                   ['filtered_ps'], ['p_interpro_kernel']),
 
+            Stage(self._compute_p_interpro_count_kernel,
+                  ['filtered_ps'], ['p_interpro_count_kernel']),
+
             Stage(self._compute_p_pssm_kernel,
                   ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
 
@@ -814,7 +821,7 @@ class SGDExperiment(_Experiment):
             Stage(lambda *args, **kwargs: None,
                   ['p_colocalization_kernel', 'p_gene_expression_kernel',
                    'p_complex_kernel', 'p_interpro_kernel', 'p_pssm_kernel',
-                   'p_average_kernel'],
+                   'p_average_kernel', 'p_interpro_count_kernel'],
                   ['p_kernels']),
 
             Stage(self._load_go_and_filter,
