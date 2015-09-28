@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import itertools as it
+from collections import Counter
 from glob import glob
 
 from ocelot.kernels import *
@@ -100,14 +101,16 @@ class InterProKernel(Kernel):
     :param ps: list of protein IDs.
     :param cache_path: path to the directory holding the interpro output.
     :param allowed_sources: list of allowed domain providers (default: ``None``).
-    :param use_evalue: whether to use the evalue to score the predictions (default: ``False``).
+    :param mode: one of ``"match"``, ``"count"``, ``"evalue"`` (default: ``"match"``).
     :param default_score: default score to use when no evalue is provided (default: ``1.0``).
     """
     def __init__(self, ps, cache_path, allowed_sources = None,
                  use_evalue = False, default_score = 1.0, *args, **kwargs):
+        if not mode in ("match", "count", "evalue"):
+            raise ValueError("invalid mode '{}'".format(mode))
         self._cache_path = cache_path
         self._allowed_sources = allowed_sources
-        self._use_evalue = use_evalue
+        self._mode = mode
         self._default_score = default_score
         super(InterProKernel, self).__init__(ps, *args, **kwargs)
 
@@ -136,9 +139,12 @@ class InterProKernel(Kernel):
             except IOError, e:
                 domain_to_evalue = {}
                 num_missing += 1
-            if not self._use_evalue:
+
+            if self._mode == "match":
                 hits = set(domain_to_evalue.keys())
-            else:
+            elif self._mode == "count":
+                hits = dict(Counter(domain_to_evalue.keys()))
+            elif self._mode == "evalue":
                 hits = {domain: self._to_score(evalue)
                         for domain, evalue in domain_to_evalue.iteritems()}
             all_hits.append(hits)
@@ -147,7 +153,7 @@ class InterProKernel(Kernel):
             print _cls(self), ": no interpro domains for '{}/{}' proteins" \
                                 .format(num_missing, len(self))
 
-        if not self._use_evalue:
+        if self._mode == "match":
             return SetKernel(all_hits).compute()
         else:
             return SparseLinearKernel(all_hits).compute()
