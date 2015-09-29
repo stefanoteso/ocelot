@@ -358,6 +358,9 @@ class SGDExperiment(_Experiment):
         return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
                                     k=4, threshold=6.0)
 
+    def _compute_p_average_kernel(self, *matrices):
+        return sum(matrices) / len(matrices)
+
     def _compute_pp_kernel(self, ps, folds, submatrix):
         p_to_i = {p: i for i, p in enumerate(ps)}
 
@@ -813,15 +816,26 @@ class SGDExperiment(_Experiment):
             Stage(self._compute_p_pssm_kernel,
                   ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
 
-            Stage(lambda *args, **kwargs: None, # XXX implemented externally
-                  ['p_colocalization_kernel', 'p_gene_expression_kernel',
-                   'p_complex_kernel', 'p_interpro_kernel', 'p_pssm_kernel'],
+            Stage(self._compute_p_average_kernel,
+                  [
+                    'p_colocalization_kernel',
+                    'p_gene_expression_kernel',
+                    'p_complex_kernel',
+                    'p_interpro_kernel',
+                    'p_pssm_kernel'
+                  ],
                   ['p_average_kernel']),
 
             Stage(lambda *args, **kwargs: None,
-                  ['p_colocalization_kernel', 'p_gene_expression_kernel',
-                   'p_complex_kernel', 'p_interpro_kernel', 'p_pssm_kernel',
-                   'p_average_kernel', 'p_interpro_count_kernel'],
+                  [
+                    'p_colocalization_kernel',
+                    'p_gene_expression_kernel',
+                    'p_complex_kernel',
+                    'p_interpro_kernel',
+                    'p_interpro_count_kernel',
+                    'p_pssm_kernel',
+                    'p_average_kernel',
+                  ],
                   ['p_kernels']),
 
             Stage(self._load_go_and_filter,
