@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 import cPickle as pickle
 from collections import namedtuple
 
