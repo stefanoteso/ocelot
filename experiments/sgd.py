@@ -698,7 +698,7 @@ class SGDExperiment(_Experiment):
         # Write the examples for each fold
         for k, fold in enumerate(folds):
             ps_in_test_set = fold_to_ps(fold)
-            ps_in_validation_set = fold_to_ps(folds[(k + 1) % len(folds)])
+            ps_in_validation_set = set(fold_to_ps(folds[(k + 1) % len(folds)])) - ps_in_test_set
             ps_in_training_set = set(ps) - (ps_in_test_set | ps_in_validation_set)
 
             write_example_file(os.path.join(self.dst, "sbr-fold{}-testset.txt".format(k)), ps_in_test_set, dag)
