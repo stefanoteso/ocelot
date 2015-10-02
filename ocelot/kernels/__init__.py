@@ -122,6 +122,38 @@ class DummyKernel(Kernel):
         if self._do_normalize:
             self._matrix = self._normalize(self._matrix)
 
+class _TestKernel(object):
+    def _test(matrix, expected):
+        kernel = DummyKernel(np.array(matrix), do_normalize=True)
+        output = kernel.compute()
+        assert (output == expected).all()
+
+    def test_normalization(self):
+        MATRIX = np.array([
+            [2, 1, 0],
+            [1, 2, 1],
+            [0, 1, 2],
+        ])
+        EXPECTED = np.array([
+            [1, 1/2., 0],
+            [1/2., 1, 1/2.],
+            [0, 1/2., 1],
+        ])
+        self._test(MATRIX, EXPECTED)
+
+    def test_normalization_weird(self):
+        MATRIX = np.array([
+            [2, 1, 0],
+            [1, 0, 1],
+            [0, 2, 2],
+        ])
+        EXPECTED = np.array([
+            [1, 1, 0],
+            [1, 1, 1],
+            [0, 1, 1],
+        ])
+        self._test(MATRIX, EXPECTED)
+
 from .vector import *
 from .string import *
 from .graph import *
