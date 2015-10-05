@@ -631,19 +631,29 @@ class SGDExperiment(_Experiment):
     def _term_to_predicate(term):
         assert len(term.namespace)
         assert term.level >= 0
-        return "{}_lvl{}_{}_{}".format(term.namespace, term.level, term.id.replace(":", "_"), term.name.replace(" ", "_").replace("-", "_").replace(":", "_").replace(",", ""))
+        d = {
+            "namespace": term.namespace,
+            "level": term.level,
+            "id": term.id.replace(":", "-"),
+            "name": term.name.replace(" ", "-").replace(":", "-").replace(",", "")
+        }
+        return "{namespace}-lvl{level}-{id}-{name}".format(**d)
 
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
-        """Writes the SBR dataset.
+        """Writes the SBR dataset."""
 
-        .. todo::
+        # Figure out how the pairs are laid out in the pairwise kernels
+        p_to_i = {p: i for i, p in enumerate(ps)}
 
-            Add support for the pairwise setting.
-        """
+        pps = set()
+        for fold in folds:
+            pps.update((p1, p2) for p1, p2, _ in fold)
+        pps = sorted(pps)
 
         # Write the datapoints, including proteins and protein pairs
         lines = []
         lines.extend("{};PROTEIN;1:1".format(p) for p in ps)
+        lines.extend("{}-{};PPAIR;1:1".format(pp[0], pp[1]) for pp in pps)
         with open(os.path.join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
@@ -651,6 +661,8 @@ class SGDExperiment(_Experiment):
         lines = []
         lines.extend("DEF {};LEARN;C".format(self._term_to_predicate(term))
                      for term_id, term in dag._id_to_term.iteritems())
+        lines.append("DEF BOUND(PPAIR);LEARN;C")
+        lines.append("DEF IN(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
         with open(os.path.join(self.dst, "sbr-predicates.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
@@ -683,10 +695,23 @@ class SGDExperiment(_Experiment):
             with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
+            # Interaction implies 
+            aspect_terms_by_level = defaultdict(set)
+            for term in dag.generate_terms_by_level():
+                if term.namespace == aspect:
+                    aspect_terms_by_level[term.level].add(term)
+
+            lines = []
+            for level in sorted(aspect_terms_by_level):
+                head = " OR ".join("({}(p) AND {}(q))".format(self._term_to_predicate(term), self._term_to_predicate(term)) for term in aspect_terms_by_level[level])
+                lines.append("forall p forall q forall pq [(BOUND(pq)) AND (IN(p,q,pq)) => {}];LEARN;L1;MINIMUM_TNORM;1;1;IN".format(head))
+            with open(os.path.join(self.dst, "sbr-rules-interaction_implies_same_{}_levelwise.txt".format(aspect)), "wb") as fp:
+                fp.write("\n".join(lines))
+
         def fold_to_ps(fold):
             return set(p for p, _, _ in fold) | set(q for _, q, _ in fold)
 
-        def write_example_file(path, ps, dag):
+        def write_functions(path, ps, dag):
             lines = []
             for p in ps:
                 for term in dag._id_to_term.itervalues():
@@ -695,15 +720,49 @@ class SGDExperiment(_Experiment):
             with open(path, "wb") as fp:
                 fp.write("\n".join(lines))
 
-        # Write the examples for each fold
-        for k, fold in enumerate(folds):
-            ps_in_test_set = fold_to_ps(fold)
-            ps_in_validation_set = set(fold_to_ps(folds[(k + 1) % len(folds)])) - ps_in_test_set
-            ps_in_training_set = set(ps) - (ps_in_test_set | ps_in_validation_set)
+        def write_interactions(path, fold):
+            lines = []
+            for p, q, state in fold:
+                lines.append("IN({},{},{}-{})=1".format(p, q, p, q))
+                lines.append("BOUND({}-{})={}".format(p, q, state))
+            with open(path, "wb") as fp:
+                fp.write("\n".join(lines))
 
-            write_example_file(os.path.join(self.dst, "sbr-fold{}-testset.txt".format(k)), ps_in_test_set, dag)
-            write_example_file(os.path.join(self.dst, "sbr-fold{}-validset.txt".format(k)), ps_in_validation_set, dag)
-            write_example_file(os.path.join(self.dst, "sbr-fold{}-trainset.txt".format(k)), ps_in_training_set, dag)
+        # Write the examples for each fold
+        for k, test_fold in enumerate(folds):
+            l = (k + 1) % len(folds)
+
+            validation_fold = folds[l]
+
+            training_set = set()
+            for i, fold in enumerate(folds):
+                if i != k and i != l:
+                    training_set.update(fold)
+
+            ps_in_training_set = fold_to_ps(training_set)
+            ps_in_test_set = fold_to_ps(test_fold) - ps_in_training_set
+            ps_in_validation_set = fold_to_ps(validation_fold) - (ps_in_training_set | ps_in_test_set)
+
+            print _cls(self), \
+                "fold {} examples: #ps = {}, {}, {}; #pps = {}, {}, {}" \
+                    .format(k, len(ps_in_training_set),
+                            len(ps_in_validation_set), len(ps_in_test_set),
+                            len(training_set), len(validation_fold),
+                            len(test_fold))
+
+            write_functions(os.path.join(self.dst, "sbr-fold{}-testset-fun.txt".format(k)),
+                            ps_in_test_set, dag)
+            write_functions(os.path.join(self.dst, "sbr-fold{}-validset-fun.txt".format(k)),
+                            ps_in_validation_set, dag)
+            write_functions(os.path.join(self.dst, "sbr-fold{}-trainset-fun.txt".format(k)),
+                            ps_in_training_set, dag)
+
+            write_interactions(os.path.join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
+                               test_fold)
+            write_interactions(os.path.join(self.dst, "sbr-fold{}-validset-int.txt".format(k)),
+                               validation_fold)
+            write_interactions(os.path.join(self.dst, "sbr-fold{}-trainset-int.txt".format(k)),
+                               training_set)
 
         return True,
 
