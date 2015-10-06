@@ -401,7 +401,7 @@ class GODag(object):
             aspect_to_ps[term.namespace].update(term.proteins)
         return aspect_to_ps
 
-    def _generate_terms_by_level(self):
+    def generate_terms_by_level(self):
         """Generates all terms according to their recorder level."""
         level_to_terms = defaultdict(set)
         for term in self._id_to_term.itervalues():
@@ -457,7 +457,7 @@ class GODag(object):
         # terms C1 and C2 such that C2 is a child of C1 (i.e. C2 is a child of
         # both T and C1). DAGs be damned!
         processed, terms_to_keep = set(), set()
-        for term in self._generate_terms_by_level():
+        for term in self.generate_terms_by_level():
             if term in processed:
                 continue
             processed.add(term)
