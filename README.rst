@@ -1,8 +1,0 @@
-Ocelot
-======
-
-To build the HTML documentation, run::
-
-    sphinx-build -b html docs/source docs/build
-
-The result can be found in ``docs/build/index.html``.
