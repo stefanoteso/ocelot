@@ -1,29 +1,45 @@
 # -*- coding: utf-8 -*-
 
 import sys, re, copy
+import numpy as np
 from collections import defaultdict
 from ocelot.services import _cls
 from copy import deepcopy
 
 class GOTerm(object):
-    """A GO Term."""
+    """A GO Term.
+
+    Attributes
+    ----------
+    id : str
+        ID of the term, e.g. ``"GO:0048308'"``
+    alt_ids : list
+        List of alternative IDs.
+    name : str
+        Short description of the term.
+    namespace : str
+        Namespace of the term, one of ``["biological_process",
+        "cellular_component", "molecular_function"]``.
+    is_obsolete : bool
+        Whether the term is marked as obsolete.
+    level : set
+        Distance from the root, ``-1`` if unknown.
+    parents : list
+        List of (parent term ID, relation) tuples.
+    children : list
+        List of (child term ID, relation) tuples.
+    proteins : set
+        Collection of proteins annotated with the GO term.
+    """
     def __init__(self):
         self.id = ""
-        """ID of the term, e.g. ``"GO:0048308'"``"""
         self.alt_ids = []
-        """List of alternative IDs."""
         self.name = ""
-        """Short description of the term."""
         self.namespace = ""
-        """Namespace of the term, one of ``["biological_process", "cellular_component", "molecular_function"]``."""
-        self.parents = []
-        """List of (parent term ID, relation) tuples."""
-        self.children = []
-        """List of (child term ID, relation) tuples."""
         self.is_obsolete = False
-        """Whether the term is marked as obsolete."""
         self.level = -1
-        """Distance from the root, ``-1`` if unknown."""
+        self.parents = []
+        self.children = []
         self.proteins = set()
 
     def __str__(self):
@@ -34,35 +50,8 @@ class GOTerm(object):
     def __repr__(self):
         return "GOTerm('%s')" % (self.id)
 
-    def get_name(self):
-        bound = 15
-        ret = self.name[0].upper() + self.name[1:].replace('_', ' ')
-        if len(ret) > bound:
-            ret = ret[:bound] + ret[bound:].replace(' ', '\n', 1)
-        return ret
-
-    def has_ancestor(self, dag, term_id, relations=set(["is_a"])):
-        """Checks whether ``term_id`` is an ancestor of this term."""
-        for parent_id, relation in self.parents:
-            if not relation in relations:
-                continue
-            if dag._id_to_term[parent_id].id == term_id or \
-               dag._id_to_term[parent_id].has_parent(term_id):
-                return True
-        return False
-
-    def has_descendant(self, dag, term, relations=set(["is_a"])):
-        """Checks whether ``term_id`` is a descendant of this term."""
-        for child_id, relation in self.children:
-            if not relation in relations:
-                continue
-            if dag._id_to_term[child_id].id == term_id or \
-               dag._id_to_term[child_id].has_child(term_id):
-                return True
-        return False
-
     def get_parents(self, dag, relations=set(["is_a"])):
-        """Returns the parents of a node."""
+        """Returns the parents of the node."""
         parents = set()
         for parent_id, relation in self.parents:
             if not relation in relations:
@@ -71,7 +60,7 @@ class GOTerm(object):
         return parents
 
     def get_children(self, dag, relations=set(["is_a"])):
-        """Returns the children of a node."""
+        """Returns the children of the term."""
         children = set()
         for child_id, relation in self.children:
             if not relation in relations:
@@ -80,7 +69,7 @@ class GOTerm(object):
         return children
 
     def get_ancestors(self, dag, relations=set(["is_a"])):
-        """Returns the ancestors of a node.
+        """Returns the ancestors of the node.
 
         :param dag: DAG.
         :param relations:
@@ -105,18 +94,19 @@ class GOTerm(object):
         return descendants
 
 class BinTerm(GOTerm):
-    """A placeholder 'bin' GO term."""
+    """A placeholder GO term."""
 
     def __init__(self, parent_id, parent_term, proteins=set()):
         super(BinTerm, self).__init__()
+
         self.id = "BN:{}".format(parent_id[parent_id.index(":")+1:])
         self.name = "bin term for {}".format(parent_id)
         self.namespace = parent_term.namespace
+        self.is_obsolete = False
+        self.level = parent_term.level + 1
         self.parents = [(parent_id, "bin_for")]
         self.children = []
-        self.is_obsolete = False
         self.proteins = proteins
-        self.level = -1 #parent_term.level + 1
 
 class _GOReader(object):
     """Parse a GO OBO file.
@@ -125,17 +115,12 @@ class _GOReader(object):
 
         http://purl.obolibrary.org/obo/go/
 
-    :param path: path to the OBO file.
-    :param keep_obsolete: whether to keep obsolete nodes (default: ``True``).
-
-    Example usage::
-
-        >>> reader = GOReader()
-        >>> for term in reader:
-                print term
-    .. todo::
-
-        Handle the remaining term information.
+    Parameters
+    ----------
+    path : str
+        Path to the OBO file.
+    keep_obsolete : bool, defaults to ``True``
+        Whether to keep obsolete nodes.
     """
     _TYPEDEF_TAG    = "[Typedef]"
     _TERM_TAG       = "[Term]"
@@ -225,17 +210,18 @@ class _GOReader(object):
 class GODag(object):
     """The GO DAG.
 
-    Basically a dictionary between identifiers (i.e., strings like
-    ``"GO:0006468"``) and ``GOTerm``'s.
+    Essentially a map from term IDs and GOTerm objects.
 
-    .. todo::
-
-        Double check the depth computation, it seems to be a bit off.
-
-    :param path: path to the OBO file.
-    :param keep_obsolete: whether to keep obsolete terms (default: ``True``).
+    Parameters
+    ----------
+    path : str
+        Path to the OBO file.
+    keep obsolete : bool, defaults to ``False``
+        Whether to keep terms marked as obsolete.
+    include_alt_ids : bool, defaults to ``False``
+        Whether to include alternative term IDs in the dictionary.
     """
-    def __init__(self, path=None, keep_obsolete=True):
+    def __init__(self, path=None, keep_obsolete=False, include_alt_ids=False):
         self._id_to_term = {}
         self._path = path
         if not path:
@@ -243,9 +229,10 @@ class GODag(object):
         for term in _GOReader(path, keep_obsolete = keep_obsolete):
             assert not term.id in self._id_to_term
             self._id_to_term[term.id] = term
-            for alt_id in term.alt_ids:
-                assert not alt_id in self._id_to_term
-                self._id_to_term[alt_id] = term
+            if include_alt_ids:
+                for alt_id in term.alt_ids:
+                    assert not alt_id in self._id_to_term
+                    self._id_to_term[alt_id] = term
         self._populate_terms()
 
     def _set_term_depth(self, term):
@@ -343,11 +330,35 @@ class GODag(object):
                                 for term in self._id_to_term.itervalues())
         return num_annotations_1 == num_annotations_2, "{} != {}".format(num_annotations_1, num_annotations_2)
 
+    def _check_annotation_hierarchy(self):
+        for term in self._id_to_term.itervalues():
+
+            # Sanity check: check that a term has at most as many annotations
+            # as the number of annotations in all its parents (note that a term
+            # may have more than one parent, hence the sum).
+            num_parent_annot = 0
+            for parent_id, relation in term.parents:
+                parent = self._id_to_term[parent_id]
+                if relation == "is_a":
+                    num_parent_annot += len(parent.proteins)
+            assert len(term.parents) == 0 or num_parent_annot >= len(term.proteins), \
+                "failed sanity check: {} -> parents {}".format(term, term.parents)
+
+            # Sanity check: check that a term has at least as many annotations
+            # as each of its children
+            for child_id, relation in term.children:
+                child = self._id_to_term[child_id]
+                if relation == "is_a":
+                    assert len(term.proteins) >= len(child.proteins), \
+                        "failed sanity check: {} -> children {}".format(term, term.children)
+
     def _check(self, p_to_term_ids):
         assert sum(len(term.proteins) for term in self._id_to_term.itervalues())
         assert self._check_annotations(p_to_term_ids)
+        self._check_annotation_hierarchy()
 
     def _propagate(self, p_to_term_ids):
+        """Propagate annotations to the root."""
         propagated_p_to_term_ids = {}
         for p, term_ids in p_to_term_ids.iteritems():
             propagated_term_ids = set()
@@ -365,6 +376,7 @@ class GODag(object):
                     # Do the actual propagation
                     for term in path:
                         term.proteins.add(p)
+                        print "propagating", term, "with", p
                     # Take note of the propagated terms
                     propagated_term_ids.update(term.id for term in path)
             # Update the protein ID->term IDs map
@@ -385,6 +397,7 @@ class GODag(object):
             for term_id in term_ids:
                 assert term_id in self._id_to_term, "unknown term ID '{}'".format(term_id)
                 self._id_to_term[term_id].proteins.add(p)
+                print "annotating", term_id, "with", p
 
         self._check(p_to_term_ids)
 
@@ -416,46 +429,39 @@ class GODag(object):
 
         This method does the following:
 
-        * Removes from terms in unwanted namespaces.
-        * Removes from terms with too few annotations.
-        * Removes from terms that are too deep.
+        * Removes all terms in unwanted namespaces.
+        * Removes all terms without enough annotations.
+        * Removes all terms that are too deep.
         * Adds *bin* terms.
 
         The protein-to-function map is adjusted accordingly.
 
-        :param ps: collection of protein IDs.
-        :param aspects: collection of aspects to keep; valid aspects are ``"biological_process"``, ``"cellular_component"``, ``"molecular_function"``.
-        :param max_depth: maximum term depth.
-        :param min_annot: minimum number of proteins to keep a term.
+        Parameters
+        ----------
+        ps : list
+            List of protein IDs a strings
+        aspects : list, optional, defaults to ``None``
+            Terms not in these aspects are discarded.
+        max_depth : int, optional, defaults to ``None``
+            Terms deeper than this are discarded.
+        min_annot : int, optional, defaults to ``None``
+            Terms with fewer annotations than this are discarded.
         """
+        ALL_ASPECTS = [
+            "biological_process",
+            "cellular_component",
+            "molecular_function"
+        ]
+
         if aspects is None:
-            aspects = ["biological_process", "cellular_component", "molecular_function"]
+            aspects = ALL_ASPECTS
+        elif any(aspect not in ALL_ASPECTS for aspect in aspects):
+            raise ValueError("invalid GO aspect.")
 
-        for term in self._id_to_term.itervalues():
-
-            # Sanity check: check that a term has at most as many annotations
-            # as the number of annotations in all its parents (note that a term
-            # may have more than one parent, hence the sum).
-            num_parent_annot = 0
-            for parent_id, relation in term.parents:
-                parent = self._id_to_term[parent_id]
-                if relation == "is_a":
-                    num_parent_annot += len(parent.proteins)
-            assert len(term.parents) == 0 or num_parent_annot >= len(term.proteins), \
-                "failed sanity check: {} -> parents {}".format(term, term.parents)
-
-            # Sanity check: check that a term has at least as many annotations
-            # as each of its children
-            for child_id, relation in term.children:
-                child = self._id_to_term[child_id]
-                if relation == "is_a":
-                    assert len(term.proteins) >= len(child.proteins), \
-                        "failed sanity check: {} -> children {}".format(term, term.children)
+        self._check_annotation_hierarchy()
 
         # Do a per-level traversal of the dag, and mark the terms that satisfy
-        # all constraints. There may be cases where a term T has two child
-        # terms C1 and C2 such that C2 is a child of C1 (i.e. C2 is a child of
-        # both T and C1). DAGs be damned!
+        # all constraints.
         processed, terms_to_keep = set(), set()
         for term in self.generate_terms_by_level():
             if term in processed:
@@ -464,9 +470,7 @@ class GODag(object):
 
             if not max_depth is None and term.level > max_depth:
                 print "discarding '{}', too deep ({} > {})".format(term, term.level, max_depth)
-                # Since this is a per-level traversal, we can break here
-                #break
-                continue # XXX for safety, the traversal code has not really been audited
+                continue
             if not term.namespace in aspects:
                 print "discarding '{}', not in namespace".format(term)
                 continue
@@ -479,21 +483,21 @@ class GODag(object):
         print "found {} terms to keep".format(len(terms_to_keep))
 
         # Ancestores of terms to be kept must also be kept
-        expanded_terms_to_keep = set(terms_to_keep)
+        expanded_terms_to_keep = set()
         for term in terms_to_keep:
             expanded_terms_to_keep.update(self._id_to_term[id_] for id_ in term.get_ancestors(self))
-        terms_to_keep = expanded_terms_to_keep
+        terms_to_keep = terms_to_keep | expanded_terms_to_keep
 
         print "expanded to {} terms to keep".format(len(terms_to_keep))
 
         # Sanity check
         for term in terms_to_keep:
             if not max_depth is None and term.level > max_depth:
-                print "recovered '{}', even if too deep ({} > {})".format(term, term.level, max_depth)
+                print "Warning: keeping '{}' even if too deep ({} > {})".format(term, term.level, max_depth)
             if not term.namespace in aspects:
-                print "recovered '{}', even if not in allowed namespaces".format(term)
+                print "Warning: keeping '{}' even if not in allowed namespaces".format(term)
             if not min_annot is None and len(term.proteins) < min_annot:
-                print "recovered '{}', even if too few annotations ({} < {})".format(term, len(term.proteins), min_annot)
+                print "Warning: keeping '{}' even if too few annotations ({} < {})".format(term, len(term.proteins), min_annot)
 
         # Create a new id->term dictionary for terms to be kept only
         filtered_id_to_term = {term.id: deepcopy(term) for term in terms_to_keep}
@@ -526,7 +530,7 @@ class GODag(object):
             for child_id, _ in removed_children:
                 removed_proteins.update(self._id_to_term[child_id].proteins)
 
-            if len(removed_proteins):
+            if len(removed_proteins) > (min_annot if min_annot is None else 0):
                 print "adding bin term to {}".format(id_)
                 bin_term = BinTerm(id_, filtered_id_to_term[id_],
                                    proteins=removed_proteins)
@@ -559,8 +563,7 @@ class GODag(object):
 
         # Make sure that all original proteins are still mapped to at least
         # one kept term
-        for p in ps:
-            assert p in filtered_p_to_term_ids and len(filtered_p_to_term_ids[p])
+        assert all(p in filtered_p_to_term_ids and len(filtered_p_to_term_ids[p]) for p in ps)
 
         # Replace the current id->term map
         self._id_to_term = filtered_id_to_term
@@ -569,4 +572,79 @@ class GODag(object):
         for term in self._id_to_term.itervalues():
             self._set_term_depth(term)
 
+        self._check_annotation_hierarchy()
+
         return filtered_p_to_term_ids
+
+    def draw(self, path, p_to_term_ids, fontname="Verdana"):
+        import pydot
+
+        NAMESPACE_TO_NS = {
+            "biological_process": "bp",
+            "cellular_component": "cc",
+            "molecular_function": "mf",
+        }
+
+        graph = pydot.Dot(graph_type="digraph", fontname=fontname)
+
+        term_to_node = {}
+        for _, term_ids in p_to_term_ids.items():
+            for term_id in term_ids:
+                term = self._id_to_term[term_id]
+                name = term.id.replace(":", "") + "_" + NAMESPACE_TO_NS[term.namespace]
+                node = pydot.Node(name, fontname=fontname)
+                term_to_node[term] = node
+                graph.add_node(node)
+
+        for _, term_ids in p_to_term_ids.items():
+            for term_id in term_ids:
+                term = self._id_to_term[term_id]
+                for parent_id, relation in term.parents:
+                    parent = self._id_to_term[parent_id]
+                    graph.add_edge(pydot.Edge(term_to_node[term], term_to_node[parent], fontname=fontname))
+
+        graph.write_png(path)
+
+class _TestDAG(object):
+
+    def _load_and_fill(self, p_to_term_ids, propagate):
+        dag = GODag("data/GO/go-basic.obo")
+        return dag, dag.annotate(p_to_term_ids, propagate=propagate)
+
+    def _all_term_ids(self, p_to_term_ids):
+        all_term_ids = set()
+        for term_ids in p_to_term_ids.values():
+            all_term_ids.update(term_ids)
+        return all_term_ids
+
+    def test_propagation_roots(self):
+        ANNOTATIONS = {
+            "BP": ["GO:0008150"], # biological process
+            "MF": ["GO:0003674"], # molecular function
+            "CC": ["GO:0005575"], # cellular component
+        }
+
+        for propagate in (True, False):
+            dag, p_to_term_ids = self._load_and_fill(ANNOTATIONS, propagate)
+
+            assert len(p_to_term_ids) == 3
+            assert sum(len(term.proteins) for _, term in dag._id_to_term.items()) == 3
+
+    def test_propagation_first_level(self):
+        ANNOTATIONS = {
+            "p0": ["GO:0009987"], # cellular process
+            "p1": ["GO:0032502"], # developmental process
+            "p2": ["GO:0002376"], # immune system process
+            "p3": ["GO:0008152"], # metabolic process
+            "p4": ["GO:0051704"], # multi-organism process
+            "p5": ["GO:0032501"], # multicellular organismal process
+            "p6": ["GO:0022414"], # reproductive process
+            "p7": ["GO:0048511"], # rhythmic process
+            "p8": ["GO:0044699"], # single-organism process
+        }
+
+        _, p_to_term_ids = self._load_and_fill(ANNOTATIONS, False)
+        assert len(self._all_term_ids(p_to_term_ids)) == 9
+
+        _, p_to_term_ids = self._load_and_fill(ANNOTATIONS, True)
+        assert len(self._all_term_ids(p_to_term_ids)) == 10
