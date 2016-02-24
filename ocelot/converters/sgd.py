@@ -8,10 +8,10 @@ from rdflib import URIRef as U, BNode as B, Literal as L
 
 class SGDConverter(Converter):
     """Converter for the `Saccharomyces Genome Database <http://www.yeastgenome.org/>`_.
-    
+
     The converter assumes that the data directory includes an ``SGD`` directory
     with the following tab-separated files taken directly from the SGD website::
-    
+
       chromosome_length.tab         : not used
       dbxref.tab                    : DONE
       domains.tab                   : DONE
