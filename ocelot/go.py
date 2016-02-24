@@ -324,18 +324,17 @@ class GODag(object):
                     yield term, relation, parent
 
     def _check_annotations(self, p_to_term_ids):
-        num_annotations_1 = sum(len(term_ids)
-                                for term_ids in p_to_term_ids.itervalues())
-        num_annotations_2 = sum(len(term.proteins)
-                                for term in self._id_to_term.itervalues())
-        return num_annotations_1 == num_annotations_2, "{} != {}".format(num_annotations_1, num_annotations_2)
+        # The number of annotations in the GODag and in the p_to_term_ids map
+        # must be the same
+        n = sum(len(term_ids) for term_ids in p_to_term_ids.itervalues())
+        m = sum(len(term.proteins) for term in self._id_to_term.itervalues())
+        assert n == m, "GODag and p_to_term_ids mismatch"
 
     def _check_annotation_hierarchy(self):
         for term in self._id_to_term.itervalues():
 
-            # Sanity check: check that a term has at most as many annotations
-            # as the number of annotations in all its parents (note that a term
-            # may have more than one parent, hence the sum).
+            # A term should have at most as many annotations as all its
+            # parents.
             num_parent_annot = 0
             for parent_id, relation in term.parents:
                 parent = self._id_to_term[parent_id]
@@ -344,18 +343,13 @@ class GODag(object):
             assert len(term.parents) == 0 or num_parent_annot >= len(term.proteins), \
                 "failed sanity check: {} -> parents {}".format(term, term.parents)
 
-            # Sanity check: check that a term has at least as many annotations
-            # as each of its children
+            # A term should have at least as many annotations as each of its
+            # children
             for child_id, relation in term.children:
                 child = self._id_to_term[child_id]
                 if relation == "is_a":
                     assert len(term.proteins) >= len(child.proteins), \
                         "failed sanity check: {} -> children {}".format(term, term.children)
-
-    def _check(self, p_to_term_ids):
-        assert sum(len(term.proteins) for term in self._id_to_term.itervalues())
-        assert self._check_annotations(p_to_term_ids)
-        self._check_annotation_hierarchy()
 
     def _propagate(self, p_to_term_ids):
         """Propagate annotations to the root."""
@@ -376,17 +370,14 @@ class GODag(object):
                     # Do the actual propagation
                     for term in path:
                         term.proteins.add(p)
-                        print "propagating", term, "with", p
                     # Take note of the propagated terms
                     propagated_term_ids.update(term.id for term in path)
             # Update the protein ID->term IDs map
             propagated_p_to_term_ids[p] = propagated_term_ids
 
-        self._check(propagated_p_to_term_ids)
-
         return propagated_p_to_term_ids
 
-    def annotate(self, p_to_term_ids, propagate = False):
+    def annotate(self, p_to_term_ids, propagate=False):
         """Annotates the GO DAG with protein annotations.
 
         :param p_to_term_ids: map from protein IDs to GO Term IDs.
@@ -397,12 +388,11 @@ class GODag(object):
             for term_id in term_ids:
                 assert term_id in self._id_to_term, "unknown term ID '{}'".format(term_id)
                 self._id_to_term[term_id].proteins.add(p)
-                print "annotating", term_id, "with", p
-
-        self._check(p_to_term_ids)
+        self._check_annotations(p_to_term_ids)
 
         if propagate:
             p_to_term_ids = self._propagate(p_to_term_ids)
+            self._check_annotations(p_to_term_ids)
 
         return p_to_term_ids
 
@@ -591,7 +581,7 @@ class GODag(object):
         for _, term_ids in p_to_term_ids.items():
             for term_id in term_ids:
                 term = self._id_to_term[term_id]
-                name = term.id.replace(":", "") + "_" + NAMESPACE_TO_NS[term.namespace]
+                name = term.id.replace(":", "") + "_" + NAMESPACE_TO_NS[term.namespace] + "_" + str(len(term.proteins))
                 node = pydot.Node(name, fontname=fontname)
                 term_to_node[term] = node
                 graph.add_node(node)
