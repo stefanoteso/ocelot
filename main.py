@@ -145,7 +145,7 @@ def _run_experiment(args):
                                 endpoint = args.endpoint,
                                 default_graph = args.default_graph,
                                 force_update = args.force_update,
-                                go_aspects = args.go_aspects,
+                                go_aspects = args.go_aspects.split(","),
                                 max_go_depth = args.max_go_depth,
                                 min_go_annot = args.min_go_annot,
                                 dump_stats = args.dump_stats,
@@ -184,7 +184,7 @@ def main():
                         help="[all] enable debugging output")
     parser.add_argument("--seed", type=int, default=None,
                         help="[all] seed for the RNG.")
-    parser.add_argument("--go-aspects", type=list, default=None,
+    parser.add_argument("--go-aspects", type=str, default=None,
                         help="[run-experiment] restrict GO annotations/predictions to these aspects (default: all of them)")
     parser.add_argument("--max-go-depth", type=int, default=None,
                         help="[run-experiment] restrict GO annotations/predictions to terms with at most this depth (default: None)")
