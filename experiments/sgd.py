@@ -48,7 +48,7 @@ class SGDExperiment(_Experiment):
         }}
         """
         ids = set(bindings[u"orf"].split(".")[-1]
-                  for bindings in self.iterquery(query, n = 1))
+                  for bindings in self.iterquery(query, n=1))
         return sorted(list(ids))
 
     def _get_sgd_id_to_seq(self):
@@ -63,7 +63,7 @@ class SGDExperiment(_Experiment):
         }}
         """
         sgd_id_to_seq = {}
-        for bindings in self.iterquery(query, n = 2):
+        for bindings in self.iterquery(query, n=2):
             sgd_id = bindings[u"orf"].split(".")[-1]
             sgd_id_to_seq[sgd_id] = bindings[u"seq"]
         return sgd_id_to_seq
@@ -80,7 +80,7 @@ class SGDExperiment(_Experiment):
         }}
         """
         sgd_id_to_fun = {}
-        for bindings in self.iterquery(query, n = 2):
+        for bindings in self.iterquery(query, n=2):
             sgd_id = bindings[u"orf"].split(".")[-1]
             fun = bindings[u"fun"].split("#")[-1]
             if not sgd_id in sgd_id_to_fun:
@@ -102,7 +102,7 @@ class SGDExperiment(_Experiment):
         }}
         """
         sgd_id_to_feat = {}
-        for bindings in self.iterquery(query, n = 2):
+        for bindings in self.iterquery(query, n=2):
             sgd_id = bindings[u"orf"].split(".")[-1]
             feat   = bindings[u"feat"].split(".")[-1]
             if not sgd_id in sgd_id_to_feat:
@@ -129,7 +129,7 @@ class SGDExperiment(_Experiment):
         }}
         """
         p_to_context = {}
-        for bindings in self.iterquery(query, n = 5):
+        for bindings in self.iterquery(query, n=5):
             orf     = bindings[u"orf"].split(".")[-1]
             chrom   = bindings[u"chrom"].split(".")[-1]
             strand  = bindings[u"strand"]
@@ -140,7 +140,7 @@ class SGDExperiment(_Experiment):
                 (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
         return p_to_context
 
-    def _get_sgd_pin(self, ps = None, manual_only = False):
+    def _get_sgd_pin(self, ps=None, manual_only=False):
         query = """
         SELECT DISTINCT ?orf1 ?orf2
         FROM <{default_graph}>
@@ -165,7 +165,7 @@ class SGDExperiment(_Experiment):
                 ocelot:sgd_int_has_type ocelot:sgd_int_type.physical_interactions .
         }}"""
         pp_pos = set()
-        for bindings in self.iterquery(query, n = 2):
+        for bindings in self.iterquery(query, n=2):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
             pp_pos.update([(p1,p2), (p2,p1)])
@@ -178,7 +178,7 @@ class SGDExperiment(_Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
-    def _get_string_pin(self, ps = None):
+    def _get_string_pin(self, ps=None):
         query = """
         SELECT DISTINCT ?orf1 ?orf2
         FROM <{default_graph}>
@@ -196,7 +196,7 @@ class SGDExperiment(_Experiment):
             ?id1 ?mode ?id2 .
         }}"""
         pp_pos = set()
-        for bindings in self.iterquery(query, n = 2):
+        for bindings in self.iterquery(query, n=2):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
             pp_pos.update([(p1,p2), (p2,p1)])
@@ -406,7 +406,7 @@ class SGDExperiment(_Experiment):
                 for term in pp_to_terms[(p1, p2)]:
                     counts[term_to_i[term]] += 1
             print _cls(self), " fold{}: {} pairs, L1 distance from average term counts = {}" \
-                .format(k, len(fold), np.linalg.norm((average - counts) / len(all_pp_terms), ord = 1))
+                .format(k, len(fold), np.linalg.norm((average - counts) / len(all_pp_terms), ord=1))
 
     def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_terms, num_folds=10):
         """Generates the folds.
@@ -551,7 +551,7 @@ class SGDExperiment(_Experiment):
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         x = [len(p_to_seq[p]) for p in ps]
-        ax.hist(x, range(min(x), max(x) + 50, 50), color = "red", alpha = 0.8)
+        ax.hist(x, range(min(x), max(x) + 50, 50), color="red", alpha=0.8)
         ax.yaxis.grid(True)
         fig.savefig(os.path.join(self.dst, "p-{}-length-hist.png".format(prefix)),
                     bbox_inches = "tight", pad_inches = 0)
@@ -562,7 +562,7 @@ class SGDExperiment(_Experiment):
         x = []
         for term in dag._id_to_term.itervalues():
             x.extend([term.level] * len(term.proteins))
-        ax.hist(x, bins = 15, color = "red", alpha = 0.8)
+        ax.hist(x, bins=15, color="red", alpha=0.8)
         ax.yaxis.grid(True)
         fig.savefig(os.path.join(self.dst, "p-{}-annot-depth.png".format(prefix)),
                     bbox_inches = "tight", pad_inches = 0)
@@ -589,7 +589,7 @@ class SGDExperiment(_Experiment):
             ps2 = dag._id_to_term[term_id2].proteins
             condprob = len(ps1 & ps2) / float(len(ps1))
             tt_condprob.append((term_id1, term_id2, condprob))
-        tt_condprob = sorted(tt_condprob, key = lambda triple: triple[-1],
+        tt_condprob = sorted(tt_condprob, key=lambda triple: triple[-1],
                                reverse = True)
         with open(os.path.join(self.dst, "p-{}-term-condprob.txt".format(prefix)), "wb") as fp:
             for term_id1, term_id2, condprob in tt_condprob:
@@ -603,7 +603,7 @@ class SGDExperiment(_Experiment):
 
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        ax.matshow(matrix, interpolation = "nearest", cmap = cm.OrRd)
+        ax.matshow(matrix, interpolation="nearest", cmap=cm.OrRd)
         fig.savefig(os.path.join(self.dst, "p-{}-term-condprob.png".format(prefix)),
                     bbox_inches="tight", pad_inches=0)
 
@@ -620,7 +620,7 @@ class SGDExperiment(_Experiment):
                 ps2 = dag._id_to_term[child_id2].proteins
                 ni, nu = len(ps1 & ps2), len(ps1 | ps2)
                 tt_mutex.append((child_id1, child_id2, nu, ni))
-        tt_mutex = sorted(tt_mutex, key = lambda quad: quad[-1], reverse = True)
+        tt_mutex = sorted(tt_mutex, key=lambda quad: quad[-1], reverse=True)
         with open(os.path.join(self.dst, "p-{}-term-mutex.txt".format(prefix)), "wb") as fp:
             for term_id1, term_id1, nu, ni in tt_mutex:
                 fp.write("{},{}: {}/{}={}\n".format(term_id1, term_id2, ni, nu, ni / float(nu) if nu > 0 else -1.0))
@@ -801,7 +801,7 @@ class SGDExperiment(_Experiment):
 
         # Cluster the filtered sequences with CD-HIT
         filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
-        _, clusters = CDHit().run(filtered_p_seq, threshold = cdhit_threshold)
+        _, clusters = CDHit().run(filtered_p_seq, threshold=cdhit_threshold)
         print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
                 .format(len(clusters), cdhit_threshold)
 
@@ -835,9 +835,9 @@ class SGDExperiment(_Experiment):
         print _cls(self), ": annotations by aspect: {}".format([(aspect, len(ps)) for aspect, ps in aspect_to_ps.iteritems()])
 
         filtered_p_to_term_ids = dag.preprocess(filtered_ps,
-                                                aspects = self._go_aspects,
-                                                min_annot = self._min_go_annot,
-                                                max_depth = self._max_go_depth)
+                                                aspects=self._go_aspects,
+                                                min_annot=self._min_go_annot,
+                                                max_depth=self._max_go_depth)
 
         return dag, filtered_p_to_term_ids
 
