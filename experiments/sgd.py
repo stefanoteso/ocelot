@@ -69,25 +69,73 @@ class SGDExperiment(_Experiment):
         return sgd_id_to_seq
 
     def _get_sgd_id_to_term_ids(self):
+        ECODES_TO_KEEP = [
+            # Experimental evidence codes. Use of an experimental evidence code
+            # in a GO annotation indicates that the cited paper displayed
+            # results from a physical characterization of a gene or gene
+            # product that has supported the association of a GO term.
+            "EXP",  # Inferred from Experiment (EXP)
+            "IDA",  # Inferred from Direct Assay (IDA)
+            "IPI",  # Inferred from Physical Interaction (IPI)
+            "IMP",  # Inferred from Mutant Phenotype (IMP)
+            "IGI",  # Inferred from Genetic Interaction (IGI)
+            "IEP",  # Inferred from Expression Pattern (IEP)
+
+            # Computational analysis evidence codes. Use of the computational
+            # analysis evidence codes indicates that the annotation is based on
+            # an in silico analysis of the gene sequence and/or other data as
+            # described in the cited reference.  The evidence codes in this
+            # category also indicate a varying degree of curatorial input.
+        #    "ISS",  # Inferred from Sequence or structural Similarity (ISS)
+        #    "ISO",  # Inferred from Sequence Orthology (ISO)
+        #    "ISA",  # Inferred from Sequence Alignment (ISA)
+        #    "ISM",  # Inferred from Sequence Model (ISM)
+        #    "IGC",  # Inferred from Genomic Context (IGC)
+        #    "IBA",  # Inferred from Biological aspect of Ancestor (IBA)
+        #    "IBD",  # Inferred from Biological aspect of Descendant (IBD)
+        #    "IKR",  # Inferred from Key Residues (IKR)
+        #    "IRD",  # Inferred from Rapid Divergence(IRD)
+        #    "RCA",  # Inferred from Reviewed Computational Analysis (RCA)
+
+            # Author statement codes. Author statement codes indicate that the
+            # annotation was made on the basis of a statement made by the
+            # author(s) in the reference cited.
+            "TAS",  # Traceable Author Statement (TAS)
+            "NAS",  # Non-traceable Author Statement (NAS)
+
+            # Curatorial evidence codes. Use of the curatorial statement
+            # evidence codes indicates an annotation made on the basis of a
+            # curatorial judgement that does not fit into one of the other
+            # evidence code classifications.
+            "IC",   # Inferred by Curator (IC)
+        #    "ND",   # No biological Data available (ND) evidence code
+
+            # Automatically-assigned evidence code. Assigned by automated
+            # methods, without curatorial judgement
+        #    "IEA",  # Inferred from Electronic Annotation (IEA)
+        ]
+
         query = """
-        SELECT ?orf ?fun
+        SELECT ?orf ?fun ?ecode
         FROM <{default_graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
-                 ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
-                 ocelot:sgd_id_has_goslim ?fun .
+                 ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
+            ?annot a ocelot:sgd_go_annotation ;
+                ocelot:sgd_go_annotation_has_ecode ?ecode ;
+                ocelot:sgd_go_annotation_has_sgd_id ?orf ;
+                ocelot:sgd_go_annotation_has_term ?fun .
         }}
         """
-        sgd_id_to_fun = {}
-        for bindings in self.iterquery(query, n=2):
-            sgd_id = bindings[u"orf"].split(".")[-1]
-            fun = bindings[u"fun"].split("#")[-1]
-            if not sgd_id in sgd_id_to_fun:
-                sgd_id_to_fun[sgd_id] = set([ fun ])
-            else:
+        sgd_id_to_fun = defaultdict(set)
+        for bindings in self.iterquery(query, n=3):
+            sgd_id  = bindings[u"orf"].split(".")[-1]
+            fun     = bindings[u"fun"].split("#")[-1]
+            ecode   = bindings[u"ecode"]
+            if str(ecode) in ECODES_TO_KEEP:
                 sgd_id_to_fun[sgd_id].add(fun)
-        return sgd_id_to_fun
+        return dict(sgd_id_to_fun)
 
     def _get_sgd_id_to_feat(self):
         query = """
@@ -819,25 +867,21 @@ class SGDExperiment(_Experiment):
 
         # Fill in the GO data structure with the protein annotations and
         # propagate them to the root
-        propagated_p_to_term_ids = dag.annotate(p_to_term_ids, propagate=True)
+        dag.annotate(p_to_term_ids, propagate=True)
+        propagated_p_to_term_ids = dag.get_p_to_term_ids()
 
-        print _cls(self), ": '{}' annotations in the DAG" \
+        print _cls(self), ": '{}' annotations in the DAG after propagation" \
                             .format(sum(len(dag._id_to_term[term_id].proteins)
                                         for term_id in dag._id_to_term.iterkeys()))
-        tot_increase = 0.0
-        for p in p_to_term_ids:
-            tot_increase += len(propagated_p_to_term_ids[p]) / float(len(p_to_term_ids[p]))
 
-        print _cls(self), ": propagated GO annotations, average increase is '{}'" \
-                            .format(tot_increase / len(p_to_term_ids))
+        dag.preprocess(filtered_ps, aspects=self._go_aspects,
+                       min_annot=self._min_go_annot,
+                       max_depth=self._max_go_depth)
+        filtered_p_to_term_ids = dag.get_p_to_term_ids()
 
-        aspect_to_ps = dag.get_proteins_by_aspect()
-        print _cls(self), ": annotations by aspect: {}".format([(aspect, len(ps)) for aspect, ps in aspect_to_ps.iteritems()])
-
-        filtered_p_to_term_ids = dag.preprocess(filtered_ps,
-                                                aspects=self._go_aspects,
-                                                min_annot=self._min_go_annot,
-                                                max_depth=self._max_go_depth)
+        print _cls(self), ": '{}' annotations in the DAG after preprocessing" \
+                            .format(sum(len(dag._id_to_term[term_id].proteins)
+                                        for term_id in dag._id_to_term.iterkeys()))
 
         return dag, filtered_p_to_term_ids
 
