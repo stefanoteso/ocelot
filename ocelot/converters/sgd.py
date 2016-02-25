@@ -32,6 +32,7 @@ class SGDConverter(Converter):
             ("xref",            self._siphon_xrefs),
             ("sequences",       self._siphon_sequences),
             ("go-slim",         self._siphon_goslims),
+            ("go",              self._siphon_gos),
             ("domains",         self._siphon_domains),
             ("pdb-homologues",  self._siphon_pdb_homologues),
             ("interactions",    self._siphon_interactions),
@@ -234,6 +235,42 @@ class SGDConverter(Converter):
             sgd_id  = O.uri(O.SGD_ID, self._sanitize(row["SGD_ID"]))
             goslim  = O.go_to_uri(self._sanitize(row["GO_ID"]))
             triples.append((sgd_id, O.SGD_ID_HAS_GOSLIM, goslim))
+
+    def _siphon_gos(self, triples):
+        """Converts the `gene_association.sgd` file."""
+        FIELDS = (
+            "DB",           # always "SGD"
+            "SGD_ID",       # SGD ID
+            "DONTCARE_ID",  # yeah
+            "QUALIFIERS",   # Stuff like NOT, contributes_to, colocalizes; pipe-separated
+            "GO_ID",        # GO term ID
+            "DB_REFS",      # DB references; pipe-separated
+            "ECODE",        # Evidence code for the annotation
+            "WITH_FROM",    # With or From optional qualifiers
+            "GO_ASPECT",    # P = Process, F = Function, C = Component
+            "DB_NAMES",     # DB object names; pipe-separated
+            "DB_SYNONYMS",  # DB synonyms; pipe-separated
+            "DB_TYPES",     # DB object types; pipe-separated
+            "TAXIDS",       # Taxon IDs; pipe-separated
+            "DATE",         # Date the GO annotation was defined in YYYYMMDD
+            "ASSIGNED_BY",  # always "SGD"
+            "EXTENSION",    # yeah
+            "VARIANTS",     # yeah
+        )
+        for row in iterate_csv(self._get_path("gene_association.sgd"),
+                               num_skip=26, delimiter="\t", fieldnames=FIELDS):
+            assert len(row["SGD_ID"]), row
+            assert len(row["GO_ID"]), row
+            sgd_id  = O.uri(O.SGD_ID, self._sanitize(row["SGD_ID"]))
+            go_term = O.go_to_uri(self._sanitize(row["GO_ID"]))
+
+            annotation = B()
+            triples.extend([
+                (annotation, O.RDF.type,                        O.SGD_GO_ANNOTATION),
+                (annotation, O.SGD_GO_ANNOTATION_HAS_SGD_ID,    sgd_id),
+                (annotation, O.SGD_GO_ANNOTATION_HAS_TERM,      go_term),
+                (annotation, O.SGD_GO_ANNOTATION_HAS_ECODE,     L(row["ECODE"])),
+            ])
 
     def _siphon_pdb_homologues(self, triples):
         """Converts the `pdb_homologs.tab` file."""

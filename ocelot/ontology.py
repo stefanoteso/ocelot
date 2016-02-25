@@ -73,6 +73,12 @@ SGD_FEATURE_TYPE        = OCELOT.sgd_feature_type
 # An SGD chromosome, e.g. `12`
 SGD_CHROMOSOME          = OCELOT.sgd_chromosome
 
+# An individua SGD-GO annotation
+SGD_GO_ANNOTATION               = OCELOT.sgd_go_annotation
+SGD_GO_ANNOTATION_HAS_SGD_ID    = OCELOT.sgd_go_annotation_has_sgd_id
+SGD_GO_ANNOTATION_HAS_TERM      = OCELOT.sgd_go_annotation_has_term
+SGD_GO_ANNOTATION_HAS_ECODE     = OCELOT.sgd_go_annotation_has_ecode
+
 # An individual SGD-PDB homology match
 SGD_PDB_HOMOLOGY        = OCELOT.sgd_pdb_homology
 SGD_PDB_ALIGNMENT       = OCELOT.sgd_pdb_alignment
