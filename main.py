@@ -140,12 +140,16 @@ def _run_experiment(args):
 
     rng = np.random.RandomState(args.seed)
 
+    go_aspects = None
+    if args.go_aspects is not None:
+        go_aspects = args.go_aspects.split(",")
+
     for id_, Experiment in _filter_targets(ALL_TARGETS, args.targets):
         experiment = Experiment(args.src, args.dst,
                                 endpoint = args.endpoint,
                                 default_graph = args.default_graph,
                                 force_update = args.force_update,
-                                go_aspects = args.go_aspects.split(","),
+                                go_aspects = go_aspects,
                                 max_go_depth = args.max_go_depth,
                                 min_go_annot = args.min_go_annot,
                                 dump_stats = args.dump_stats,
