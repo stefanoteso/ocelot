@@ -101,7 +101,7 @@ class SGDExperiment(_Experiment):
             # annotation was made on the basis of a statement made by the
             # author(s) in the reference cited.
             "TAS",  # Traceable Author Statement (TAS)
-            "NAS",  # Non-traceable Author Statement (NAS)
+        #    "NAS",  # Non-traceable Author Statement (NAS)
 
             # Curatorial evidence codes. Use of the curatorial statement
             # evidence codes indicates an annotation made on the basis of a
@@ -456,44 +456,52 @@ class SGDExperiment(_Experiment):
             print _cls(self), " fold{}: {} pairs, L1 distance from average term counts = {}" \
                 .format(k, len(fold), np.linalg.norm((average - counts) / len(all_pp_terms), ord=1))
 
-    def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_terms, num_folds=10):
+    def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_term_ids, num_folds=10):
         """Generates the folds.
 
         The interactions are split into folds according to their functions.
         No two protein-protein interactions can occur in two distinct folds.
 
-        :param pp_pos_hq: high-quality positive interactions.
-        :param pp_pos_lq: low-quality positive interactions, if any.
-        :param p_to_terms: map between proteins and ``GOTerm``'s.
-        :param num_folds: number of folds to generate (default: ``10``).
-        :returns: a list of sets of protein pairs.
-        """
-        assert isinstance(pp_pos_hq, set)
-        assert isinstance(pp_pos_lq, set)
+        Parameters
+        ----------
+        pp_pos_hq : set
+            High-quality positive interactions.
+        pp_pos_lq : set
+            Low-quality positive interactions.
+        p_to_term_ids : dict
+            Map between proteins and GO terms IDs.
+        num_folds : int, optional
+            Number of folds, defaults to 10.
 
-        # Map from protein *pairs* to the GO terms that either protein is
-        # annotated with, and vice-versa
-        pp_to_terms = {(p1,p2): (set(p_to_terms[p1]) | set(p_to_terms[p2]))
+        Returns
+        -------
+        folds : list
+            Each fold is a set of triples of the form (protein, protein, state).
+        """
+
+        # Map from high-quality interacting protein pairs to the GO terms that
+        # either protein is annotated with, and vice-versa
+        pp_to_term_ids = {(p1, p2): set(p_to_term_ids[p1]) | set(p_to_term_ids[p2])
                        for p1, p2 in pp_pos_hq}
 
-        term_to_pps = defaultdict(set)
-        for pp, terms in pp_to_terms.iteritems():
-            for term in terms:
-                term_to_pps[term].add(pp)
+        # Map from each GO term ID to the protein pairs it is annotated with
+        term_id_to_pps = defaultdict(set)
+        for pp, term_ids in pp_to_term_ids.iteritems():
+            for term_id in term_ids:
+                term_id_to_pps[term_id].add(pp)
 
-        # Gather all GO terms and assign them an index
-        all_pp_terms = term_to_pps.keys()
-        term_to_i = {term: i for i, term in enumerate(all_pp_terms)}
+        # Assign an index to all term IDs
+        term_id_to_i = {term_id: i for i, term_id in enumerate(term_id_to_pps.keys())}
 
         # Compute the ideal (perfect average) GO term distribution
-        average = np.zeros((len(all_pp_terms),))
-        for pp, terms in pp_to_terms.iteritems():
-            for term in terms:
-                average[term_to_i[term]] += 1
+        average = np.zeros((len(term_id_to_pps),))
+        for pp, term_ids in pp_to_term_ids.iteritems():
+            for term_id in term_ids:
+                average[term_id_to_i[term_id]] += 1
         average *= 1.0 / num_folds
 
         # Sanity check. Note that self-interactions are fine.
-        for term, term_pps in term_to_pps.iteritems():
+        for term_id, term_pps in term_id_to_pps.iteritems():
             for p1, p2 in term_pps:
                 assert (p2, p1) in term_pps
 
@@ -501,11 +509,12 @@ class SGDExperiment(_Experiment):
         print _cls(self), ": generating the folds..."
 
         folds = [set() for _ in range(num_folds)]
-        while len(term_to_pps):
+        while len(term_id_to_pps):
+
             # Pick the term with the least unprocessed protein-protein pairs
-            cur_term, cur_pps = min(term_to_pps.iteritems(),
-                                    key = lambda term_pps: len(term_pps[1]))
-            print _cls(self), ": best term: {} (num pairs = {})".format(cur_term, len(cur_pps))
+            cur_term_id, cur_pps = min(term_id_to_pps.iteritems(),
+                                       key=lambda term_id_and_pps: len(term_id_and_pps[1]))
+            print _cls(self), ": best term: {} (num pairs = {})".format(cur_term_id, len(cur_pps))
 
             # Evenly distribute the associated protein-protein pairs among all
             # folds, taking into account the fact that if (p1, p2) is in
@@ -520,24 +529,21 @@ class SGDExperiment(_Experiment):
                 folds[i % num_folds].update([(p1, p2, True), (p2, p1, True)])
 
             # Update term_to_pps
-            new_term_to_pps = {}
-            for term in term_to_pps:
+            new_term_id_to_pps = {}
+            for term_id in term_id_to_pps:
                 # Skip the term we just processed
-                if term == cur_term:
+                if term_id == cur_term_id:
                     continue
                 # Skip the protein pairs annotated with it
-                new_term_pps = set(pp for pp in term_to_pps[term]
+                new_term_pps = set(pp for pp in term_id_to_pps[term_id]
                                    if not pp in cur_pps)
                 if len(new_term_pps) == 0:
                     continue
-                new_term_to_pps[term] = new_term_pps
-            term_to_pps = new_term_to_pps
+                new_term_id_to_pps[term_id] = new_term_pps
+            term_id_to_pps = new_term_id_to_pps
 
         print _cls(self), ": checking fold sanity..."
         self._check_folds_are_sane(folds)
-
-        print _cls(self), ": fold quality (positives only):"
-        self._print_fold_quality(folds, pp_to_terms, all_pp_terms, term_to_i, average)
 
         # Now that we partitioned all interactions into folds, let's add the
         # negatives interactions -- by sampling them at random
@@ -587,105 +593,7 @@ class SGDExperiment(_Experiment):
         print _cls(self), ": checking fold sanity..."
         self._check_folds_are_sane(folds)
 
-        # XXX pp_to_terms is not updated at this point, do not bother printing
-        # the fold quality...
-
         return folds,
-
-    def _dump_dataset_statistics(self, ps, p_to_seq, p_to_term_ids, dag, prefix):
-        """Dump a few dataset statistics."""
-
-        # Draw the histogram of protein lengths
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        x = [len(p_to_seq[p]) for p in ps]
-        ax.hist(x, range(min(x), max(x) + 50, 50), color="red", alpha=0.8)
-        ax.yaxis.grid(True)
-        fig.savefig(os.path.join(self.dst, "p-{}-length-hist.png".format(prefix)),
-                    bbox_inches = "tight", pad_inches = 0)
-
-        # Draw the GO annotation depth
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        x = []
-        for term in dag._id_to_term.itervalues():
-            x.extend([term.level] * len(term.proteins))
-        ax.hist(x, bins=15, color="red", alpha=0.8)
-        ax.yaxis.grid(True)
-        fig.savefig(os.path.join(self.dst, "p-{}-annot-depth.png".format(prefix)),
-                    bbox_inches = "tight", pad_inches = 0)
-
-        # Print the protein->function map
-        with open(os.path.join(self.dst, "p-{}-p-to-term-ids.txt".format(prefix)), "wb") as fp:
-            for p, term_ids in p_to_term_ids.iteritems():
-                fp.write("{}: {}\n".format(p, ",".join(sorted(term_ids))))
-
-        # Print the function->protein map
-        with open(os.path.join(self.dst, "p-{}-term-id-to-ps.txt".format(prefix)), "wb") as fp:
-            for term_id, term in dag._id_to_term.iteritems():
-                fp.write("{}: {}\n".format(term_id, ",".join(sorted(term.proteins))))
-
-        annotated_term_ids = [term_id for term_id, term in dag._id_to_term.iteritems()
-                              if len(term.proteins)]
-        annotated_term_id_to_i = {term_id: i for i, term_id
-                                  in enumerate(annotated_term_ids)}
-
-        # Plot function co-occurrence
-        tt_condprob = []
-        for term_id1, term_id2 in it.product(annotated_term_ids, annotated_term_ids):
-            ps1 = dag._id_to_term[term_id1].proteins
-            ps2 = dag._id_to_term[term_id2].proteins
-            condprob = len(ps1 & ps2) / float(len(ps1))
-            tt_condprob.append((term_id1, term_id2, condprob))
-        tt_condprob = sorted(tt_condprob, key=lambda triple: triple[-1],
-                               reverse = True)
-        with open(os.path.join(self.dst, "p-{}-term-condprob.txt".format(prefix)), "wb") as fp:
-            for term_id1, term_id2, condprob in tt_condprob:
-                fp.write("{},{}: {}\n".format(term_id1, term_id2, condprob))
-
-        matrix = np.zeros((len(annotated_term_ids), len(annotated_term_ids)))
-        for term_id1, term_id2, condprob in tt_condprob:
-            i = annotated_term_id_to_i[term_id1]
-            j = annotated_term_id_to_i[term_id2]
-            matrix[i,j] = condprob
-
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        ax.matshow(matrix, interpolation="nearest", cmap=cm.OrRd)
-        fig.savefig(os.path.join(self.dst, "p-{}-term-condprob.png".format(prefix)),
-                    bbox_inches="tight", pad_inches=0)
-
-        # Print consistency w.r.t. mutual exclusion of children
-        tt_mutex = []
-        for term_id in annotated_term_ids:
-            term = dag._id_to_term[term_id]
-            for (child_id1, rel1), (child_id2, rel2) in it.product(term.children, term.children):
-                if child_id1 == child_id2:
-                    continue
-                if rel1 != "is_a" or rel2 != "is_a":
-                    continue
-                ps1 = dag._id_to_term[child_id1].proteins
-                ps2 = dag._id_to_term[child_id2].proteins
-                ni, nu = len(ps1 & ps2), len(ps1 | ps2)
-                tt_mutex.append((child_id1, child_id2, nu, ni))
-        tt_mutex = sorted(tt_mutex, key=lambda quad: quad[-1], reverse=True)
-        with open(os.path.join(self.dst, "p-{}-term-mutex.txt".format(prefix)), "wb") as fp:
-            for term_id1, term_id1, nu, ni in tt_mutex:
-                fp.write("{},{}: {}/{}={}\n".format(term_id1, term_id2, ni, nu, ni / float(nu) if nu > 0 else -1.0))
-
-        # TODO: plot GO consistency w.r.t. interactions
-
-    @staticmethod
-    def _term_to_predicate(term):
-        assert len(term.namespace)
-        assert term.level >= 0
-        d = {
-            "namespace": term.namespace,
-            "level": term.level,
-            "id": term.id.replace(":", "-"),
-            "name": term.name.replace(" ", "-").replace(":", "-").replace(",", "")
-        }
-        return "{namespace}-lvl{level}-{id}-{name}".format(**d)
 
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
         """Writes the SBR dataset."""
@@ -698,6 +606,17 @@ class SGDExperiment(_Experiment):
             pps.update((p1, p2) for p1, p2, _ in fold)
         pps = sorted(pps)
 
+        def term_to_predicate(term):
+            assert len(term.namespace)
+            assert term.level >= 0
+            d = {
+                "namespace": term.namespace,
+                "level": term.level,
+                "id": term.id.replace(":", "-"),
+                "name": term.name.replace(" ", "-").replace(":", "-").replace(",", "")
+            }
+            return "{namespace}-lvl{level}-{id}-{name}".format(**d)
+
         # Write the datapoints, including proteins and protein pairs
         lines = []
         lines.extend("{};PROTEIN;1:1".format(p) for p in ps)
@@ -707,7 +626,7 @@ class SGDExperiment(_Experiment):
 
         # Write the predicates, including BOUNDP, ISPAIR and per-term predicates
         lines = []
-        lines.extend("DEF {};LEARN;C".format(self._term_to_predicate(term))
+        lines.extend("DEF {};LEARN;C".format(term_to_predicate(term))
                      for term_id, term in dag._id_to_term.iteritems())
         lines.append("DEF BOUND(PPAIR);LEARN;C")
         lines.append("DEF IN(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
@@ -725,8 +644,8 @@ class SGDExperiment(_Experiment):
                 children = [child for child, _ in term.get_children(dag)]
                 if not len(children):
                     continue
-                children_or = " OR ".join(self._term_to_predicate(child) + "(p)" for child in children)
-                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), children_or))
+                children_or = " OR ".join(term_to_predicate(child) + "(p)" for child in children)
+                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(term_to_predicate(term), children_or))
             with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_or_of_children.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
@@ -738,8 +657,8 @@ class SGDExperiment(_Experiment):
                 parents = [parent for parent, _ in term.get_parents(dag)]
                 if not len(parents):
                     continue
-                parents_and = " AND ".join(self._term_to_predicate(parent) + "(p)" for parent in parents)
-                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(self._term_to_predicate(term), parents_and))
+                parents_and = " AND ".join(term_to_predicate(parent) + "(p)" for parent in parents)
+                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(term_to_predicate(term), parents_and))
             with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
@@ -751,7 +670,7 @@ class SGDExperiment(_Experiment):
 
             lines = []
             for level in sorted(aspect_terms_by_level):
-                head = " OR ".join("({}(p) AND {}(q))".format(self._term_to_predicate(term), self._term_to_predicate(term)) for term in aspect_terms_by_level[level])
+                head = " OR ".join("({}(p) AND {}(q))".format(term_to_predicate(term), term_to_predicate(term)) for term in aspect_terms_by_level[level])
                 lines.append("forall p forall q forall pq [(BOUND(pq)) AND (IN(p,q,pq)) => {}];LEARN;L1;MINIMUM_TNORM;1;1;IN".format(head))
             with open(os.path.join(self.dst, "sbr-rules-interaction_implies_same_{}_levelwise.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
@@ -759,12 +678,14 @@ class SGDExperiment(_Experiment):
         def fold_to_ps(fold):
             return set(p for p, _, _ in fold) | set(q for _, q, _ in fold)
 
-        def write_functions(path, ps, dag):
+        def write_functions(path, ps, dag, p_to_term_ids):
             lines = []
             for p in ps:
+                if len(p_to_term_ids) == 0:
+                    continue
                 for term in dag._id_to_term.itervalues():
                     state = {True:"1", False:"0"}[term.id in p_to_term_ids[p]]
-                    lines.append("{}({})={}".format(self._term_to_predicate(term), p, state))
+                    lines.append("{}({})={}".format(term_to_predicate(term), p, state))
             with open(path, "wb") as fp:
                 fp.write("\n".join(lines))
 
@@ -775,6 +696,8 @@ class SGDExperiment(_Experiment):
                 lines.append("BOUND({}-{})={}".format(p, q, state))
             with open(path, "wb") as fp:
                 fp.write("\n".join(lines))
+
+        p_to_term_ids = dag.get_p_to_term_ids()
 
         # Write the examples for each fold
         for k, test_fold in enumerate(folds):
@@ -799,11 +722,11 @@ class SGDExperiment(_Experiment):
                             len(test_fold))
 
             write_functions(os.path.join(self.dst, "sbr-fold{}-testset-fun.txt".format(k)),
-                            ps_in_test_set, dag)
+                            ps_in_test_set, dag, p_to_term_ids)
             write_functions(os.path.join(self.dst, "sbr-fold{}-validset-fun.txt".format(k)),
-                            ps_in_validation_set, dag)
+                            ps_in_validation_set, dag, p_to_term_ids)
             write_functions(os.path.join(self.dst, "sbr-fold{}-trainset-fun.txt".format(k)),
-                            ps_in_training_set, dag)
+                            ps_in_training_set, dag, p_to_term_ids)
 
             write_interactions(os.path.join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
                                test_fold)
@@ -826,16 +749,25 @@ class SGDExperiment(_Experiment):
 
         :returns: the four items above.
         """
-        ps              = self._get_sgd_ids()
-        p_to_feat       = self._get_sgd_id_to_feat()
-        p_to_seq        = self._get_sgd_id_to_seq()
-        p_to_term_ids   = self._get_sgd_id_to_term_ids()
+        def to_link(p):
+            return "http://www.yeastgenome.org/locus/{}/go".format(p)
 
-        print _cls(self), ": found {} proteins".format(len(ps))
+        ps = self._get_sgd_ids()
+        print _cls(self), ": found {} proteins (validated ORFs)".format(len(ps))
+
+        p_to_feat = self._get_sgd_id_to_feat()
+        print _cls(self), ": found {} proteins with known SGD feature".format(len(p_to_feat))
+
+        p_to_seq = self._get_sgd_id_to_seq()
+        print _cls(self), ": found {} proteins with known SGD sequence".format(len(p_to_seq))
+
+        p_to_term_ids = self._get_sgd_id_to_term_ids()
+        print _cls(self), ": found {} proteins with known GO terms".format(len(p_to_term_ids))
+
         for p in ps:
             assert p in p_to_seq, "'{}' has no sequence".format(p)
-            assert p in p_to_term_ids, "'{}' has no GO annotation".format(p)
             assert p in p_to_feat, "'{}' has no associated feature ID".format(p)
+            if not p in p_to_term_ids: print "'{}' has no associated GO terms".format(to_link(p))
 
         return ps, p_to_feat, p_to_seq, p_to_term_ids
 
@@ -857,31 +789,41 @@ class SGDExperiment(_Experiment):
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
         print _cls(self), ": there are {} filtered proteins".format(len(filtered_ps))
 
-        return filtered_ps,
+        return sorted(filtered_ps),
 
     def _load_go_and_filter(self, filtered_ps, p_to_term_ids):
         """Load the GO OBO file, fill it in, and prune it."""
 
         # Load the GO OBO file
-        dag = GODag(os.path.join(self.src, "GO", "go-basic.obo"))
+        dag = GODag(os.path.join(self.src, "GO", "go.obo"))
 
         # Fill in the GO data structure with the protein annotations and
         # propagate them to the root
         dag.annotate(p_to_term_ids, propagate=True)
-        propagated_p_to_term_ids = dag.get_p_to_term_ids()
 
-        print _cls(self), ": '{}' annotations in the DAG after propagation" \
-                            .format(sum(len(dag._id_to_term[term_id].proteins)
-                                        for term_id in dag._id_to_term.iterkeys()))
+        id_to_term = dag.get_id_to_term()
+        print _cls(self), ": '{}' GO annotations after propagation" \
+                            .format(sum(len(id_to_term[id_].proteins)
+                                        for id_ in id_to_term.iterkeys()))
 
+        # Prune all useless terms from the GO
+        print _cls(self), ": preprocessing the DAG: aspects={} max_depth={} min_annot={}" \
+                            .format(self._go_aspects, self._min_go_annot,
+                                    self._max_go_depth)
         dag.preprocess(filtered_ps, aspects=self._go_aspects,
                        min_annot=self._min_go_annot,
                        max_depth=self._max_go_depth)
-        filtered_p_to_term_ids = dag.get_p_to_term_ids()
 
-        print _cls(self), ": '{}' annotations in the DAG after preprocessing" \
-                            .format(sum(len(dag._id_to_term[term_id].proteins)
-                                        for term_id in dag._id_to_term.iterkeys()))
+        id_to_term = dag.get_id_to_term()
+        print _cls(self), ": '{}' GO annotations after preprocessing" \
+                            .format(sum(len(id_to_term[id_].proteins)
+                                        for id_ in id_to_term.iterkeys()))
+
+        # At this point, some proteins may not be annotated anymore. Fill in
+        # the blanks by mapping them to an empty set.
+        filtered_p_to_term_ids = dict(dag.get_p_to_term_ids())
+        for p in set(filtered_ps) - set(filtered_p_to_term_ids.keys()):
+            filtered_p_to_term_ids[p] = set()
 
         return dag, filtered_p_to_term_ids
 
