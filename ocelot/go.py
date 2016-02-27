@@ -303,9 +303,6 @@ class GODag(object):
 
     def _check_term_parent_annotations(self):
         for term in self._id_to_term.itervalues():
-            print term
-            print "  parents  =", term._parents
-            print "  children =", term._children
 
             # All terms must have at *most* as many annotations as any of their
             # parents
@@ -474,7 +471,6 @@ class GODag(object):
             new_children_ids = set(c.id for c, r in new_term.get_children(self))
 
             assert len(new_children_ids - old_children_ids) == 0
-            print "CHILDREN {} -> {} vs {}".format(id_, old_children_ids, new_children_ids)
 
             # Collect annotations in removed terms
             removed_proteins = set()
