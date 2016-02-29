@@ -257,83 +257,6 @@ class SGDExperiment(_Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
-
-
-    def _get_sgd_pins(self, ps):
-        """Computes the high-quality positive interactions, high+low-quality
-        positive interactions, and the negative interactions."""
-
-        def check_ps_pps(ps, pps):
-            """Checks that the protein pairs are (i) symmetric, and (ii) entirely
-            contained in the list of proteins."""
-            assert all((q, p) in pps for (p, q) in pps), \
-                "pairs are not symmetric"
-            assert all(p in ps for p, _ in pps), \
-                "singletons and pairs do not match"
-
-        pp_pos_hq = self._get_sgd_pin(ps=ps, manual_only=True)
-        density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} hi-quality PPIs (density = {})" \
-                .format(len(pp_pos_hq), density)
-        check_ps_pps(ps, pp_pos_hq)
-
-        # Query all (high+low-quality) protein-protein interactions
-        pp_pos_lq = self._get_sgd_pin(ps=ps, manual_only=False)
-        density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} lo-quality PPIs (density = {})" \
-                .format(len(pp_pos_lq), density)
-        check_ps_pps(ps, pp_pos_lq)
-
-        # Query (literally) all protein-protein actions annotated in STRING
-        pp_pos_string = self._get_string_pin(ps=ps)
-        density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
-                .format(len(pp_pos_string), density)
-        check_ps_pps(ps, pp_pos_string)
-
-        return pp_pos_hq, pp_pos_lq | pp_pos_string
-
-    @staticmethod
-    def _desymmetrize(pairs):
-        pairs_asymm = set()
-        for p, q in pairs_asymm:
-            if not (q, p) in pairs:
-                pairs_asymm.add((p, q))
-        return pairs_asymm
-
-    @staticmethod
-    def _symmetrize(pairs):
-        return set(pairs) | set((q, p) for p, q in pairs)
-
-    def _compute_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
-
-        # Take the complement of the symmetrical positives, subtract the known
-        # positives (both high-quality and low-quality, just to be sure); the
-        # complement will be symmetrical, since the HQ and LQ interactions are
-        print _cls(self), ": computing the complement of the positive PIN"
-        pp_neg_all = set(it.product(ps, ps)) - (pp_pos_lq | pp_pos_hq)
-
-        print _cls(self), ": computing asymmetric negative PIN"
-        pp_neg_asymm = list(self._desymmetrize(pp_neg_all))
-
-        print _cls(self), ": computing asymmetric positive PIN"
-        pp_pos_asymm = self._desymmetrize(pp_pos_hq)
-
-        del pp_pos_hq
-        del pp_pos_lq
-        del pp_neg_all
-
-        # Sample the negative interactions from the complement
-        print _cls(self), ": sampling the negative PIN"
-        pi = self._rng.permutation(len(pp_neg_asymm))
-        pp_neg_half = set(pp_neg_asymm[pi[i]] for i in xrange(len(pp_pos_asymm)))
-
-        # Symmetrize the negatives
-        pp_neg = self._symmetrize(pp_neg_half)
-        self._check_p_pp_are_sane(ps, pp_neg)
-
-        return pp_neg,
-
     def _get_sgd_din(self):
         query = """
         SELECT DISTINCT ?id ?family ?chain ?evalue ?complex
@@ -370,6 +293,91 @@ class SGDExperiment(_Experiment):
             print bindings
         sys.exit(1)
         return dd_pos
+
+
+
+    def _get_sgd_pins(self, ps):
+        """Computes the high-quality positive interactions, high+low-quality
+        positive interactions, and the negative interactions."""
+
+        def check_ps_pps(ps, pps):
+            """Checks that the protein pairs are (i) symmetric, and (ii) entirely
+            contained in the list of proteins."""
+            assert all((q, p) in pps for (p, q) in pps), \
+                "pairs are not symmetric"
+            assert all(p in ps for p, _ in pps), \
+                "singletons and pairs do not match"
+
+        pp_pos_hq = self._get_sgd_pin(ps=ps, manual_only=True)
+        density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
+        print _cls(self), ": found {} hi-quality PPIs (density = {})" \
+                .format(len(pp_pos_hq), density)
+        check_ps_pps(ps, pp_pos_hq)
+
+        # Query all (high+low-quality) protein-protein interactions
+        pp_pos_lq = self._get_sgd_pin(ps=ps, manual_only=False)
+        density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
+        print _cls(self), ": found {} lo-quality PPIs (density = {})" \
+                .format(len(pp_pos_lq), density)
+        check_ps_pps(ps, pp_pos_lq)
+
+        # Query (literally) all protein-protein actions annotated in STRING
+        pp_pos_string = self._get_string_pin(ps=ps)
+        density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
+        print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
+                .format(len(pp_pos_string), density)
+        check_ps_pps(ps, pp_pos_string)
+
+        return pp_pos_hq, pp_pos_lq | pp_pos_string
+
+
+
+    def _compute_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
+        """Computes the network of negative protein interactions.
+
+        The idea is to sample the negative pairs from the complement of the
+        positive PIN minus a set of candidate interactions (of any kind,
+        really).
+        """
+
+        def symmetrize(pairs):
+            return set(pairs) | set((q, p) for p, q in pairs)
+
+        def desymmetrize(pairs):
+            pairs_asymm = set()
+            for p, q in pairs_asymm:
+                if not (q, p) in pairs:
+                    pairs_asymm.add((p, q))
+            return pairs_asymm
+
+        # Take the complement of the symmetrical positives, subtract the known
+        # positives (both high-quality and low-quality, just to be sure); the
+        # complement will be symmetrical, since the HQ and LQ interactions are
+        print _cls(self), ": computing the complement of the positive PIN"
+        pp_neg_all = set(it.product(ps, ps)) - (pp_pos_lq | pp_pos_hq)
+
+        print _cls(self), ": computing asymmetric negative PIN"
+        pp_neg_asymm = list(desymmetrize(pp_neg_all))
+
+        print _cls(self), ": computing asymmetric positive PIN"
+        pp_pos_asymm = desymmetrize(pp_pos_hq)
+
+        del pp_pos_hq
+        del pp_pos_lq
+        del pp_neg_all
+
+        # Sample the negative interactions from the complement
+        print _cls(self), ": sampling the negative PIN"
+        pi = self._rng.permutation(len(pp_neg_asymm))
+        pp_neg_half = set(pp_neg_asymm[pi[i]] for i in xrange(len(pp_pos_asymm)))
+
+        # Symmetrize the negatives
+        pp_neg = symmetrize(pp_neg_half)
+        self._check_p_pp_are_sane(ps, pp_neg)
+
+        return pp_neg,
+
+
 
     def _compute_p_colocalization_kernel(self, ps):
         p_to_context = self._get_sgd_id_to_context()
@@ -413,6 +421,8 @@ class SGDExperiment(_Experiment):
 
         pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in pps]
         return self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
+
+
 
     def _permute(self, l):
         pi = list(self._rng.permutation(len(l)))
