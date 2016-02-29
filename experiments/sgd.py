@@ -257,45 +257,39 @@ class SGDExperiment(_Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
-    @staticmethod
-    def _get_neighbors_and_degree(ps, pps):
-        neighbors_of = { p: set() for p in ps }
-        for p, q in pps:
-            neighbors_of[p].add(q)
-            neighbors_of[q].add(p)
-        return neighbors_of
 
-    @staticmethod
-    def _check_p_pp_are_sane(ps, pps):
-        """Checks that the protein pairs are (i) symmetric, and (ii) entirely
-        contained in the list of proteins."""
-        assert all((q, p) in pps for (p, q) in pps), \
-            "pairs are not symmetric"
-        assert all(p in ps for p, _ in pps), \
-            "singletons and pairs do not match"
 
     def _get_sgd_pins(self, ps):
         """Computes the high-quality positive interactions, high+low-quality
         positive interactions, and the negative interactions."""
+
+        def check_ps_pps(ps, pps):
+            """Checks that the protein pairs are (i) symmetric, and (ii) entirely
+            contained in the list of proteins."""
+            assert all((q, p) in pps for (p, q) in pps), \
+                "pairs are not symmetric"
+            assert all(p in ps for p, _ in pps), \
+                "singletons and pairs do not match"
+
         pp_pos_hq = self._get_sgd_pin(ps=ps, manual_only=True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} hi-quality PPIs (density = {})" \
                 .format(len(pp_pos_hq), density)
-        self._check_p_pp_are_sane(ps, pp_pos_hq)
+        check_ps_pps(ps, pp_pos_hq)
 
         # Query all (high+low-quality) protein-protein interactions
         pp_pos_lq = self._get_sgd_pin(ps=ps, manual_only=False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} lo-quality PPIs (density = {})" \
                 .format(len(pp_pos_lq), density)
-        self._check_p_pp_are_sane(ps, pp_pos_lq)
+        check_ps_pps(ps, pp_pos_lq)
 
-        # Query all (literally) protein-protein actions annotated in STRING
+        # Query (literally) all protein-protein actions annotated in STRING
         pp_pos_string = self._get_string_pin(ps=ps)
         density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
                 .format(len(pp_pos_string), density)
-        self._check_p_pp_are_sane(ps, pp_pos_string)
+        check_ps_pps(ps, pp_pos_string)
 
         return pp_pos_hq, pp_pos_lq | pp_pos_string
 
