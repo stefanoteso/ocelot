@@ -476,7 +476,6 @@ class GODag(object):
             removed_proteins = set()
             for child_id in old_children_ids - new_children_ids:
                 removed_proteins.update(self._id_to_term[child_id].proteins)
-            print len(removed_proteins), min_annot
 
             # Check if we must add a bin term
             if len(removed_proteins) < (1 if min_annot is None else min_annot):
