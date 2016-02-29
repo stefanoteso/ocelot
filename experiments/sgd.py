@@ -590,6 +590,8 @@ class SGDExperiment(_Experiment):
 
         return folds,
 
+
+
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
         """Writes the SBR dataset."""
 
@@ -785,7 +787,7 @@ class SGDExperiment(_Experiment):
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
         print _cls(self), ": there are {} filtered proteins".format(len(filtered_ps))
 
-        return sorted(filtered_ps),
+        return filtered_ps,
 
     def _load_go_and_filter(self, filtered_ps, p_to_term_ids):
         """Load the GO OBO file, fill it in, and prune it."""
