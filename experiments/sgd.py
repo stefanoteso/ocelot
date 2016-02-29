@@ -448,7 +448,7 @@ class SGDExperiment(_Experiment):
         """
 
         def permute(l, rng):
-            pi = list(rng.permutation(len(l))
+            pi = list(rng.permutation(len(l)))
             return [l[pi[i]] for i in xrange(len(l))]
 
         def check_folds(folds):
