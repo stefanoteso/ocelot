@@ -662,9 +662,9 @@ class SGDExperiment(_Experiment):
             with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
-            # Interaction implies 
+            # Interaction implies same function within the same level
             aspect_terms_by_level = defaultdict(set)
-            for term in dag.generate_terms_by_level():
+            for term in dag.get_terms_by_level():
                 if term.namespace == aspect:
                     aspect_terms_by_level[term.level].add(term)
 

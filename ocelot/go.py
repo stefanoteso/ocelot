@@ -270,6 +270,14 @@ class GODag(object):
                 p_to_term_ids[p].add(term.id)
         return dict(p_to_term_ids)
 
+    def get_terms_by_level(self):
+        level_to_terms = defaultdict(set)
+        for term in self._id_to_term.itervalues():
+            level_to_terms[term.level].add(term)
+        for level in sorted(level_to_terms.keys()):
+            for term in level_to_terms[level]:
+                yield term
+
     def draw(self, path, fontname="Verdana"):
         """Draws the annotated DAG to a PNG file."""
         import pydot
