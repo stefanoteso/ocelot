@@ -4,7 +4,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import itertools as it
+from itertools import product
 from collections import defaultdict
 from ocelot.services import _cls, CDHit
 from ocelot.go import GODag, GOTerm
@@ -354,7 +354,7 @@ class SGDExperiment(_Experiment):
         # positives (both high-quality and low-quality, just to be sure); the
         # complement will be symmetrical, since the HQ and LQ interactions are
         print _cls(self), ": computing the complement of the positive PIN"
-        pp_neg_all = set(it.product(ps, ps)) - (pp_pos_lq | pp_pos_hq)
+        pp_neg_all = set(product(ps, ps)) - (pp_pos_lq | pp_pos_hq)
 
         print _cls(self), ": computing asymmetric negative PIN"
         pp_neg_asymm = list(desymmetrize(pp_neg_all))
@@ -424,42 +424,6 @@ class SGDExperiment(_Experiment):
 
 
 
-    def _permute(self, l):
-        pi = list(self._rng.permutation(len(l)))
-        return [l[pi[i]] for i in xrange(len(l))]
-
-    @staticmethod
-    def _check_folds_are_sane(folds):
-
-        # Check that interactions are symmetric
-        for k, fold in enumerate(folds):
-            assert all((q, p, state) in fold for (p, q, state) in fold), "fold {} is not symmetric".format(k)
-
-        # Check that folds do not overlap
-        for (k1, fold1), (k2, fold2) in it.product(enumerate(folds), enumerate(folds)):
-            if k1 >= k2:
-                continue
-            for p1, p2, state1 in fold1:
-                for q1, q2, state2 in fold2:
-                    assert (p1, p2) != (q1, q2), "folds {} and {} overlap ({} overlaps with {})".format(k1, k2, (p1, p2, state1), (q1, q2, state2))
-
-        # Check that no pair occurs in both states
-        interactions = set()
-        for fold in folds:
-            interactions.update(fold)
-        for p1, p2, state in interactions:
-            assert not (p1, p2, not state) in interactions, "folds are inconsistent"
-
-    def _print_fold_quality(self, folds, pp_to_terms, all_pp_terms, term_to_i, average):
-        # Evaluate the fold quality
-        for k, fold in enumerate(folds):
-            counts = np.zeros((len(all_pp_terms),))
-            for p1, p2, _ in fold:
-                for term in pp_to_terms[(p1, p2)]:
-                    counts[term_to_i[term]] += 1
-            print _cls(self), " fold{}: {} pairs, L1 distance from average term counts = {}" \
-                .format(k, len(fold), np.linalg.norm((average - counts) / len(all_pp_terms), ord=1))
-
     def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_term_ids, num_folds=10):
         """Generates the folds.
 
@@ -482,6 +446,33 @@ class SGDExperiment(_Experiment):
         folds : list
             Each fold is a set of triples of the form (protein, protein, state).
         """
+
+        def permute(l, rng):
+            pi = list(rng.permutation(len(l))
+            return [l[pi[i]] for i in xrange(len(l))]
+
+        def check_folds(folds):
+
+            # Interactions must be symmetric
+            for k, fold in enumerate(folds):
+                assert all((q, p, state) in fold for (p, q, state) in fold), \
+                    "fold {} is not symmetric".format(k)
+
+            # Folds must not overlap
+            for (k1, fold1), (k2, fold2) in product(enumerate(folds), enumerate(folds)):
+                if k1 >= k2:
+                    continue
+                for (p1, q1, state1), (p2, q2, state) in product(fold1, fold2):
+                    assert (p1, q1) != (p2, q2), \
+                        "folds {} and {} overlap".format(k1, k2)
+
+            # Interactions must be either positive or negative, but not both
+            interactions = set()
+            for fold in folds:
+                interactions.update(fold)
+            for p, q, state in interactions:
+                assert not(p, q, not state) in interactions, \
+                    "folds are inconsistent"
 
         # Map from high-quality interacting protein pairs to the GO terms that
         # either protein is annotated with, and vice-versa
@@ -528,7 +519,7 @@ class SGDExperiment(_Experiment):
             for p1, p2 in cur_pps:
                 if not (p2, p1) in pps_to_add:
                     pps_to_add.add((p1, p2))
-            folds = self._permute(folds)
+            folds = permute(folds, self._rng)
             for i, (p1, p2) in enumerate(pps_to_add):
                 folds[i % num_folds].update([(p1, p2, True), (p2, p1, True)])
 
@@ -547,7 +538,7 @@ class SGDExperiment(_Experiment):
             term_id_to_pps = new_term_id_to_pps
 
         print _cls(self), ": checking fold sanity..."
-        self._check_folds_are_sane(folds)
+        check_folds(folds)
 
         # Now that we partitioned all interactions into folds, let's add the
         # negatives interactions -- by sampling them at random
@@ -565,7 +556,7 @@ class SGDExperiment(_Experiment):
 
             # Compute the candidate negative pairs by subtracting the candidate
             # positive pairs from the complement of the pairs in the fold
-            candidate_neg_pps = set(it.product(ps_in_fold, ps_in_fold)) - candidate_pos_pps - all_candidate_neg_pps
+            candidate_neg_pps = set(product(ps_in_fold, ps_in_fold)) - candidate_pos_pps - all_candidate_neg_pps
 
             # De-symmetrize the candidate negative pairs
             temp = set()
@@ -595,7 +586,7 @@ class SGDExperiment(_Experiment):
             fold.update((p2, p1, False) for p1, p2 in sampled_neg_pps)
 
         print _cls(self), ": checking fold sanity..."
-        self._check_folds_are_sane(folds)
+        check_folds(folds)
 
         return folds,
 
