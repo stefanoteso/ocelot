@@ -681,10 +681,11 @@ class SGDExperiment(_Experiment):
         def write_functions(path, ps, dag, p_to_term_ids):
             lines = []
             for p in ps:
-                if len(p_to_term_ids) == 0:
+                if not p in p_to_term_ids:
                     continue
+                assert len(p_to_term_ids) > 0
                 for term in dag._id_to_term.itervalues():
-                    state = {True:"1", False:"0"}[term.id in p_to_term_ids[p]]
+                    state = {True: "1", False: "0"}[term.id in p_to_term_ids[p]]
                     lines.append("{}({})={}".format(term_to_predicate(term), p, state))
             with open(path, "wb") as fp:
                 fp.write("\n".join(lines))
