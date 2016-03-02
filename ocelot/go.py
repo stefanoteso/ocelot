@@ -47,7 +47,7 @@ class GOTerm(object):
         return "GOTerm('%s')" % (self.id)
 
     def get_parents(self, dag, relations=frozenset(["is_a"])):
-        """Computes all parents of the current node wrt the DAG.
+        """Computes all parents of the node wrt the DAG.
 
         It only returns parents according to the specified relations, or all
         of them if relations is None.
@@ -59,7 +59,7 @@ class GOTerm(object):
                    if relations is None or relation in relations)
 
     def get_children(self, dag, relations=frozenset(["is_a"])):
-        """Computes all children of the current node wrt the DAG.
+        """Computes all children of the node wrt the DAG.
 
         It only returns children according to the specified relations, or all
         of them if relations is None.
@@ -70,23 +70,19 @@ class GOTerm(object):
                    for id_, relation in self._children
                    if relations is None or relation in relations)
 
-    def get_paths_to_root(self, dag, relations=frozenset(["is_a"])):
-        """Computes all paths from the term to the root.
+    def get_ancestors(self, dag, relations=frozenset(["is_a"])):
+        """Computes all ancestors of the node wrt the DAG.
 
         :returns: a list of paths.
         """
-        def recurse(term, dag, relations):
-            parents = term.get_parents(dag, relations=relations)
-            if len(parents) == 0:
-                return [[term]]
-            paths = []
-            for parent, _ in parents:
-                paths_above = recurse(parent, dag, relations)
-                for path in paths_above:
-                    paths.append(path + [term])
-            return paths
-
-        return recurse(self, dag, relations)
+        ancestors = set()
+        frontier = set([self])
+        while len(frontier):
+            term = frontier.pop()
+            parents = [p for p, r in term.get_parents(dag, relations=relations)]
+            ancestors.update(parents)
+            frontier.update(parents)
+        return ancestors
 
     def update_level(self, dag, relations=frozenset(["is_a"])):
         """Computes the term level and updates it.
@@ -278,7 +274,7 @@ class GODag(object):
             for term in level_to_terms[level]:
                 yield term
 
-    def draw(self, path, fontname="Verdana"):
+    def draw(self, path, populated_only=True, fontname="Verdana"):
         """Draws the annotated DAG to a PNG file."""
         import pydot
 
@@ -296,6 +292,8 @@ class GODag(object):
         for _, term_ids in p_to_term_ids.items():
             for term_id in term_ids:
                 term = self._id_to_term[term_id]
+                if populated_only and not len(term.proteins):
+                    continue
                 name = NAMESPACE_TO_NS[term.namespace] + "_" + term.id.replace(":", "") + "_" + str(len(term.proteins))
                 node = pydot.Node(name, fontname=fontname)
                 term_to_node[term] = node
@@ -305,7 +303,8 @@ class GODag(object):
             for term_id in term_ids:
                 term = self._id_to_term[term_id]
                 for parent, _ in term.get_parents(self):
-                    graph.add_edge(pydot.Edge(term_to_node[term], term_to_node[parent], fontname=fontname))
+                    if term in term_to_node and parent in term_to_node:
+                        graph.add_edge(pydot.Edge(term_to_node[term], term_to_node[parent], fontname=fontname))
 
         graph.write_png(path)
 
@@ -390,12 +389,11 @@ class GODag(object):
             if not len(term.proteins):
                 continue
 
-            paths = term.get_paths_to_root(self)
-            assert len(paths), "term '{}' has no paths".format(term.id)
+            ancestors = term.get_ancestors(self)
+            assert len(ancestors), "term '{}' has no paths".format(term.id)
 
-            for path in paths:
-                for ancestor in path:
-                    ancestor.proteins.update(term.proteins)
+            for ancestor in ancestors:
+                ancestor.proteins.update(term.proteins)
 
         self._check_term_parent_annotations()
 
