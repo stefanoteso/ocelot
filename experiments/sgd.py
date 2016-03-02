@@ -2,16 +2,16 @@
 
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 from itertools import product
 from collections import defaultdict
 from ocelot.services import _cls, CDHit
-from ocelot.go import GODag, GOTerm
+from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.scheduler import Stage
 from . import _Experiment
 from .yeast import *
+
+
 
 class SGDExperiment(_Experiment):
     """New experiment based on SGD and iPfam.
@@ -20,22 +20,24 @@ class SGDExperiment(_Experiment):
     experiment, but performed on a different dataset based on SGD, BioGRID
     and iPfam.
 
-    .. note::
-
-        Somewhat unrelated. For up-to-date statistics on GO annotations,
-        see `<http://geneontology.org/page/current-go-statistics>`_.
-
-    :param src: source directory of all databases.
-    :param dst: destination directory for the results.
-    :param subtargets: prediction targets.
-    :param endpoint: URI of the SPARQL endpoint.
-    :param default_graph: URI of the default graph.
+    Parameters
+    ----------
+    go_aspects : list, optional
+        List of GO aspects to retain, defaults to None (all of them).
+    max_go_depth : int
+        All GO annotations deeper than this are ignored, defaults to None
+    min_go_annot : int
+        All GO terms with fewer annotations than this are ignored, defaults to
+        None
+    All other parameters are passed to the parent class.
     """
     def __init__(self, *args, **kwargs):
         self._go_aspects = kwargs.get("go_aspects", None)
         self._max_go_depth = kwargs.get("max_go_depth", None)
         self._min_go_annot = kwargs.get("min_go_annot", None)
         super(SGDExperiment, self).__init__(*args, **kwargs)
+
+
 
     def _get_sgd_ids(self):
         query = """
@@ -114,6 +116,8 @@ class SGDExperiment(_Experiment):
             # methods, without curatorial judgement
         #    "IEA",  # Inferred from Electronic Annotation (IEA)
         ]
+
+        print _cls(self), ": allowed GO ECs are '{}'".format(ECODES_TO_KEEP)
 
         query = """
         SELECT ?orf ?fun ?ecode
@@ -226,38 +230,9 @@ class SGDExperiment(_Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
-    def _get_string_pin(self, ps=None):
-        query = """
-        SELECT DISTINCT ?orf1 ?orf2
-        FROM <{default_graph}>
-        WHERE {{
-            ?orf1 a ocelot:sgd_id ;
-                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
-                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
-            ?orf2 a ocelot:sgd_id ;
-                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
-                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
-            ?id1 a ocelot:STRING_ID ;
-                owl:sameAs ?orf1 .
-            ?id2 a ocelot:STRING_ID ;
-                owl:sameAs ?orf2 .
-            ?id1 ?mode ?id2 .
-        }}"""
-        pp_pos = set()
-        for bindings in self.iterquery(query, n=2):
-            p1 = bindings[u"orf1"].split(".")[-1]
-            p2 = bindings[u"orf2"].split(".")[-1]
-            pp_pos.update([(p1,p2), (p2,p1)])
-        if not ps is None:
-            # Filter out all pairs that do not fall in ``ps``
-            ps, filtered_pp_pos = set(ps), set()
-            for (p1, p2) in pp_pos:
-                if p1 in ps and p2 in ps:
-                    filtered_pp_pos.add((p1, p2))
-            pp_pos = filtered_pp_pos
-        return pp_pos
-
     def _get_sgd_din(self):
+        raise NotImplementedError()
+
         query = """
         SELECT DISTINCT ?id ?family ?chain ?evalue ?complex
         FROM <{default_graph}>
@@ -291,12 +266,138 @@ class SGDExperiment(_Experiment):
         dd_pos = set()
         for bindings in self.iterquery(query, n=5):
             print bindings
-        sys.exit(1)
         return dd_pos
 
+    def _load_sgd_resources(self):
+        """Retrieves all SGD-derived resources.
+
+        Returns
+        -------
+        ps : list
+            Sorted list of protein (validated ORF) SGD IDs.
+        p_to_feat : dict
+            Map from SGD ID to protein (aka SGD feature) name.
+        p_to_seq: dict
+            Map from SGD ID to protein sequenze.
+        p_to_term_ids : dict
+            Map from SGD ID to GO term IDs.
+        """
+        def to_link(p):
+            return "http://www.yeastgenome.org/locus/{}/go".format(p)
+
+        ps = self._get_sgd_ids()
+        print _cls(self), ": found {} proteins (validated ORFs)".format(len(ps))
+
+        p_to_feat = self._get_sgd_id_to_feat()
+        print _cls(self), ": found {} proteins with known SGD feature".format(len(p_to_feat))
+
+        p_to_seq = self._get_sgd_id_to_seq()
+        print _cls(self), ": found {} proteins with known SGD sequence".format(len(p_to_seq))
+
+        p_to_term_ids = self._get_sgd_id_to_term_ids()
+        print _cls(self), ": found {} proteins with known GO terms".format(len(p_to_term_ids))
+
+        for p in ps:
+            assert p in p_to_seq, "'{}' has no sequence".format(p)
+            assert p in p_to_feat, "'{}' has no associated feature ID".format(p)
+            if not p in p_to_term_ids: print "'{}' has no associated GO terms".format(to_link(p))
+
+        return ps, p_to_feat, p_to_seq, p_to_term_ids
+
+    def _get_string_pin(self, ps=None):
+        query = """
+        SELECT DISTINCT ?orf1 ?orf2
+        FROM <{default_graph}>
+        WHERE {{
+            ?orf1 a ocelot:sgd_id ;
+                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
+            ?orf2 a ocelot:sgd_id ;
+                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
+            ?id1 a ocelot:STRING_ID ;
+                owl:sameAs ?orf1 .
+            ?id2 a ocelot:STRING_ID ;
+                owl:sameAs ?orf2 .
+            ?id1 ?mode ?id2 .
+        }}"""
+        pp_pos = set()
+        for bindings in self.iterquery(query, n=2):
+            p1 = bindings[u"orf1"].split(".")[-1]
+            p2 = bindings[u"orf2"].split(".")[-1]
+            pp_pos.update([(p1,p2), (p2,p1)])
+        if not ps is None:
+            # Filter out all pairs that do not fall in ``ps``
+            ps, filtered_pp_pos = set(ps), set()
+            for (p1, p2) in pp_pos:
+                if p1 in ps and p2 in ps:
+                    filtered_pp_pos.add((p1, p2))
+            pp_pos = filtered_pp_pos
+        return pp_pos
 
 
-    def _get_sgd_pins(self, ps):
+
+    def _filter_ps(self, ps, p_to_seq, min_sequence_len, cdhit_threshold):
+        """Filter out short sequences and cluster them with CD-HIT."""
+
+        # Filter out sequences shorter than min_sequence_len residues
+        filtered_ps = filter(lambda p: len(p_to_seq[p]) >= min_sequence_len, ps)
+        print _cls(self), ": found {} proteins with at least {} residues" \
+                .format(len(ps), min_sequence_len)
+
+        # Cluster the filtered sequences with CD-HIT
+        filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
+        _, clusters = CDHit().run(filtered_p_seq, threshold=cdhit_threshold)
+        print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
+                .format(len(clusters), cdhit_threshold)
+
+        # Take one protein from each cluster
+        filtered_ps = [list(cluster)[0][0] for cluster in clusters]
+        print _cls(self), ": there are {} filtered proteins".format(len(filtered_ps))
+
+        return filtered_ps,
+
+
+
+    def _get_go_annotations(self, filtered_ps, p_to_term_ids):
+        """Load the GO OBO file, fill it in, and prune it."""
+
+        # Load the GO OBO file
+        dag = GODag(os.path.join(self.src, "GO", "go.obo"))
+
+        # Fill in the GO data structure with the protein annotations and
+        # propagate them to the root
+        dag.annotate(p_to_term_ids, propagate=True)
+
+        id_to_term = dag.get_id_to_term()
+        print _cls(self), ": '{}' GO annotations after propagation" \
+                            .format(sum(len(id_to_term[id_].proteins)
+                                        for id_ in id_to_term.iterkeys()))
+
+        # Prune all useless terms from the GO
+        print _cls(self), ": preprocessing the DAG: aspects={} max_depth={} min_annot={}" \
+                            .format(self._go_aspects, self._min_go_annot,
+                                    self._max_go_depth)
+        dag.preprocess(filtered_ps, aspects=self._go_aspects,
+                       min_annot=self._min_go_annot,
+                       max_depth=self._max_go_depth)
+
+        id_to_term = dag.get_id_to_term()
+        print _cls(self), ": '{}' GO annotations after preprocessing" \
+                            .format(sum(len(id_to_term[id_].proteins)
+                                        for id_ in id_to_term.iterkeys()))
+
+        # At this point, some proteins may not be annotated anymore. Fill in
+        # the blanks by mapping them to an empty set.
+        filtered_p_to_term_ids = dict(dag.get_p_to_term_ids())
+        for p in set(filtered_ps) - set(filtered_p_to_term_ids.keys()):
+            filtered_p_to_term_ids[p] = set()
+
+        return dag, filtered_p_to_term_ids
+
+
+
+    def _get_positive_pins(self, ps):
         """Computes the high-quality positive interactions, high+low-quality
         positive interactions, and the negative interactions."""
 
@@ -332,7 +433,7 @@ class SGDExperiment(_Experiment):
 
 
 
-    def _compute_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
+    def _get_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
         """Computes the network of negative protein interactions.
 
         The idea is to sample the negative pairs from the complement of the
@@ -410,6 +511,8 @@ class SGDExperiment(_Experiment):
 
     def _compute_p_average_kernel(self, *matrices):
         return sum(matrices) / len(matrices)
+
+
 
     def _compute_pp_kernel(self, ps, folds, submatrix):
         p_to_i = {p: i for i, p in enumerate(ps)}
@@ -592,6 +695,11 @@ class SGDExperiment(_Experiment):
 
 
 
+    def _analyze_dataset(self, ps, dag, p_to_term_ids, folds):
+        pass
+
+
+
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
         """Writes the SBR dataset."""
 
@@ -735,102 +843,17 @@ class SGDExperiment(_Experiment):
 
         return True,
 
-    def _load_sgd_resources(self):
-        """Retrieves all SGD-derived resources.
 
-        Namely:
 
-        - the list of protein (validated ORF) IDs.
-        - the ID -> yeast protein name map.
-        - the ID -> sequence map.
-        - the ID -> GO term annotations map.
-
-        :returns: the four items above.
-        """
-        def to_link(p):
-            return "http://www.yeastgenome.org/locus/{}/go".format(p)
-
-        ps = self._get_sgd_ids()
-        print _cls(self), ": found {} proteins (validated ORFs)".format(len(ps))
-
-        p_to_feat = self._get_sgd_id_to_feat()
-        print _cls(self), ": found {} proteins with known SGD feature".format(len(p_to_feat))
-
-        p_to_seq = self._get_sgd_id_to_seq()
-        print _cls(self), ": found {} proteins with known SGD sequence".format(len(p_to_seq))
-
-        p_to_term_ids = self._get_sgd_id_to_term_ids()
-        print _cls(self), ": found {} proteins with known GO terms".format(len(p_to_term_ids))
-
-        for p in ps:
-            assert p in p_to_seq, "'{}' has no sequence".format(p)
-            assert p in p_to_feat, "'{}' has no associated feature ID".format(p)
-            if not p in p_to_term_ids: print "'{}' has no associated GO terms".format(to_link(p))
-
-        return ps, p_to_feat, p_to_seq, p_to_term_ids
-
-    def _filter_ps(self, ps, p_to_seq, min_sequence_len, cdhit_threshold):
-        """Filter out short sequences and cluster them with CD-HIT."""
-
-        # Filter out sequences shorter than min_sequence_len residues
-        filtered_ps = filter(lambda p: len(p_to_seq[p]) >= min_sequence_len, ps)
-        print _cls(self), ": found {} proteins with at least {} residues" \
-                .format(len(ps), min_sequence_len)
-
-        # Cluster the filtered sequences with CD-HIT
-        filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
-        _, clusters = CDHit().run(filtered_p_seq, threshold=cdhit_threshold)
-        print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
-                .format(len(clusters), cdhit_threshold)
-
-        # Take one protein from each cluster
-        filtered_ps = [list(cluster)[0][0] for cluster in clusters]
-        print _cls(self), ": there are {} filtered proteins".format(len(filtered_ps))
-
-        return filtered_ps,
-
-    def _load_go_and_filter(self, filtered_ps, p_to_term_ids):
-        """Load the GO OBO file, fill it in, and prune it."""
-
-        # Load the GO OBO file
-        dag = GODag(os.path.join(self.src, "GO", "go.obo"))
-
-        # Fill in the GO data structure with the protein annotations and
-        # propagate them to the root
-        dag.annotate(p_to_term_ids, propagate=True)
-
-        id_to_term = dag.get_id_to_term()
-        print _cls(self), ": '{}' GO annotations after propagation" \
-                            .format(sum(len(id_to_term[id_].proteins)
-                                        for id_ in id_to_term.iterkeys()))
-
-        # Prune all useless terms from the GO
-        print _cls(self), ": preprocessing the DAG: aspects={} max_depth={} min_annot={}" \
-                            .format(self._go_aspects, self._min_go_annot,
-                                    self._max_go_depth)
-        dag.preprocess(filtered_ps, aspects=self._go_aspects,
-                       min_annot=self._min_go_annot,
-                       max_depth=self._max_go_depth)
-
-        id_to_term = dag.get_id_to_term()
-        print _cls(self), ": '{}' GO annotations after preprocessing" \
-                            .format(sum(len(id_to_term[id_].proteins)
-                                        for id_ in id_to_term.iterkeys()))
-
-        # At this point, some proteins may not be annotated anymore. Fill in
-        # the blanks by mapping them to an empty set.
-        filtered_p_to_term_ids = dict(dag.get_p_to_term_ids())
-        for p in set(filtered_ps) - set(filtered_p_to_term_ids.keys()):
-            filtered_p_to_term_ids[p] = set()
-
-        return dag, filtered_p_to_term_ids
-
-    def run(self, min_sequence_len=50, cdhit_threshold=0.75, dump_stats=False):
+    def run(self, **kwargs):
         """Run the yeast prediction experiment.
 
-        :param min_sequence_len: minimum sequence length (default: ``50``).
-        :param cdhit_threshold: CD-HIT threshold (default: ``0.75``).
-        :param dump_stats: whether to dump statistics (default: ``False``).
+        Parameters
+        ----------
+        min_sequence_len : int, optional
+            Minimum allowed sequence length, defaults to 50.
+        cdhit_threshold : float, optional
+            CD-HIT sequence similarity threshold, defaults to 0.75.
         """
         STAGES = (
 
@@ -881,19 +904,20 @@ class SGDExperiment(_Experiment):
                   ],
                   ['p_kernels']),
 
-            Stage(self._load_go_and_filter,
+            Stage(self._get_go_annotations,
                   ['filtered_ps', 'p_to_term_ids'],
                   ['filtered_dag', 'filtered_p_to_term_ids']),
 
-            Stage(self._get_sgd_pins,
+            Stage(self._get_positive_pins,
                   ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
 
-            Stage(self._compute_negative_pin,
+            Stage(self._get_negative_pin,
                   ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
                   ['pp_neg']),
 
             Stage(self._compute_folds,
-                  ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'], ['folds']),
+                  ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'],
+                  ['folds']),
 
             Stage(self._compute_pp_kernel,
                   ['filtered_ps', 'folds', 'p_colocalization_kernel'],
@@ -919,18 +943,17 @@ class SGDExperiment(_Experiment):
                   ['pp_colocalization_kernel'],
                   ['pp_kernels']),
 
+            Stage(self._analyze_dataset,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'folds'],
+                  ['__dummy_stats']),
+
             Stage(self._write_sbr_dataset,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids', 'folds'],
-                  ['sbr_dataset']),
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'folds'],
+                  ['__dummy_sbr']),
         )
 
-        TARGETS = (
-            'sbr_dataset',
-        )
+        TARGETS = ('__dummy_stats', '__dummy_sbr')
 
-        context = {
-            "min_sequence_len": min_sequence_len,
-            "cdhit_threshold": cdhit_threshold,
-            "dump_states": dump_stats,
-        }
-        self._scheduler.run(STAGES, TARGETS, context=context)
+        self._scheduler.run(STAGES, TARGETS, context=kwargs)
