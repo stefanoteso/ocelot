@@ -274,9 +274,10 @@ class GODag(object):
             for term in level_to_terms[level]:
                 yield term
 
-    def draw(self, path, populated_only=True, fontname="Verdana"):
+    def draw(self, path, fontname="Verdana"):
         """Draws the annotated DAG to a PNG file."""
-        import pydot
+        import networkx as nx
+        import matplotlib.pyplot as plt
 
         NAMESPACE_TO_NS = {
             "biological_process": "bp",
@@ -284,29 +285,25 @@ class GODag(object):
             "molecular_function": "mf",
         }
 
-        p_to_term_ids = self.get_p_to_term_ids()
+        graph = nx.DiGraph()
 
-        graph = pydot.Dot(graph_type="digraph", fontname=fontname)
+        term_to_name = {}
+        for term in self._id_to_term.values():
+            if not len(term.proteins):
+                continue
+            name = NAMESPACE_TO_NS[term.namespace] + "_" + \
+                   term.id.replace(":", "")
+            term_to_name[term] = name
+            graph.add_node(name)
 
-        term_to_node = {}
-        for _, term_ids in p_to_term_ids.items():
-            for term_id in term_ids:
-                term = self._id_to_term[term_id]
-                if populated_only and not len(term.proteins):
-                    continue
-                name = NAMESPACE_TO_NS[term.namespace] + "_" + term.id.replace(":", "") + "_" + str(len(term.proteins))
-                node = pydot.Node(name, fontname=fontname)
-                term_to_node[term] = node
-                graph.add_node(node)
+        for term in self._id_to_term.values():
+            for parent, _ in term.get_parents(self):
+                if term in term_to_name and parent in term_to_name:
+                    graph.add_edge(term_to_name[term], term_to_name[parent])
 
-        for _, term_ids in p_to_term_ids.items():
-            for term_id in term_ids:
-                term = self._id_to_term[term_id]
-                for parent, _ in term.get_parents(self):
-                    if term in term_to_node and parent in term_to_node:
-                        graph.add_edge(pydot.Edge(term_to_node[term], term_to_node[parent], fontname=fontname))
-
-        graph.write_png(path)
+        layout = nx.spring_layout(graph)
+        nx.draw(graph, layout)
+        plt.savefig(path)
 
     def _check_term_parent_annotations(self):
         for term in self._id_to_term.itervalues():
@@ -388,11 +385,7 @@ class GODag(object):
         for term in self._id_to_term.values():
             if not len(term.proteins):
                 continue
-
-            ancestors = term.get_ancestors(self)
-            assert len(ancestors), "term '{}' has no paths".format(term.id)
-
-            for ancestor in ancestors:
+            for ancestor in term.get_ancestors(self):
                 ancestor.proteins.update(term.proteins)
 
         self._check_term_parent_annotations()
