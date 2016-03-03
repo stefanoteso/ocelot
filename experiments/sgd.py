@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import os
 import numpy as np
+from os.path import join
 from itertools import product
 from collections import defaultdict
+from textwrap import dedent
 from ocelot.services import _cls, CDHit
 from ocelot.go import GODag
 from ocelot.kernels import *
@@ -363,13 +364,16 @@ class SGDExperiment(_Experiment):
         """Load the GO OBO file, fill it in, and prune it."""
 
         # Load the GO OBO file
-        dag = GODag(os.path.join(self.src, "GO", "go.obo"))
+        dag = GODag(join(self.src, "GO", "go.obo"))
 
         # Fill in the GO data structure with the protein annotations and
         # propagate them to the root
         dag.annotate(p_to_term_ids, propagate=True)
 
         id_to_term = dag.get_id_to_term()
+        print _cls(self), ": '{}' pupulated GO terms after propagation" \
+                            .format(len([id_ for id_ in id_to_term
+                                         if len(id_to_term[id_].proteins) > 0]))
         print _cls(self), ": '{}' GO annotations after propagation" \
                             .format(sum(len(id_to_term[id_].proteins)
                                         for id_ in id_to_term.iterkeys()))
@@ -383,6 +387,9 @@ class SGDExperiment(_Experiment):
                        max_depth=self._max_go_depth)
 
         id_to_term = dag.get_id_to_term()
+        print _cls(self), ": '{}' pupulated GO terms after preprocessing" \
+                            .format(len([id_ for id_ in id_to_term
+                                         if len(id_to_term[id_].proteins) > 0]))
         print _cls(self), ": '{}' GO annotations after preprocessing" \
                             .format(sum(len(id_to_term[id_].proteins)
                                         for id_ in id_to_term.iterkeys()))
@@ -555,12 +562,10 @@ class SGDExperiment(_Experiment):
             return [l[pi[i]] for i in xrange(len(l))]
 
         def check_folds(folds):
-
             # Interactions must be symmetric
             for k, fold in enumerate(folds):
                 assert all((q, p, state) in fold for (p, q, state) in fold), \
                     "fold {} is not symmetric".format(k)
-
             # Folds must not overlap
             for (k1, fold1), (k2, fold2) in product(enumerate(folds), enumerate(folds)):
                 if k1 >= k2:
@@ -568,7 +573,6 @@ class SGDExperiment(_Experiment):
                 for (p1, q1, state1), (p2, q2, state) in product(fold1, fold2):
                     assert (p1, q1) != (p2, q2), \
                         "folds {} and {} overlap".format(k1, k2)
-
             # Interactions must be either positive or negative, but not both
             interactions = set()
             for fold in folds:
@@ -577,34 +581,20 @@ class SGDExperiment(_Experiment):
                 assert not(p, q, not state) in interactions, \
                     "folds are inconsistent"
 
-        # Map from high-quality interacting protein pairs to the GO terms that
-        # either protein is annotated with, and vice-versa
+        # Map from high-quality interacting protein pairs to the GO terms
         pp_to_term_ids = {(p1, p2): set(p_to_term_ids[p1]) | set(p_to_term_ids[p2])
-                       for p1, p2 in pp_pos_hq}
+                          for p1, p2 in pp_pos_hq}
 
-        # Map from each GO term ID to the protein pairs it is annotated with
         term_id_to_pps = defaultdict(set)
         for pp, term_ids in pp_to_term_ids.iteritems():
             for term_id in term_ids:
                 term_id_to_pps[term_id].add(pp)
-
-        # Assign an index to all term IDs
-        term_id_to_i = {term_id: i for i, term_id in enumerate(term_id_to_pps.keys())}
-
-        # Compute the ideal (perfect average) GO term distribution
-        average = np.zeros((len(term_id_to_pps),))
-        for pp, term_ids in pp_to_term_ids.iteritems():
-            for term_id in term_ids:
-                average[term_id_to_i[term_id]] += 1
-        average *= 1.0 / num_folds
-
-        # Sanity check. Note that self-interactions are fine.
         for term_id, term_pps in term_id_to_pps.iteritems():
             for p1, p2 in term_pps:
                 assert (p2, p1) in term_pps
 
         # Generate the folds
-        print _cls(self), ": generating the folds..."
+        print _cls(self), ": generating {} folds...".format(num_folds)
 
         folds = [set() for _ in range(num_folds)]
         while len(term_id_to_pps):
@@ -640,8 +630,8 @@ class SGDExperiment(_Experiment):
                 new_term_id_to_pps[term_id] = new_term_pps
             term_id_to_pps = new_term_id_to_pps
 
-        print _cls(self), ": checking fold sanity..."
-        check_folds(folds)
+#        print _cls(self), ": checking fold sanity..."
+#        check_folds(folds)
 
         # Now that we partitioned all interactions into folds, let's add the
         # negatives interactions -- by sampling them at random
@@ -653,12 +643,11 @@ class SGDExperiment(_Experiment):
         # All candadate negative pairs sampled so far, so that we do not sample
         # the same negative twice
         all_candidate_neg_pps = set()
-
         for fold in folds:
-            ps_in_fold = set(p for p, _, _ in fold) | set(p for _, p, _ in fold)
 
             # Compute the candidate negative pairs by subtracting the candidate
             # positive pairs from the complement of the pairs in the fold
+            ps_in_fold = set(p for p, _, _ in fold) | set(p for _, p, _ in fold)
             candidate_neg_pps = set(product(ps_in_fold, ps_in_fold)) - candidate_pos_pps - all_candidate_neg_pps
 
             # De-symmetrize the candidate negative pairs
@@ -688,15 +677,15 @@ class SGDExperiment(_Experiment):
             fold.update((p1, p2, False) for p1, p2 in sampled_neg_pps)
             fold.update((p2, p1, False) for p1, p2 in sampled_neg_pps)
 
-        print _cls(self), ": checking fold sanity..."
-        check_folds(folds)
+#        print _cls(self), ": checking fold sanity..."
+#        check_folds(folds)
 
         return folds,
 
 
 
     def _analyze_dataset(self, ps, dag, p_to_term_ids, folds):
-        pass
+        return True,
 
 
 
@@ -726,7 +715,7 @@ class SGDExperiment(_Experiment):
         lines = []
         lines.extend("{};PROTEIN;1:1".format(p) for p in ps)
         lines.extend("{}-{};PPAIR;1:1".format(pp[0], pp[1]) for pp in pps)
-        with open(os.path.join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
+        with open(join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
         # Write the predicates, including BOUNDP, ISPAIR and per-term predicates
@@ -735,7 +724,7 @@ class SGDExperiment(_Experiment):
                      for term_id, term in dag._id_to_term.iteritems())
         lines.append("DEF BOUND(PPAIR);LEARN;C")
         lines.append("DEF IN(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
-        with open(os.path.join(self.dst, "sbr-predicates.txt"), "wb") as fp:
+        with open(join(self.dst, "sbr-predicates.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
         # Write the rules
@@ -751,7 +740,7 @@ class SGDExperiment(_Experiment):
                     continue
                 children_or = " OR ".join(term_to_predicate(child) + "(p)" for child in children)
                 lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(term_to_predicate(term), children_or))
-            with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_or_of_children.txt".format(aspect)), "wb") as fp:
+            with open(join(self.dst, "sbr-rules-{}-term_implies_or_of_children.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
             # Children imply their parents
@@ -764,7 +753,7 @@ class SGDExperiment(_Experiment):
                     continue
                 parents_and = " AND ".join(term_to_predicate(parent) + "(p)" for parent in parents)
                 lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(term_to_predicate(term), parents_and))
-            with open(os.path.join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
+            with open(join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
             # Interaction implies same function within the same level
@@ -777,13 +766,14 @@ class SGDExperiment(_Experiment):
             for level in sorted(aspect_terms_by_level):
                 head = " OR ".join("({}(p) AND {}(q))".format(term_to_predicate(term), term_to_predicate(term)) for term in aspect_terms_by_level[level])
                 lines.append("forall p forall q forall pq [(BOUND(pq)) AND (IN(p,q,pq)) => {}];LEARN;L1;MINIMUM_TNORM;1;1;IN".format(head))
-            with open(os.path.join(self.dst, "sbr-rules-interaction_implies_same_{}_levelwise.txt".format(aspect)), "wb") as fp:
+            with open(join(self.dst, "sbr-rules-interaction_implies_same_{}_levelwise.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
         def fold_to_ps(fold):
             return set(p for p, _, _ in fold) | set(q for _, q, _ in fold)
 
         def write_functions(path, ps, dag, p_to_term_ids):
+            """Writes GO term predicates for each protein in the fold."""
             lines = []
             for p in ps:
                 if not p in p_to_term_ids:
@@ -796,56 +786,59 @@ class SGDExperiment(_Experiment):
                 fp.write("\n".join(lines))
 
         def write_interactions(path, fold):
+            """Writes IN/3 and BOUND/2 predicates for all (p, q, state) tuples
+            in the fold."""
             lines = []
             for p, q, state in fold:
                 lines.append("IN({},{},{}-{})=1".format(p, q, p, q))
-                lines.append("BOUND({}-{})={}".format(p, q, state))
+                lines.append("BOUND({}-{})={}".format(p, q, {True:1, False:0}[state]))
             with open(path, "wb") as fp:
                 fp.write("\n".join(lines))
 
         p_to_term_ids = dag.get_p_to_term_ids()
 
         # Write the examples for each fold
-        for k, test_fold in enumerate(folds):
+        for k, test_set in enumerate(folds):
             l = (k + 1) % len(folds)
+            validation_set = folds[l]
 
-            validation_fold = folds[l]
-
-            training_set = set()
+            train_set = set()
             for i, fold in enumerate(folds):
                 if i != k and i != l:
-                    training_set.update(fold)
+                    train_set.update(fold)
 
-            ps_in_training_set = fold_to_ps(training_set)
-            ps_in_test_set = fold_to_ps(test_fold) - ps_in_training_set
-            ps_in_validation_set = fold_to_ps(validation_fold) - (ps_in_training_set | ps_in_test_set)
+            ps_in_test_set = fold_to_ps(test_set)
+            ps_in_validation_set = fold_to_ps(validation_set) - ps_in_test_set
+            ps_in_train_set = fold_to_ps(train_set) - \
+                (ps_in_test_set | ps_in_validation_set)
 
             print _cls(self), \
                 "fold {} examples: #ps = {}, {}, {}; #pps = {}, {}, {}" \
-                    .format(k, len(ps_in_training_set),
+                    .format(k, len(ps_in_train_set),
                             len(ps_in_validation_set), len(ps_in_test_set),
-                            len(training_set), len(validation_fold),
-                            len(test_fold))
+                            len(train_set), len(validation_set),
+                            len(test_set))
 
-            write_functions(os.path.join(self.dst, "sbr-fold{}-testset-fun.txt".format(k)),
+            write_functions(join(self.dst, "sbr-fold{}-testset-fun.txt".format(k)),
                             ps_in_test_set, dag, p_to_term_ids)
-            write_functions(os.path.join(self.dst, "sbr-fold{}-validset-fun.txt".format(k)),
-                            ps_in_validation_set, dag, p_to_term_ids)
-            write_functions(os.path.join(self.dst, "sbr-fold{}-trainset-fun.txt".format(k)),
-                            ps_in_training_set, dag, p_to_term_ids)
+            write_interactions(join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
+                               test_set)
 
-            write_interactions(os.path.join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
-                               test_fold)
-            write_interactions(os.path.join(self.dst, "sbr-fold{}-validset-int.txt".format(k)),
-                               validation_fold)
-            write_interactions(os.path.join(self.dst, "sbr-fold{}-trainset-int.txt".format(k)),
-                               training_set)
+            write_functions(join(self.dst, "sbr-fold{}-validset-fun.txt".format(k)),
+                            ps_in_validation_set, dag, p_to_term_ids)
+            write_interactions(join(self.dst, "sbr-fold{}-validset-int.txt".format(k)),
+                               validation_set)
+
+            write_functions(join(self.dst, "sbr-fold{}-trainset-fun.txt".format(k)),
+                            ps_in_train_set, dag, p_to_term_ids)
+            write_interactions(join(self.dst, "sbr-fold{}-trainset-int.txt".format(k)),
+                               train_set)
 
         return True,
 
 
 
-    def run(self, **kwargs):
+    def run(self, min_sequence_len=50, cdhit_threshold=0.75):
         """Run the yeast prediction experiment.
 
         Parameters
@@ -956,4 +949,8 @@ class SGDExperiment(_Experiment):
 
         TARGETS = ('__dummy_stats', '__dummy_sbr')
 
-        self._scheduler.run(STAGES, TARGETS, context=kwargs)
+        context = {
+            "min_sequence_len": min_sequence_len,
+            "cdhit_threshold": cdhit_threshold,
+        }
+        self._scheduler.run(STAGES, TARGETS, context=context)
