@@ -15,6 +15,7 @@ class Kernel(object):
         if not (len(self._entities) >= 2):
             raise ValueError("kernels need at least two entities.")
         self._do_normalize = kwargs.get("do_normalize", True)
+        self.dtype = kwargs.get("dtype", np.float32)
         self._matrix = None
 
     def __len__(self):
