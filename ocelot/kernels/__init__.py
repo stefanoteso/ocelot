@@ -67,6 +67,7 @@ class Kernel(object):
     def check_and_fixup(self, threshold):
         matrix = self.compute()
         assert (np.abs(matrix.T - matrix) < 1e-6).all(), "not symmetric!"
+        matrix = 0.5 * (matrix + matrix.T)
 
         ls = np.linalg.eigvalsh(matrix)
         if ls[0] < 0.0:
