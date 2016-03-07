@@ -506,11 +506,11 @@ class SGDExperiment(_Experiment):
                                     feat_to_i, self.src)
 
     def _compute_p_interpro_kernel(self, ps):
-        return self._compute_kernel(InterProKernel, ps, self.dst,
+        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
                                     mode="match")
 
     def _compute_p_interpro_count_kernel(self, ps):
-        return self._compute_kernel(InterProHistogramKernel, ps, self.dst,
+        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
                                     mode="count")
 
     def _compute_p_pssm_kernel(self, ps, p_to_seq):
