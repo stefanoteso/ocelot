@@ -38,23 +38,23 @@ class SGDGeneExpressionKernel(Kernel):
     def _compute_all(self):
         pcl = PCL()
         p_to_i = self._entities
-        matrix = np.zeros((len(self), len(self)))
+        self._matrix = np.zeros((len(self), len(self)), dtype=self.dtype)
         for path in self._get_pcl_paths():
             print _cls(self), ": processing '{}'".format(path)
             p_to_levels, num_conditions = pcl.read(path)
             exp_levels, num_missing = [], 0
             for p, i in sorted(p_to_i.iteritems(), key = lambda p_i: p_i[1]):
                 try:
-                    p_levels = p_to_levels[p]
+                    p_levels = p_to_levels[p].astype(self.dtype)
                 except:
-                    p_levels = np.zeros((num_conditions,))
+                    p_levels = np.zeros((num_conditions,), dtype=self.dtype)
                     num_missing += 1
                 exp_levels.append(p_levels)
             if num_missing > 0:
                  print _cls(self), ": '{}' has no measurements for '{}/{}' proteins" \
                                     .format(path, num_missing, len(self))
-            matrix += CorrelationKernel(exp_levels, do_normalize = self._do_normalize).compute()
-        return matrix
+            self._matrix += CorrelationKernel(exp_levels, do_normalize=False).compute()
+        return self._matrix
 
 class YeastProteinComplexKernel(Kernel):
     """A yeast-specific diffusion kernel on protein complexes.
