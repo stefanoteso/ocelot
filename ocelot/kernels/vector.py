@@ -68,7 +68,7 @@ class SparseLinearKernel(Kernel):
     """
     def _compute_all(self):
         num = len(self)
-        matrix = np.zeros((num, num))
+        matrix = np.zeros((num, num), dtype=self.dtype)
         for i in xrange(num):
             entity_i = self._entities[i]
             for j in xrange(i + 1):
@@ -85,7 +85,7 @@ class SetKernel(Kernel):
     """
     def _compute_all(self):
         num = len(self)
-        matrix = np.zeros((num, num))
+        matrix = np.zeros((num, num), dtype=self.dtype)
         for i in xrange(num):
             entity_i = self._entities[i]
             for j in xrange(i + 1):
