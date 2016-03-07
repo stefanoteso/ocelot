@@ -41,7 +41,7 @@ class Kernel(object):
         # *assume* that the corresponding non-diagonal entries are also zero,
         # which implies that it is safe to turn the infinities to 1, as doing
         # so retains the zeros on the non-diagonal entries.
-        z[np.isinf(invd)] = 1.0
+        z[np.isinf(z)] = 1.0
         for i, row in enumerate(matrix):
             matrix[i] = row * z * z[i]
         return matrix
