@@ -87,7 +87,7 @@ class YeastProteinComplexKernel(Kernel):
 
         complex_to_orfs = self._read_complex_to_orf()
 
-        adjmatrix = np.zeros((len(self), len(self)))
+        adjmatrix = np.zeros((len(self), len(self)), dtype=self.dtype)
         for _, orfs in complex_to_orfs.iteritems():
             orf_indices = [p_to_i[orf] for orf in orfs if orf in p_to_i]
             for i, j in it.product(orf_indices, orf_indices):
