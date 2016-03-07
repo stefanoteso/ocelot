@@ -9,33 +9,38 @@ from . import Kernel
 
 _MAX_SURVIVORS_PER_FLUSH = 65536
 
+# TODO The current formulation completely throws away information about
+# *l*-mers, where :math:`l < k`. We should avoid this, and compute all kernel
+# matrices for :math:`l \leq k` in a single pass. In the original code this is
+# done by aggregating instances at each node, rather than filtering them out
+# like we do here, and storing the number of hops survived in the instances
+# themselves, then adding a check in _update.  However this is **very** slow.
+#
+# An alternative is to update the matrix when all child nodes have been
+# considered.
+
 class _RecursivePrefixStringKernel(Kernel):
     """Base prefix-tree string kernel implemented using recursion.
 
     Used to implement the spectrum, mismatch and profile kernels. Adapted from
-    `<http://cbio.mskcc.org/leslielab/software/string_kernels.html>`_.
+    [1]_. The matrix update mechanism has been taken from fastprof [2]_.
 
-    The matrix update mechanism has been taken from
-    `fastprof <https://rostlab.org/owiki/index.php/Fastprofkernel>`_.
+    Parameters
+    ----------
+    strings : collection
+        Ordered collection of strings.
+    k : int, optional
+        k-mer size, inclusive, defaults to 1.
+    alphabet : collection, optional
+        List of valid symbols, defaults to ocelot.AMINOACIDS.
+    min_survivors_per_node : int, optional
+        Minimum number of instances to proceed one step lower within the
+        prefix tree, defaults to 1.
 
-    :param strings: a list of strings.
-    :param k: kmer size, inclusive (default: 1).
-    :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param min_survivors_per_node: minimum number of instances to proceed lower
-        within the prefix tree (default: 1)
-
-    .. todo::
-
-        The current formulation completely throws away information about
-        *l*-mers, where :math:`l < k`. We should avoid this, and compute all
-        kernel matrices for :math:`l \leq k` in a single pass. In the original
-        code this is done by aggregating instances at each node, rather than
-        filtering them out like we do here, and storing the number of hops
-        survived in the instances themselves, then adding a check in _update.
-        However this is **very** slow.
-
-        An alternative is to update the matrix when all child nodes have
-        been considered.
+    References
+    ----------
+    .. [1] http://cbio.mskcc.org/leslielab/software/string_kernels.html
+    .. [2] https://rostlab.org/owiki/index.php/Fastprofkernel
     """
     def __init__(self, strings, **kwargs):
         super(_RecursivePrefixStringKernel, self).__init__(strings, **kwargs)
@@ -131,7 +136,7 @@ class _RecursivePrefixStringKernel(Kernel):
         return self._matrix
 
 class SpectrumKernel(_RecursivePrefixStringKernel):
-    """The spectrum kernel for strings [Leslie02a]_.
+    """The spectrum kernel for strings [1]_.
 
     According to the spectrum kernel of order :math:`k`, the feature
     representation of a string :math:`x` over an alphabet :math:`A` is given
@@ -152,11 +157,14 @@ class SpectrumKernel(_RecursivePrefixStringKernel):
 
         K(x,x') := \\langle \\varphi(x), \\varphi(x') \\rangle = \sum_{\\alpha \in A^k} count(x,\\alpha) count(x',\\alpha)
 
-    :param strings: a list of strings.
-    :param k: kmer size, inclusive (default: 1).
-    :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param min_survivors_per_node: minimum number of instances to proceed lower
-        within the prefix tree (default: 1)
+    Parameters
+    ----------
+    All options are passed to the underlying ``_RecursivePrefixStringKernel``.
+
+    References
+    ----------
+    .. [1] Leslie et al., *The spectrum kernel: A string kernel for SVM protein
+           classification*, 2002.
     """
     def _check_instance(self, instance, _, symbol, depth):
         i, offset = instance
@@ -167,7 +175,7 @@ class SpectrumKernel(_RecursivePrefixStringKernel):
         return (i, offset)
 
 class MismatchKernel(_RecursivePrefixStringKernel):
-    """The mismatch kernel for strings [Leslie02b]_.
+    """The mismatch kernel for strings [1]_.
 
     According to the mismatch kernel of order :math:`k` and mismatch parameter
     `m`, the feature representation of a string :math:`x` over an alphabet
@@ -189,12 +197,16 @@ class MismatchKernel(_RecursivePrefixStringKernel):
 
         K_m(x,x') := \\langle \\varphi_m(x), \\varphi_m(x') \\rangle = \sum_{\\alpha \in A^k} count_m(x,\\alpha) count_m(x',\\alpha)
 
-    :param strings: a list of strings.
-    :param k: kmer size, inclusive (default: 1).
-    :param m: maximum number of mismatches (default: 1).
-    :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param min_survivors_per_node: minimum number of instances to proceed lower
-        within the prefix tree (default: 1)
+    Parameters
+    ----------
+    m : int, optional
+        Maximum number of mismatches, defaults to 1.
+    All remaining options are passed to the underlying ``_RecursivePrefixStringKernel``.
+
+    References
+    ----------
+    .. [Leslie02b] Leslie et al., *Mismatch String Kernels for SVM Protein
+                   Classification*, 2002.
     """
     def __init__(self, strings, **kwargs):
         super(MismatchKernel, self).__init__(strings, **kwargs)
@@ -215,7 +227,7 @@ class MismatchKernel(_RecursivePrefixStringKernel):
         return (i, offset, 0)
 
 class ProfileKernel(_RecursivePrefixStringKernel):
-    """The profile kernel for strings [Kuang04]_.
+    """The profile kernel for strings [1]_.
 
     According to the profile kernel of order :math:`k` and threshold parameter
     :math:`\\tau`, the feature representation of a string :math:`x` over an
@@ -263,13 +275,18 @@ class ProfileKernel(_RecursivePrefixStringKernel):
                                k = 4, threshold = 6.0)
         matrix = kernel.compute()
 
-    :param pssms: list of PSSMs of the form [(residue, transition-score)*].
-    :param k: kmer size, inclusive (default: 1).
-    :param threshold: threshold mutation probability to count as a hit
-        (default: 6.0)
-    :param alphabet: list of valid symbols (default: AMINOACIDS).
-    :param min_survivors_per_node: minimum number of instances to proceed lower
-        within the prefix tree (default: 1)
+    Parameters
+    ----------
+    pssms : collection
+        List of PSSMs of the form [(residue, transition-score)+].
+    threshold : float, optional
+        Threshold mutation probability to count as a hit, defaults to 6.
+    All remaining options are passed to the underlying ``_RecursivePrefixStringKernel``.
+
+    References
+    ----------
+    .. [1] Kuang et al., *Profile-based string kernels for remote homology
+           detection and motif extraction*, 2004.
     """
     def __init__(self, pssms, **kwargs):
         super(ProfileKernel, self).__init__(pssms, **kwargs)
@@ -293,10 +310,16 @@ class PSSMKernel(ProfileKernel):
 
     It takes care of generating the PSSM profiles.
 
-    :param ps: WRITEME
-    :param p_to_seq: WRITEME
-    :param cache_path: WRITEME
-    :param num_iterations: WRITEME (default: 2)
+    Parameters
+    ----------
+    ps :
+        WRITEME
+    p_to_seq :
+        WRITEME
+    cache :
+        WRITEME
+    num_iterations :
+        WRITEME
 
     All remaining options are passed to the underlying ``ProfileKernel``.
     """
