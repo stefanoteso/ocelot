@@ -516,8 +516,8 @@ class SGDExperiment(_Experiment):
         return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
                                     k=4, threshold=6.0)
 
-    def _compute_p_average_kernel(self, *matrices):
-        return sum(matrices) / len(matrices)
+    def _compute_average_kernel(self, *matrices):
+        return sum(matrices) / len(matrices),
 
 
 
@@ -869,7 +869,7 @@ class SGDExperiment(_Experiment):
             Stage(self._compute_p_pssm_kernel,
                   ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
 
-            Stage(self._compute_p_average_kernel,
+            Stage(self._compute_average_kernel,
                   [
                     'p_colocalization_kernel',
                     'p_gene_expression_kernel',
