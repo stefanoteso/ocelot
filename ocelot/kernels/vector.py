@@ -44,24 +44,21 @@ class IntersectionKernel(Kernel):
 class CorrelationKernel(Kernel):
     """An explicit dot product kernel over z-scores.
 
-    Entities with no measurements should be set to all-zeroes.
+    Entities with no measurements should be set to all-zeroes. NaNs on the
+    diagonal are substituted by ones, while NaNs not on the diagonal are
+    substituted by zeros.
 
-    .. note::
-
-        The computation of the standard deviation uses the Maximum
-        Likelihood (i.e. unbiased) estimator.
-
-    :param entities: list of real-valued vectors.
+    Parameters
+    ----------
+    entities : collection
+        Ordered collection of real-valued vectors.
     """
     def _compute_all(self):
-        phis = np.array(self._entities)
-        m = np.mean(phis, axis = 1, keepdims = True)
-        s = np.std(phis, axis = 1, keepdims = True)
-        temp = np.seterr(divide = 'ignore', invalid = 'ignore')
-        z = (phis - m) / s
-        np.seterr(**temp)
-        z[np.isnan(z)] = 0.0
-        return np.dot(z, z.T)
+        corr = np.corrcoef(np.array(self._entities, dtype=self.dtype))
+        nans = np.isnan(corr).nonzero()
+        for i, j in zip(nans[0], nans[1]):
+            corr[i,j] = 1.0 if i == j else 0.0
+        return corr
 
 class SparseLinearKernel(Kernel):
     """A sparse linear kernel.
