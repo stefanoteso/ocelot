@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os
+from os.path import join
 import numpy as np
 import itertools as it
 from collections import Counter
@@ -25,7 +25,7 @@ class SGDGeneExpressionKernel(Kernel):
     :param experiments: list of microarray experiments to use.
     """
     def __init__(self, p_to_i, src, experiments, *args, **kwargs):
-        self._wc = os.path.join(src, "SGD", "microarray", "*", "*.pcl")
+        self._wc = join(src, "SGD", "microarray", "*", "*.pcl")
         self._experiments = experiments
         super(SGDGeneExpressionKernel, self).__init__(p_to_i, *args, **kwargs)
 
@@ -68,7 +68,7 @@ class YeastProteinComplexKernel(Kernel):
     :param gamma: parameter of the diffusion kernel.
     """
     def __init__(self, p_to_i, src, *args, **kwargs):
-        self._path = os.path.join(src, "yeast", "ppi", "CYC2008_complex.tab")
+        self._path = join(src, "yeast", "ppi", "CYC2008_complex.tab")
         super(YeastProteinComplexKernel, self).__init__(p_to_i, *args, **kwargs)
 
     def _read_complex_to_orf(self):
@@ -98,29 +98,28 @@ class YeastProteinComplexKernel(Kernel):
 class InterProKernel(Kernel):
     """A simple domain kernel built around InterPro.
 
-    :param ps: list of protein IDs.
-    :param cache_path: path to the directory holding the interpro output.
-    :param allowed_sources: list of allowed domain providers (default: ``None``).
-    :param mode: one of ``"match"``, ``"count"``, ``"evalue"`` (default: ``"match"``).
-    :param default_score: default score to use when no evalue is provided (default: ``1.0``).
+    Parameters
+    ----------
+    ps : collection
+        Ordered list of protein IDs.
+    path : str
+        Path to the directory holding the InterPro files.
+    mode : str, optional
+        One of "match", "count", "evalue", defaults to "match".
+    allowed_sources : collection or None, optional
+        List of allowed domain providers, defaults to all of them.
+    default_score : float
+        Score to use when no E-value is provided, defaults to 1.0.
     """
-    def __init__(self, ps, cache_path, allowed_sources = None,
-                 use_evalue = False, default_score = 1.0, *args, **kwargs):
+    def __init__(self, ps, path, mode="match", allowed_sources=None,
+                 default_score=1.0, *args, **kwargs):
         if not mode in ("match", "count", "evalue"):
             raise ValueError("invalid mode '{}'".format(mode))
-        self._cache_path = cache_path
-        self._allowed_sources = allowed_sources
+        self._path = path
         self._mode = mode
+        self._allowed_sources = allowed_sources
         self._default_score = default_score
         super(InterProKernel, self).__init__(ps, *args, **kwargs)
-
-    def _path(self, p):
-        return os.path.join(self._cache_path, "interpro",
-                            "{}.tsv.txt".format(p))
-
-    def _compute_iprscan_hits(self):
-        # WRITEME
-        pass
 
     def _to_score(self, evalue):
         if evalue is None or evalue <= 0.0:
@@ -128,14 +127,13 @@ class InterProKernel(Kernel):
         return -np.log(evalue)
 
     def _compute_all(self):
-        self._compute_iprscan_hits()
         parser = InterProTSV()
 
         all_hits, num_missing = [], 0
         for p in self._entities:
             try:
-                domain_to_evalue = parser.read(self._path(p),
-                                               self._allowed_sources)
+                path = join(self._path, "{}.tsv.txt".format(p))
+                domain_to_evalue = parser.read(path, self._allowed_sources)
             except IOError, e:
                 domain_to_evalue = {}
                 num_missing += 1
