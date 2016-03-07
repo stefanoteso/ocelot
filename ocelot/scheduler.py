@@ -15,34 +15,19 @@ class Scheduler(object):
         self.dst = dst
 
     def _resolve_save(self, basename, what):
-        relpath = os.path.join(self.dst, basename)
+        relpath = os.path.join(self.dst, basename) + ".pickle"
         print _cls(self), ": saving '{}'".format(relpath)
         try:
-            what.dump(relpath + ".npy")
-            return
-        except:
-            # Not a numpy object
-            pass
-        try:
-            with open(relpath + ".pickle", "wb") as fp:
-                pickle.dump(what, fp)
-            return
-        except:
-            pass
-        raise IOError("can not save '{}'".format(relpath))
+            with open(relpath, "wb") as fp:
+                pickle.dump(what, fp, protocol=2)
+        except Exception, e:
+            raise IOError("can not save '{}':\n{}".format(relpath, e))
 
     def _resolve_load(self, basename):
-        relpath = os.path.join(self.dst, basename)
-        # Try to load a pickled file
+        relpath = os.path.join(self.dst, basename) + ".pickle"
         try:
-            with open(relpath + ".pickle", "rb") as fp:
+            with open(relpath, "rb") as fp:
                 return pickle.load(fp)
-        except:
-            pass
-        # Try to load a numpy array
-        try:
-            with open(relpath + ".npy", "rb") as fp:
-                return np.load(fp)
         except:
             pass
         raise IOError("can not load '{}'".format(relpath))
