@@ -683,11 +683,6 @@ class SGDExperiment(_Experiment):
 
 
 
-    def _analyze_dataset(self, ps, dag, p_to_term_ids, folds):
-        return True,
-
-
-
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
         """Writes the SBR dataset."""
 
@@ -932,13 +927,9 @@ class SGDExperiment(_Experiment):
                   ['pp_pssm_kernel']),
 
             Stage(lambda *args, **kwargs: None,
-                  ['pp_colocalization_kernel'],
-                  ['pp_kernels']),
-
-            Stage(self._analyze_dataset,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'folds'],
-                  ['__dummy_stats']),
+                  ['pp_colocalization_kernel', 'pp_gene_expression_kernel',
+                   'pp_complex_kernel', 'pp_interpro_kernel', 'pp_pssm_kernel'],
+                  ['__dummy_kernels']),
 
             Stage(self._write_sbr_dataset,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
@@ -946,7 +937,7 @@ class SGDExperiment(_Experiment):
                   ['__dummy_sbr']),
         )
 
-        TARGETS = ('__dummy_stats', '__dummy_sbr')
+        TARGETS = ('__dummy_kernels', '__dummy_sbr')
 
         context = {
             "min_sequence_len": min_sequence_len,
