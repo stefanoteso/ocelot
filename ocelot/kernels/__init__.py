@@ -60,13 +60,13 @@ class Kernel(object):
 
     def is_psd(self):
         matrix = self.compute()
-        is_symmetric = (matrix.T == matrix).all()
+        is_symmetric = (np.abs(matrix.T - matrix) < 1e-6).all()
         is_semi_psd = np.all(np.linalg.eigvalsh(matrix) >= 0)
         return is_symmetric and is_semi_psd
 
     def check_and_fixup(self, threshold):
         matrix = self.compute()
-        assert (matrix.T == matrix).all(), "not symmetric!"
+        assert (np.abs(matrix.T - matrix) < 1e-6).all(), "not symmetric!"
 
         ls = np.linalg.eigvalsh(matrix)
         if ls[0] < 0.0:
