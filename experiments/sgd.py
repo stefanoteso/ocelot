@@ -356,7 +356,7 @@ class SGDExperiment(_Experiment):
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
         print _cls(self), ": there are {} filtered proteins".format(len(filtered_ps))
 
-        return filtered_ps,
+        return sorted(filtered_ps),
 
 
 
@@ -522,14 +522,13 @@ class SGDExperiment(_Experiment):
 
 
     def _compute_pp_kernel(self, ps, folds, submatrix):
-        p_to_i = {p: i for i, p in enumerate(ps)}
+        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
 
         pps = set()
         for fold in folds:
             pps.update((p1, p2) for p1, p2, _ in fold)
-        pps = sorted(pps)
 
-        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in pps]
+        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in sorted(pps)]
         return self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
 
 
