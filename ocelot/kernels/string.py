@@ -123,7 +123,7 @@ class _RecursivePrefixStringKernel(Kernel):
         return instances
 
     def _compute_all(self):
-        self._matrix = np.zeros((len(self), len(self)))
+        self._matrix = np.zeros((len(self), len(self)), dtype=self.dtype)
         self._instances = self._get_instances()
         self._node_counter = 0
         self._recurse(self._instances, 0)
