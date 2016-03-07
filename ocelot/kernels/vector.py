@@ -103,9 +103,17 @@ class ColocalizationKernel(Kernel):
     different-strand proteins (i.e., their distances are computed the same
     way), while this may have a rather serious biological implications.
 
-    The idea comes from [Lee03]_.
+    Parameters
+    ----------
+    contexts : collection
+        Ordered collection of tuples of the form (chromosome, position).
+    gamma : float, optional
+        Diffusion factor, defaults to 1.0.
 
-    :param contexts: a sequence of tuples of the form ``(chromosome, position)``.
+    References
+    ----------
+    .. [1] Lee and Sonnhammer, *Genomic gene clustering analysis of pathways in
+           eukaryotes*, 2003.
     """
     def __init__(self, contexts, *args, **kwargs):
         self._gamma = kwargs.get("gamma", 1.0)
@@ -117,7 +125,7 @@ class ColocalizationKernel(Kernel):
         for i, (chromosome, pos) in enumerate(self._entities):
             chromosome_to_contexts[chromosome].append((i, pos))
 
-        matrix = np.zeros((len(self), len(self)))
+        matrix = np.zeros((len(self), len(self)), dtype=self.dtype)
         for contexts in chromosome_to_contexts.itervalues():
             # Figure out the maximum distance between genes
             max_d = None
