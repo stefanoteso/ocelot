@@ -495,9 +495,10 @@ class SGDExperiment(_Experiment):
     def _compute_p_gene_expression_kernel(self, ps, p_to_feat):
         feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
         return self._compute_kernel(SGDGeneExpressionKernel,
-                                    feat_to_i, self.src, 
+                                    feat_to_i, self.src,
                                     ["Gasch_2000_PMID_11102521",
-                                     "Spellman_1998_PMID_9843569"])
+                                     "Spellman_1998_PMID_9843569"],
+                                    do_normalize=True)
 
     def _compute_p_complex_kernel(self, ps, p_to_feat):
         feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
