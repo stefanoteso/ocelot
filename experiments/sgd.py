@@ -851,6 +851,21 @@ class SGDExperiment(_Experiment):
                   ['ps', 'p_to_seq', 'min_sequence_len', 'cdhit_threshold'],
                   ['filtered_ps']),
 
+            Stage(self._get_go_annotations,
+                  ['filtered_ps', 'p_to_term_ids'],
+                  ['filtered_dag', 'filtered_p_to_term_ids']),
+
+            Stage(self._get_positive_pins,
+                  ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
+
+            Stage(self._get_negative_pin,
+                  ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
+                  ['pp_neg']),
+
+            Stage(self._compute_folds,
+                  ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'],
+                  ['folds']),
+
             Stage(self._compute_p_colocalization_kernel,
                   ['filtered_ps'], ['p_colocalization_kernel']),
 
@@ -889,22 +904,7 @@ class SGDExperiment(_Experiment):
                     'p_pssm_kernel',
                     'p_average_kernel',
                   ],
-                  ['p_kernels']),
-
-            Stage(self._get_go_annotations,
-                  ['filtered_ps', 'p_to_term_ids'],
-                  ['filtered_dag', 'filtered_p_to_term_ids']),
-
-            Stage(self._get_positive_pins,
-                  ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
-
-            Stage(self._get_negative_pin,
-                  ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
-                  ['pp_neg']),
-
-            Stage(self._compute_folds,
-                  ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'],
-                  ['folds']),
+                  ['__dummy_p_kernels']),
 
             Stage(self._compute_pp_kernel,
                   ['filtered_ps', 'folds', 'p_colocalization_kernel'],
@@ -927,9 +927,14 @@ class SGDExperiment(_Experiment):
                   ['pp_pssm_kernel']),
 
             Stage(lambda *args, **kwargs: None,
-                  ['pp_colocalization_kernel', 'pp_gene_expression_kernel',
-                   'pp_complex_kernel', 'pp_interpro_kernel', 'pp_pssm_kernel'],
-                  ['__dummy_kernels']),
+                  [
+                    'pp_colocalization_kernel',
+                    'pp_gene_expression_kernel',
+                    'pp_complex_kernel',
+                    'pp_interpro_kernel',
+                    'pp_pssm_kernel'
+                  ],
+                  ['__dummy_pp_kernels']),
 
             Stage(self._write_sbr_dataset,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
@@ -937,7 +942,7 @@ class SGDExperiment(_Experiment):
                   ['__dummy_sbr']),
         )
 
-        TARGETS = ('__dummy_kernels', '__dummy_sbr')
+        TARGETS = ('__dummy_p_kernels', '__dummy_sbr')
 
         context = {
             "min_sequence_len": min_sequence_len,
