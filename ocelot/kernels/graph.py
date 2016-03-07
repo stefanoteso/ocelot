@@ -41,11 +41,4 @@ class DiffusionKernel(Kernel):
         A = self._A
         D = np.eye(A.shape[0], dtype=self.dtype) * np.sum(A, axis=1)
         E = la.expm(self._beta * (A - D))
-
-        # Matrix exponentiation can give slightly asymmetric results; here we
-        # fix them if they are small enough.
-        asymmetry = np.linalg.norm(E.T - E, ord="fro")
-        if asymmetry > 0.0:
-            assert asymmetry < 1e-10, "the gods are playful today"
-            E = 0.5 * (E.T + E)
         return E
