@@ -477,6 +477,25 @@ class SGDExperiment(_Experiment):
             term_ids.update(ids)
         print "# annotated GO terms =", len(term_ids)
 
+        print "GO DAG STATISTICS"
+
+        level_to_term_ids = defaultdict(set)
+        level_to_annots = defaultdict(list)
+        level_to_ps = defaultdict(set)
+        for id_ in term_ids:
+            term = dag._id_to_term[id_]
+            assert len(term.proteins)
+            level_to_term_ids[term.level].add(id_)
+            level_to_annots[term.level].extend(list(term.proteins))
+            level_to_ps[term.level].update(term.proteins)
+
+        for level in level_to_annots:
+            num_terms = len(level_to_term_ids[level])
+            num_annots = len(level_to_annots[level])
+            num_ps = len(level_to_ps[level])
+            print "level {} has {} terms with {} annotations over {} proteins".format(
+                level, num_terms, num_annots, num_ps)
+
         print "FOLD STATISTICS"
         all_fold_ps = set()
         for k, fold in enumerate(folds):
