@@ -908,32 +908,12 @@ class SGDExperiment(_Experiment):
                   ['__dummy_p_kernels']),
 
             Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'folds', 'p_colocalization_kernel'],
+                  ['filtered_ps', 'folds', 'p_average_kernel'],
                   ['pp_colocalization_kernel']),
-
-            Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'folds', 'p_gene_expression_kernel'],
-                  ['pp_gene_expression_kernel']),
-
-            Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'folds', 'p_complex_kernel'],
-                  ['pp_complex_kernel']),
-
-            Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'folds', 'p_interpro_kernel'],
-                  ['pp_interpro_kernel']),
-
-            Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'folds', 'p_pssm_kernel'],
-                  ['pp_pssm_kernel']),
 
             Stage(lambda *args, **kwargs: None,
                   [
-                    'pp_colocalization_kernel',
-                    'pp_gene_expression_kernel',
-                    'pp_complex_kernel',
-                    'pp_interpro_kernel',
-                    'pp_pssm_kernel'
+                    'pp_average_kernel',
                   ],
                   ['__dummy_pp_kernels']),
 
