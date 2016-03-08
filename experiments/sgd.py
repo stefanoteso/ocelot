@@ -322,8 +322,37 @@ class SGDExperiment(_Experiment):
 
 
 
+    def _print_go_stats(self, dag, message):
+        p_to_ids = dag.get_p_to_term_ids()
+
+        id_to_ps = defaultdict(set)
+        for p, ids in p_to_ids.iteritems():
+            for id_ in ids:
+                id_to_ps[id_].add(p)
+
+        num_ps = len(p_to_ids)
+        num_annot_ps = len(set(p for p, ids in p_to_ids.iteritems()
+                               if len(ids) > 0))
+
+        num_terms = len(id_to_ps)
+        num_annot_terms = len(set(id_ for id_, ps in id_to_ps.iteritems()
+                                  if len(ps) > 0))
+
+        print _cls(self), ": {}/{} annotated proteins" \
+                            .format(num_annot_ps, num_ps)
+        print _cls(self), ": {}/{} annotated terms" \
+                            .format(num_annot_terms, num_terms)
+
     def _get_go_annotations(self, filtered_ps, p_to_term_ids):
         """Load the GO OBO file, fill it in, and prune it."""
+
+        print _cls(self), ": processing GO annotations (aspects={} max_depth={} min_annot={})" \
+                            .format(self._go_aspects, self._min_go_annot,
+                                    self._max_go_depth)
+
+        # Keep only the filtered proteins
+        p_to_term_ids = {p: term_ids for p, term_ids in p_to_term_ids.iteritems()
+                         if p in filtered_ps}
 
         # Load the GO OBO file
         dag = GODag(join(self.src, "GO", "go.obo"))
@@ -331,36 +360,13 @@ class SGDExperiment(_Experiment):
         # Fill in the GO data structure with the protein annotations and
         # propagate them to the root
         dag.annotate(p_to_term_ids, propagate=True)
-
-        id_to_term = dag.get_id_to_term()
-        print _cls(self), ": '{}' pupulated GO terms after propagation" \
-                            .format(len([id_ for id_ in id_to_term
-                                         if len(id_to_term[id_].proteins) > 0]))
-        print _cls(self), ": '{}' GO annotations after propagation" \
-                            .format(sum(len(id_to_term[id_].proteins)
-                                        for id_ in id_to_term.iterkeys()))
+        self._print_go_stats(dag, "propagation")
 
         # Prune all useless terms from the GO
-        print _cls(self), ": preprocessing the DAG: aspects={} max_depth={} min_annot={}" \
-                            .format(self._go_aspects, self._min_go_annot,
-                                    self._max_go_depth)
         dag.preprocess(filtered_ps, aspects=self._go_aspects,
                        min_annot=self._min_go_annot,
                        max_depth=self._max_go_depth)
-
-        id_to_term = dag.get_id_to_term()
-        print _cls(self), ": '{}' pupulated GO terms after preprocessing" \
-                            .format(len([id_ for id_ in id_to_term
-                                         if len(id_to_term[id_].proteins) > 0]))
-        print _cls(self), ": '{}' GO annotations after preprocessing" \
-                            .format(sum(len(id_to_term[id_].proteins)
-                                        for id_ in id_to_term.iterkeys()))
-
-        # At this point, some proteins may not be annotated anymore. Fill in
-        # the blanks by mapping them to an empty set.
-        filtered_p_to_term_ids = dict(dag.get_p_to_term_ids())
-        for p in set(filtered_ps) - set(filtered_p_to_term_ids.keys()):
-            filtered_p_to_term_ids[p] = set()
+        self._print_go_stats(dag, "preprocessing")
 
         return dag, filtered_p_to_term_ids
 
