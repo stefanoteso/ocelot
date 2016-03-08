@@ -487,6 +487,11 @@ class SGDExperiment(_Experiment):
 
 
 
+    def _dump_stats(self, ps, dag, p_to_term_ids, pp_pos_hq, pp_pos_lq, pp_neg,
+                    folds):
+        return None,
+
+
     def _compute_p_colocalization_kernel(self, ps):
         p_to_context = self._get_sgd_id_to_context()
         contexts = [p_to_context[p] for p in ps]
@@ -867,6 +872,11 @@ class SGDExperiment(_Experiment):
                   ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'],
                   ['folds']),
 
+            Stage(self._dump_stats,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'folds'],
+                  ['__dummy_stats']),
+
             Stage(self._compute_p_colocalization_kernel,
                   ['filtered_ps'], ['p_colocalization_kernel']),
 
@@ -923,7 +933,7 @@ class SGDExperiment(_Experiment):
                   ['__dummy_sbr']),
         )
 
-        TARGETS = ('__dummy_p_kernels', '__dummy_sbr')
+        TARGETS = ('__dummy_stats', '__dummy_p_kernels', '__dummy_sbr')
 
         context = {
             "min_sequence_len": min_sequence_len,
