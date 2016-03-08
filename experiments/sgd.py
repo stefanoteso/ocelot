@@ -447,42 +447,18 @@ class SGDExperiment(_Experiment):
         positive PIN minus a set of candidate interactions (of any kind,
         really).
         """
+        print _cls(self), ": sampling {} negative interactions".format(len(pp_pos_hq))
+        pp_neg = set()
+        while len(pp_neg) != len(pp_pos_hq):
+            i, j = self._rng.randint(len(ps), size=2)
+            p, q = ps[i], ps[j]
+            if (p, q) not in pp_pos_lq and \
+               (p, q) not in pp_pos_hq and \
+               (p, q) not in pp_neg:
+                pp_neg.update([(p, q), (q, p)])
+        print _cls(self), ": got {} negative interactions".format(len(pp_neg))
 
-        def symmetrize(pairs):
-            return set(pairs) | set((q, p) for p, q in pairs)
-
-        def desymmetrize(pairs):
-            pairs_asymm = set()
-            for p, q in pairs_asymm:
-                if not (q, p) in pairs:
-                    pairs_asymm.add((p, q))
-            return pairs_asymm
-
-        # Take the complement of the symmetrical positives, subtract the known
-        # positives (both high-quality and low-quality, just to be sure); the
-        # complement will be symmetrical, since the HQ and LQ interactions are
-        print _cls(self), ": computing the complement of the positive PIN"
-        pp_neg_all = set(product(ps, ps)) - (pp_pos_lq | pp_pos_hq)
-
-        print _cls(self), ": computing asymmetric negative PIN"
-        pp_neg_asymm = list(desymmetrize(pp_neg_all))
-
-        print _cls(self), ": computing asymmetric positive PIN"
-        pp_pos_asymm = desymmetrize(pp_pos_hq)
-
-        del pp_pos_hq
-        del pp_pos_lq
-        del pp_neg_all
-
-        # Sample the negative interactions from the complement
-        print _cls(self), ": sampling the negative PIN"
-        pi = self._rng.permutation(len(pp_neg_asymm))
-        pp_neg_half = set(pp_neg_asymm[pi[i]] for i in xrange(len(pp_pos_asymm)))
-
-        # Symmetrize the negatives
-        pp_neg = symmetrize(pp_neg_half)
         self._check_ps_pps(ps, pp_neg)
-
         return pp_neg,
 
 
