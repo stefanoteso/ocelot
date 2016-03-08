@@ -403,38 +403,38 @@ class SGDExperiment(_Experiment):
         return dag, filtered_p_to_term_ids
 
 
+    def _check_ps_pps(self, ps, pps):
+        """Checks that the protein pairs are (i) symmetric, and (ii) entirely
+        contained in the list of proteins."""
+        assert all((q, p) in pps for (p, q) in pps), \
+            "pairs are not symmetric"
+        assert all(p in ps for p, _ in pps), \
+            "singletons and pairs do not match"
+
 
     def _get_positive_pins(self, ps):
         """Computes the high-quality positive interactions, high+low-quality
         positive interactions, and the negative interactions."""
 
-        def check_ps_pps(ps, pps):
-            """Checks that the protein pairs are (i) symmetric, and (ii) entirely
-            contained in the list of proteins."""
-            assert all((q, p) in pps for (p, q) in pps), \
-                "pairs are not symmetric"
-            assert all(p in ps for p, _ in pps), \
-                "singletons and pairs do not match"
-
         pp_pos_hq = self._get_sgd_pin(ps=ps, manual_only=True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} hi-quality PPIs (density = {})" \
                 .format(len(pp_pos_hq), density)
-        check_ps_pps(ps, pp_pos_hq)
+        self._check_ps_pps(ps, pp_pos_hq)
 
         # Query all (high+low-quality) protein-protein interactions
         pp_pos_lq = self._get_sgd_pin(ps=ps, manual_only=False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} lo-quality PPIs (density = {})" \
                 .format(len(pp_pos_lq), density)
-        check_ps_pps(ps, pp_pos_lq)
+        self._check_ps_pps(ps, pp_pos_lq)
 
         # Query (literally) all protein-protein actions annotated in STRING
         pp_pos_string = self._get_string_pin(ps=ps)
         density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
                 .format(len(pp_pos_string), density)
-        check_ps_pps(ps, pp_pos_string)
+        self._check_ps_pps(ps, pp_pos_string)
 
         return pp_pos_hq, pp_pos_lq | pp_pos_string
 
@@ -481,7 +481,7 @@ class SGDExperiment(_Experiment):
 
         # Symmetrize the negatives
         pp_neg = symmetrize(pp_neg_half)
-        self._check_p_pp_are_sane(ps, pp_neg)
+        self._check_ps_pps(ps, pp_neg)
 
         return pp_neg,
 
