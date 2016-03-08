@@ -352,6 +352,22 @@ class GODag(object):
         assert num_roots == len(aspects), "roots {} mismatch with aspects {}"\
             .format(num_roots, len(aspects))
 
+    def _check_maps(self, id_to_term, p_to_term_ids, check_nonempty=False):
+        # If a term has a protein, then protein must be annotated with the term
+        for term_id, term in id_to_term.iteritems():
+            if check_nonempty:
+                assert len(term.proteins)
+            for p in term.proteins:
+                assert term_id in p_to_term_ids[p]
+
+        # If a protein is annotated with a term, the term must hold the protein
+        for p, term_ids in p_to_term_ids.iteritems():
+            if check_nonempty:
+                assert len(term_ids)
+            for term_id in term_ids:
+                term = id_to_term[term_id]
+                assert p in term.proteins
+
     def annotate(self, p_to_term_ids, propagate=False):
         """Annotates the GO DAG with protein annotations.
 
@@ -371,6 +387,7 @@ class GODag(object):
         propagate : bool, defaults to ``False``
             Whether to propagate the annotations to the root.
         """
+        filtered_p_to_term_ids = defaultdict(set)
         for p, term_ids in p_to_term_ids.iteritems():
             for term_id in term_ids:
                 if not term_id in self._id_to_term:
@@ -378,6 +395,9 @@ class GODag(object):
                             .format(p, term_id)
                 else:
                     self._id_to_term[term_id].proteins.add(p)
+                    filtered_p_to_term_ids[p].add(term_id)
+
+        self._check_maps(self._id_to_term, filtered_p_to_term_ids)
 
         if not propagate:
             return
@@ -388,6 +408,7 @@ class GODag(object):
             for ancestor in term.get_ancestors(self):
                 ancestor.proteins.update(term.proteins)
 
+        self._check_maps(self._id_to_term, self.get_p_to_term_ids())
         self._check_term_parent_annotations()
 
     def preprocess(self, ps, aspects=None, max_depth=None, min_annot=None):
@@ -455,6 +476,7 @@ class GODag(object):
                               if child_id in ids_to_keep]
             filtered_id_to_term[id_] = term
 
+        self._check_maps(filtered_id_to_term, self.get_p_to_term_ids())
         self._check_dag(filtered_id_to_term, aspects, max_depth, min_annot)
 
         # Add the bin nodes. A bin is added whenever at least one child of a
@@ -502,6 +524,8 @@ class GODag(object):
 
         # Replace the term ID -> term map
         self._id_to_term = filtered_id_to_term
+
+        self._check_maps(filtered_id_to_term, self.get_p_to_term_ids())
 
 
 class _TestDAG(object):
