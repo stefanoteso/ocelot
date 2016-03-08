@@ -491,10 +491,11 @@ class SGDExperiment(_Experiment):
 
         for level in level_to_annots:
             num_terms = len(level_to_term_ids[level])
+            num_bins = len([id_ for id_ in level_to_term_ids[level] if id_.startswith("BN")])
             num_annots = len(level_to_annots[level])
             num_ps = len(level_to_ps[level])
-            print "level {} has {} terms with {} annotations over {} proteins".format(
-                level, num_terms, num_annots, num_ps)
+            print "level {} has {} terms (of which {} bins) with {} annotations over {} proteins".format(
+                level, num_terms, num_bins, num_annots, num_ps)
 
         print "FOLD STATISTICS"
         all_fold_ps = set()
