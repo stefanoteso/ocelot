@@ -252,9 +252,6 @@ class GODag(object):
     def __repr__(self):
         return "GODag('{}')".format(self._path)
 
-    def get_id_to_term(self):
-        return self._id_to_term
-
     def get_p_to_term_ids(self, id_to_term=None):
         """Computes the protein -> term ID map."""
         if id_to_term is None:
