@@ -65,7 +65,8 @@ class _RecursivePrefixStringKernel(Kernel):
                len(self._survivors_cols) == len(self._survivors_counts)
         v = sparse.coo_matrix((self._survivors_counts,
                                (self._survivors_rows, self._survivors_cols)),
-                              shape = (len(self._entities), self._num_nodes)).tocsr()
+                              shape=(len(self._entities), self._num_nodes),
+                              dtype=self.dtype).tocsr()
         self._matrix += v * v.T
         self._survivors_rows, self._survivors_cols, self._survivors_counts = \
             [], [], []
