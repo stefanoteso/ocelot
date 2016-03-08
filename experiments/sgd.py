@@ -231,44 +231,6 @@ class SGDExperiment(_Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
-    def _get_sgd_din(self):
-        raise NotImplementedError()
-
-        query = """
-        SELECT DISTINCT ?id ?family ?chain ?evalue ?complex
-        FROM <{default_graph}>
-        WHERE {{
-            # Pick all SGD ORFs
-            ?orf a ocelot:sgd_id ;
-                ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
-                ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified ;
-                owl:sameAs ?feat .
-
-            # Map them to SGD feature names
-            ?feat a ocelot:sgd_feature .
-
-            # Map them to PDB chains via SGD's precomputed homology mappings
-            ?_h a ocelot:sgd_pdb_homology ;
-                ocelot:sgd_pdb_has_query ?feat ;
-                ocelot:sgd_pdb_has_target ?chain ;
-                ocelot:sgd_pdb_alignment ?evalue .
-
-            # Find all iPfam domain instances including that chain
-            ?region a ocelot:ipfam_region ;
-                ocelot:ipfam_region_instance_of ?family ;
-                ocelot:ipfam_region_occurs_in ?chain .
-
-            ?_ri a ocelot:ipfam_region_int ;
-                ocelot:ipfam_region_int_has_region ?region ;
-                ocelot:ipfam_region_int_occurs_in ?complex .
-
-            # TODO filter out all non-yeast complexes
-        }}"""
-        dd_pos = set()
-        for bindings in self.iterquery(query, n=5):
-            print bindings
-        return dd_pos
-
     def _load_sgd_resources(self):
         """Retrieves all SGD-derived resources.
 
