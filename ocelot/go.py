@@ -473,7 +473,6 @@ class GODag(object):
                               if child_id in ids_to_keep]
             filtered_id_to_term[id_] = term
 
-        self._check_maps(filtered_id_to_term, self.get_p_to_term_ids())
         self._check_dag(filtered_id_to_term, aspects, max_depth, min_annot)
 
         # Add the bin nodes. A bin is added whenever at least one child of a
