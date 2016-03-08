@@ -378,6 +378,7 @@ class SGDExperiment(_Experiment):
         """Computes the high-quality positive interactions, high+low-quality
         positive interactions, and the negative interactions."""
 
+        # Query the high-quality protein-protein interactions
         pp_pos_hq = self._get_sgd_pin(ps=ps, manual_only=True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
         print _cls(self), ": found {} hi-quality PPIs (density = {})" \
