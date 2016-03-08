@@ -491,52 +491,6 @@ class SGDExperiment(_Experiment):
         return None,
 
 
-    def _compute_p_colocalization_kernel(self, ps):
-        p_to_context = self._get_sgd_id_to_context()
-        contexts = [p_to_context[p] for p in ps]
-        return self._compute_kernel(ColocalizationKernel, contexts, gamma=1.0)
-
-    def _compute_p_gene_expression_kernel(self, ps, p_to_feat):
-        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
-        return self._compute_kernel(SGDGeneExpressionKernel,
-                                    feat_to_i, self.src,
-                                    ["Gasch_2000_PMID_11102521",
-                                     "Spellman_1998_PMID_9843569"],
-                                    do_normalize=True)
-
-    def _compute_p_complex_kernel(self, ps, p_to_feat):
-        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
-        return self._compute_kernel(YeastProteinComplexKernel,
-                                    feat_to_i, self.src)
-
-    def _compute_p_interpro_kernel(self, ps):
-        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
-                                    mode="match")
-
-    def _compute_p_interpro_count_kernel(self, ps):
-        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
-                                    mode="count")
-
-    def _compute_p_pssm_kernel(self, ps, p_to_seq):
-        return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
-                                    k=4, threshold=6.0)
-
-    def _compute_average_kernel(self, *matrices):
-        return sum(matrices) / len(matrices),
-
-
-
-    def _compute_pp_kernel(self, ps, folds, submatrix):
-        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
-
-        pps = set()
-        for fold in folds:
-            pps.update((p1, p2) for p1, p2, _ in fold)
-
-        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in sorted(pps)]
-        return self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
-
-
 
     def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_term_ids, num_folds=10):
         """Generates the folds.
@@ -685,6 +639,52 @@ class SGDExperiment(_Experiment):
 #        check_folds(folds)
 
         return folds,
+
+
+    def _compute_p_colocalization_kernel(self, ps):
+        p_to_context = self._get_sgd_id_to_context()
+        contexts = [p_to_context[p] for p in ps]
+        return self._compute_kernel(ColocalizationKernel, contexts, gamma=1.0)
+
+    def _compute_p_gene_expression_kernel(self, ps, p_to_feat):
+        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
+        return self._compute_kernel(SGDGeneExpressionKernel,
+                                    feat_to_i, self.src,
+                                    ["Gasch_2000_PMID_11102521",
+                                     "Spellman_1998_PMID_9843569"],
+                                    do_normalize=True)
+
+    def _compute_p_complex_kernel(self, ps, p_to_feat):
+        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
+        return self._compute_kernel(YeastProteinComplexKernel,
+                                    feat_to_i, self.src)
+
+    def _compute_p_interpro_kernel(self, ps):
+        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
+                                    mode="match")
+
+    def _compute_p_interpro_count_kernel(self, ps):
+        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
+                                    mode="count")
+
+    def _compute_p_pssm_kernel(self, ps, p_to_seq):
+        return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
+                                    k=4, threshold=6.0)
+
+    def _compute_average_kernel(self, *matrices):
+        return sum(matrices) / len(matrices),
+
+
+
+    def _compute_pp_kernel(self, ps, folds, submatrix):
+        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
+
+        pps = set()
+        for fold in folds:
+            pps.update((p1, p2) for p1, p2, _ in fold)
+
+        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in sorted(pps)]
+        return self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
 
 
 
