@@ -7,8 +7,12 @@ from ..services import _cls
 class Kernel(object):
     """Base kernel class.
 
-    :param entities: list of arbitrary data entries.
-    :param do_normalize: normalize the Gram matrix.
+    Parameters
+    ----------
+    entities : collection
+        Ordered collection of arbitrary elements.
+    do_normalize : boo, optional (defaults to True)
+        Whether to normalize the Gram matrix.
     """
     def __init__(self, entities, *args, **kwargs):
         self._entities = entities
@@ -19,6 +23,7 @@ class Kernel(object):
         self._matrix = None
 
     def __len__(self):
+        """Returns the number of entities."""
         return len(self._entities)
 
     @staticmethod
@@ -48,7 +53,7 @@ class Kernel(object):
         return matrix
 
     def compute(self):
-        """Computes the kernel matrix.
+        """Computes the Gram matrix.
 
         Relies on `self._compute_all`.
         """
@@ -59,12 +64,15 @@ class Kernel(object):
         return self._matrix
 
     def is_psd(self):
+        """Checks whether the Gram matrix is positive semi-definite."""
         matrix = self.compute()
         is_symmetric = (np.abs(matrix.T - matrix) < 1e-6).all()
         is_semi_psd = np.all(np.linalg.eigvalsh(matrix) >= 0)
         return is_symmetric and is_semi_psd
 
     def check_and_fixup(self, threshold):
+        """Checks whether the Gram matrix is positive semi-definite and
+        preconditions it if it is slightly non-PSD."""
         matrix = self.compute()
         assert (np.abs(matrix.T - matrix) < 1e-6).all(), "not symmetric!"
         matrix = 0.5 * (matrix + matrix.T)
@@ -78,11 +86,11 @@ class Kernel(object):
             assert eigvals[0] > -threshold, "eigenvalues are too non-negative, even after preconditioning: {}".format(eigvals)
 
     def draw(self, path):
-        """Draws the kernel matrix to a file."""
+        """Draws the Gram matrix to a file."""
         try:
             import matplotlib.pyplot as plt
             import matplotlib.cm as cm
-        except:
+        except ImportError:
             print "matplotlib is required; can not draw"
             return
         try:
@@ -94,15 +102,17 @@ class Kernel(object):
         except Exception, e:
             print "failed to draw kernel; skipping"
 
-    def save(self, path):
-        np.savetxt(path, self.compute())
-
 class DummyKernel(Kernel):
     """A wrapper around ``np.ndarray``'s and files.
 
-    :param arg: either a ``numpy.ndarray`` or a path to a file.
-    :param num: number of elements in the wrapper kernel.
-    :param check_psd: whether to raise an exception if the wrapped kernel is not PSD.
+    Parameters
+    ----------
+    arg : numpy.ndarray or str
+        Either a Gram matrix or a path to a file.
+    num : int
+        Number of elements in the Gram matrix.
+    check_psd : bool
+        Whether to raise an exception if the wrapped kernel is not PSD.
     """
     def __init__(self, arg, **kwargs):
         arg = arg
@@ -125,35 +135,37 @@ class DummyKernel(Kernel):
             self._matrix = self._normalize(self._matrix)
 
 class _TestKernel(object):
-    def _test(matrix, expected):
-        kernel = DummyKernel(np.array(matrix), do_normalize=True)
+    def _test(self, matrix, expected, do_normalize=True):
+        kernel = DummyKernel(np.array(matrix), do_normalize=do_normalize)
         output = kernel.compute()
-        assert (output == expected).all()
+        assert (np.abs(output - expected) < 1e-6).all()
 
     def test_normalization(self):
         MATRIX = np.array([
             [2, 1, 0],
             [1, 2, 1],
             [0, 1, 2],
-        ])
+        ], dtype=np.float64)
         EXPECTED = np.array([
-            [1, 1/2., 0],
-            [1/2., 1, 1/2.],
-            [0, 1/2., 1],
-        ])
+            [1,   0.5,   0],
+            [0.5,   1, 0.5],
+            [0,   0.5,   1],
+        ], dtype=np.float64)
         self._test(MATRIX, EXPECTED)
 
-    def test_normalization_weird(self):
+    def test_normalization_zero_diag(self):
+        # zero diagonal elements are treated as ones
+        S = 1.0 / np.sqrt(2)
         MATRIX = np.array([
             [2, 1, 0],
             [1, 0, 1],
-            [0, 2, 2],
-        ])
+            [0, 1, 2],
+        ], dtype=np.float64)
         EXPECTED = np.array([
-            [1, 1, 0],
-            [1, 1, 1],
-            [0, 1, 1],
-        ])
+            [1, S, 0],
+            [S, 0, S],
+            [0, S, 1],
+        ], dtype=np.float64)
         self._test(MATRIX, EXPECTED)
 
 from .vector import *
