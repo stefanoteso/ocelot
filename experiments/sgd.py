@@ -9,6 +9,7 @@ from ocelot.services import _cls, CDHit
 from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.scheduler import Stage
+from ocelot.utils import permute
 from . import _Experiment
 from .yeast import *
 
@@ -431,8 +432,46 @@ class SGDExperiment(_Experiment):
         return pp_neg,
 
 
+    def _check_folds(self, ps, pps, folds):
+        """Checks that the folds make sense."""
 
-    def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_term_ids, num_folds=10):
+        # # All proteins must belong to at least a fold
+        # ps_in_folds = set()
+        # for fold in folds:
+        #     ps_in_folds.update(p for p, _, _ in fold)
+        #     ps_in_folds.update(q for _, q, _ in fold)
+        # assert len(ps_in_folds) == len(set(ps))
+        # del ps_in_folds
+
+        # All protein pairs must belong to at least a fold
+        pps_in_folds = set()
+        for fold in folds:
+            pps_in_folds.update((p, q) for p, q, _ in fold)
+        assert len(pps_in_folds) == len(set(pps))
+        del pps_in_folds
+
+        # Interactions must be symmetric
+        for k, fold in enumerate(folds):
+            assert all((q, p, state) in fold for (p, q, state) in fold), \
+                "fold {} is not symmetric".format(k)
+
+        # Folds must not overlap
+        for (k1, fold1), (k2, fold2) in product(enumerate(folds), enumerate(folds)):
+            if k1 >= k2:
+                continue
+            for (p1, q1, state1), (p2, q2, state) in product(fold1, fold2):
+                assert (p1, q1) != (p2, q2), \
+                    "folds {} and {} overlap".format(k1, k2)
+
+        # Interactions must be either positive or negative, but not both
+        interactions = set()
+        for fold in folds:
+            interactions.update(fold)
+        for p, q, state in interactions:
+            assert not(p, q, not state) in interactions, \
+                "folds are inconsistent"
+
+    def _compute_folds(self, ps, pp_pos, pp_neg, p_to_term_ids, num_folds=10):
         """Generates the folds.
 
         The interactions are split into folds according to their functions.
@@ -440,10 +479,10 @@ class SGDExperiment(_Experiment):
 
         Parameters
         ----------
-        pp_pos_hq : set
-            High-quality positive interactions.
-        pp_pos_lq : set
-            Low-quality positive interactions.
+        pp_pos : set
+            Positive interactions.
+        pp_neg : set
+            Negative interactions.
         p_to_term_ids : dict
             Map between proteins and GO terms IDs.
         num_folds : int, optional
@@ -459,128 +498,73 @@ class SGDExperiment(_Experiment):
         # XXX take into consideration unbound proteins
         # XXX take into consideration unannotated proteins
 
-        def permute(l, rng):
-            pi = list(rng.permutation(len(l)))
-            return [l[pi[i]] for i in xrange(len(l))]
+        def distribute_pps(folds, pps, state, p_to_term_ids):
 
-        def check_folds(folds):
-            # Interactions must be symmetric
-            for k, fold in enumerate(folds):
-                assert all((q, p, state) in fold for (p, q, state) in fold), \
-                    "fold {} is not symmetric".format(k)
-            # Folds must not overlap
-            for (k1, fold1), (k2, fold2) in product(enumerate(folds), enumerate(folds)):
-                if k1 >= k2:
-                    continue
-                for (p1, q1, state1), (p2, q2, state) in product(fold1, fold2):
-                    assert (p1, q1) != (p2, q2), \
-                        "folds {} and {} overlap".format(k1, k2)
-            # Interactions must be either positive or negative, but not both
-            interactions = set()
-            for fold in folds:
-                interactions.update(fold)
-            for p, q, state in interactions:
-                assert not(p, q, not state) in interactions, \
-                    "folds are inconsistent"
+            # Map from pairs to term IDs
+            pp_to_term_ids = {}
+            for p, q in pps:
+                p_term_ids = p_to_term_ids.get(p, set())
+                q_term_ids = p_to_term_ids.get(q, set())
+                pp_to_term_ids[(p, q)] = p_term_ids | q_term_ids
 
-        # Map from high-quality interacting protein pairs to the GO terms
-        pp_to_term_ids = {(p1, p2): set(p_to_term_ids[p1]) | set(p_to_term_ids[p2])
-                          for p1, p2 in pp_pos_hq}
+            # Map from term IDs to pairs
+            term_id_to_pps = defaultdict(set)
+            for pp, term_ids in pp_to_term_ids.iteritems():
+                if not len(term_ids):
+                    term_id_to_pps["unannotated"].add(pp)
+                else:
+                    for term_id in term_ids:
+                        term_id_to_pps[term_id].add(pp)
 
-        term_id_to_pps = defaultdict(set)
-        for pp, term_ids in pp_to_term_ids.iteritems():
-            for term_id in term_ids:
-                term_id_to_pps[term_id].add(pp)
-        for term_id, term_pps in term_id_to_pps.iteritems():
-            for p1, p2 in term_pps:
-                assert (p2, p1) in term_pps
+            # Distribute the interactions among the folds
+            while len(term_id_to_pps):
 
-        # Generate the folds
+                # Shuffle the folds
+                folds = permute(folds, self._rng)
+
+                # Pick the term with the least unallocated pairs
+                cur_term_id, symm_pps = min(term_id_to_pps.iteritems(),
+                                            key=lambda id_pps: len(id_pps[-1]))
+
+                print "distributing interactions with term {} (# interactions = {})".format(cur_term_id, len(symm_pps))
+
+                # Desymmetrize the pps to add
+                asymm_pps = set()
+                for p, q in symm_pps:
+                    if not (q, p) in asymm_pps:
+                        asymm_pps.add((p, q))
+
+                # Evenly distribute the associated pairs among all folds.
+                for i, (p, q) in enumerate(sorted(asymm_pps)):
+                    folds[i % len(folds)].update([(p, q, state), (q, p, state)])
+
+                # Update term_to_pps by removing all interactions that we
+                # just allocated
+                new_term_id_to_pps = {}
+                for term_id in term_id_to_pps:
+                    # Skip the term we just processed (it's done, right?)
+                    if term_id == cur_term_id:
+                        continue
+                    new_pps = set(pp for pp in term_id_to_pps[term_id]
+                                  if not pp in symm_pps)
+                    if not len(new_pps):
+                        continue
+                    new_term_id_to_pps[term_id] = new_pps
+                term_id_to_pps = new_term_id_to_pps
+
         print _cls(self), ": generating {} folds...".format(num_folds)
-
         folds = [set() for _ in range(num_folds)]
-        while len(term_id_to_pps):
 
-            # Pick the term with the least unprocessed protein-protein pairs
-            cur_term_id, cur_pps = min(term_id_to_pps.iteritems(),
-                                       key=lambda term_id_and_pps: len(term_id_and_pps[1]))
-            print _cls(self), ": best term: {} (num pairs = {})".format(cur_term_id, len(cur_pps))
+        print _cls(self), ": adding {} positive interactions...".format(len(pp_pos))
+        distribute_pps(folds, pp_pos, True, p_to_term_ids)
+        print _cls(self), ": adding {} negative interactions...".format(len(pp_neg))
+        distribute_pps(folds, pp_neg, False, p_to_term_ids)
 
-            # Evenly distribute the associated protein-protein pairs among all
-            # folds, taking into account the fact that if (p1, p2) is in
-            # cur_pps, then (p2, p1) is in cur_pps as well. Also, make sure
-            # to allow self-interactions.
-            pps_to_add = set()
-            for p1, p2 in cur_pps:
-                if not (p2, p1) in pps_to_add:
-                    pps_to_add.add((p1, p2))
-            folds = permute(folds, self._rng)
-            for i, (p1, p2) in enumerate(pps_to_add):
-                folds[i % num_folds].update([(p1, p2, True), (p2, p1, True)])
+        # XXX proteins that do not interact (or non-interact) with anybody
+        # do not appear in the folds.
 
-            # Update term_to_pps
-            new_term_id_to_pps = {}
-            for term_id in term_id_to_pps:
-                # Skip the term we just processed
-                if term_id == cur_term_id:
-                    continue
-                # Skip the protein pairs annotated with it
-                new_term_pps = set(pp for pp in term_id_to_pps[term_id]
-                                   if not pp in cur_pps)
-                if len(new_term_pps) == 0:
-                    continue
-                new_term_id_to_pps[term_id] = new_term_pps
-            term_id_to_pps = new_term_id_to_pps
-
-#        print _cls(self), ": checking fold sanity..."
-#        check_folds(folds)
-
-        # Now that we partitioned all interactions into folds, let's add the
-        # negatives interactions -- by sampling them at random
-        print _cls(self), ": adding negative interactions..."
-
-        candidate_pos_pps = {(p1, p2) for p1, p2 in pp_pos_hq | pp_pos_lq} | \
-                            {(p2, p1) for p1, p2 in pp_pos_hq | pp_pos_lq}
-
-        # All candadate negative pairs sampled so far, so that we do not sample
-        # the same negative twice
-        all_candidate_neg_pps = set()
-        for fold in folds:
-
-            # Compute the candidate negative pairs by subtracting the candidate
-            # positive pairs from the complement of the pairs in the fold
-            ps_in_fold = set(p for p, _, _ in fold) | set(p for _, p, _ in fold)
-            candidate_neg_pps = set(product(ps_in_fold, ps_in_fold)) - candidate_pos_pps - all_candidate_neg_pps
-
-            # De-symmetrize the candidate negative pairs
-            temp = set()
-            for p1, p2 in candidate_neg_pps:
-                if not (p2, p1) in temp:
-                    temp.add((p1, p2))
-            candidate_neg_pps = list(temp)
-
-            # De-symmetrize the positive fold
-            temp = set()
-            for p1, p2, _ in fold:
-                if not (p2, p1) in temp:
-                    temp.add((p1, p2))
-
-            # Randomly sample a number of negative pairs equal to the number of
-            # positives pairs (actually only half of that; we symmetrize the
-            # negatives later)
-            pi = self._rng.permutation(len(candidate_neg_pps))
-            sampled_neg_pps = set(candidate_neg_pps[pi[i]] for i in xrange(len(temp)))
-
-            # Update with the sampled negative pairs
-            all_candidate_neg_pps.update((p1, p2) for p1, p2 in sampled_neg_pps)
-            all_candidate_neg_pps.update((p2, p1) for p1, p2 in sampled_neg_pps)
-
-            # Assemble the fold
-            fold.update((p1, p2, False) for p1, p2 in sampled_neg_pps)
-            fold.update((p2, p1, False) for p1, p2 in sampled_neg_pps)
-
-#        print _cls(self), ": checking fold sanity..."
-#        check_folds(folds)
+        print _cls(self), ": checking fold sanity..."
+        self._check_folds(ps, pp_pos | pp_neg, folds)
 
         return folds,
 
@@ -890,7 +874,7 @@ class SGDExperiment(_Experiment):
                   ['pp_neg']),
 
             Stage(self._compute_folds,
-                  ['pp_pos_hq', 'pp_pos_lq', 'filtered_p_to_term_ids'],
+                  ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'filtered_p_to_term_ids'],
                   ['folds']),
 
             Stage(self._dump_stats,
