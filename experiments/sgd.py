@@ -700,6 +700,27 @@ class SGDExperiment(_Experiment):
         return self._compute_kernel(PairwiseKernel, pp_indices, submatrix),
 
 
+    def _write_sbr_datapoints(self, p_to_i, pp_indices):
+        i_to_p = {i: p for p, i in p_to_i.iteritems()}
+
+        lines = []
+        for p, i in sorted(p_to_i.items(), key=lambda p_i: p_i[-1]):
+            lines.append("{};PROTEIN".format(p))
+        for i, j in pp_indices:
+            lines.append("{}-{};PPAIR".format(i_to_p[i], i_to_p[j]))
+
+        with open(join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
+            fp.write("\n".join(lines))
+
+    def _write_sbr_predicates(self, dag):
+        lines = []
+        lines.append("DEF BOUND(PPAIR);LEARN;C")
+        lines.append("DEF IN(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
+        lines.extend("DEF {};LEARN;C".format(term_to_predicate(term))
+                     for term in dag._id_to_term.itervalues())
+
+        with open(join(self.dst, "sbr-predicates.txt"), "wb") as fp:
+            fp.write("\n".join(lines))
 
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, pp_pos, pp_neg,
                            p_to_i, pp_indices, folds):
@@ -716,26 +737,9 @@ class SGDExperiment(_Experiment):
             }
             return "{namespace}-lvl{level}-{id}-{name}".format(**d)
 
-        # Write the datapoints, including proteins and protein pairs
-        # XXX remove proteins not in folds
-        i_to_p = {i: p for p, i in p_to_i.iteritems()}
+        self._write_sbr_datapoints(p_to_i, pp_indices)
 
-        lines = []
-        for p, i in sorted(p_to_i.items(), key=lambda p_i: p_i[-1]):
-            lines.append("{};PROTEIN".format(p))
-        for i, j in pp_indices:
-            lines.append("{}-{};PPAIR".format(p_to_i[i], p_to_i[j]))
-        with open(join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
-            fp.write("\n".join(lines))
-
-        # Write the predicates, including BOUNDP, ISPAIR and per-term predicates
-        lines = []
-        lines.extend("DEF {};LEARN;C".format(term_to_predicate(term))
-                     for term_id, term in dag._id_to_term.iteritems())
-        lines.append("DEF BOUND(PPAIR);LEARN;C")
-        lines.append("DEF IN(PROTEIN,PROTEIN,PPAIR);GIVEN;C;F")
-        with open(join(self.dst, "sbr-predicates.txt"), "wb") as fp:
-            fp.write("\n".join(lines))
+        self._write_sbr_predicates(dag)
 
         # Write the rules
         for aspect in ("biological_process", "cellular_component", "molecular_function"):
