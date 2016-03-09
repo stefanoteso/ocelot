@@ -330,7 +330,7 @@ class PSSMKernel(ProfileKernel):
         super(PSSMKernel, self).__init__(ps, *args, **kwargs)
 
     def _get_pssm_path(self, p):
-        return os.path.join(self._cache_path, "pssm", "{}.ascii-pssm".format(p))
+        return os.path.join(self._cache_path, "{}.ascii-pssm".format(p))
 
     def _compute_pssms(self):
         pass

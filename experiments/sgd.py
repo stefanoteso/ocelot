@@ -670,16 +670,16 @@ class SGDExperiment(_Experiment):
                                     feat_to_i, self.src)
 
     def _compute_p_interpro_kernel(self, ps):
-        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
-                                    mode="match")
+        return self._compute_kernel(InterProKernel, ps,
+                                    join(self.dst, "interpro"), mode="match")
 
     def _compute_p_interpro_count_kernel(self, ps):
-        return self._compute_kernel(InterProKernel, ps, join(self.dst, "interpro"),
-                                    mode="count")
+        return self._compute_kernel(InterProKernel, ps,
+                                    join(self.dst, "interpro"), mode="count")
 
     def _compute_p_pssm_kernel(self, ps, p_to_seq):
-        return self._compute_kernel(PSSMKernel, ps, p_to_seq, self.dst,
-                                    k=4, threshold=6.0)
+        return self._compute_kernel(PSSMKernel, ps, p_to_seq,
+                                    join(self.dst, "pssm"), k=4, threshold=6.0)
 
     def _compute_average_kernel(self, *matrices):
         return sum(matrices) / len(matrices),
