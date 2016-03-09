@@ -368,7 +368,7 @@ class SGDExperiment(_Experiment):
                        max_depth=self._max_go_depth)
         self._print_go_stats(dag, "preprocessing")
 
-        return dag, filtered_p_to_term_ids
+        return dag, dag.get_p_to_term_ids()
 
 
     def _check_ps_pps(self, ps, pps):
@@ -671,15 +671,15 @@ class SGDExperiment(_Experiment):
 
     def _compute_p_interpro_kernel(self, ps):
         return self._compute_kernel(InterProKernel, ps,
-                                    join(self.dst, "interpro"), mode="match")
+                                    join(self.src, "interpro"), mode="match")
 
     def _compute_p_interpro_count_kernel(self, ps):
         return self._compute_kernel(InterProKernel, ps,
-                                    join(self.dst, "interpro"), mode="count")
+                                    join(self.src, "interpro"), mode="count")
 
     def _compute_p_pssm_kernel(self, ps, p_to_seq):
         return self._compute_kernel(PSSMKernel, ps, p_to_seq,
-                                    join(self.dst, "pssm"), k=4, threshold=6.0)
+                                    join(self.src, "pssm"), k=4, threshold=6.0)
 
     def _compute_average_kernel(self, *matrices):
         return sum(matrices) / len(matrices),
@@ -692,7 +692,7 @@ class SGDExperiment(_Experiment):
         pps = set()
         pps.update(pp_pos)
         pps.update(pp_neg)
-        pp_indices = [(p_to_i[p], p_to_i[q] for p, q in sorted(pps)
+        pp_indices = sorted([(p_to_i[p], p_to_i[q]) for p, q in sorted(pps)])
 
         return p_to_i, pp_indices
 
@@ -722,6 +722,55 @@ class SGDExperiment(_Experiment):
         with open(join(self.dst, "sbr-predicates.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
+    def _write_sbr_rules(self, dag):
+        for aspect in dag.ASPECTS:
+
+            # Parents imply the OR of the children
+            lines = []
+            for term in dag._id_to_term.itervalues():
+                if term.namespace != aspect:
+                    continue
+                children = [child for child, _ in term.get_children(dag)]
+                if not len(children):
+                    continue
+                children_or = " OR ".join(term_to_predicate(child) + "(p)"
+                                          for child in children)
+                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1" \
+                                .format(term_to_predicate(term), children_or))
+
+            with open(join(self.dst, "sbr-rules-{}-term_implies_or_of_children.txt".format(aspect)), "wb") as fp:
+                fp.write("\n".join(lines))
+
+            # Children imply their parents
+            lines = []
+            for term in dag._id_to_term.itervalues():
+                if term.namespace != aspect:
+                    continue
+                parents = [parent for parent, _ in term.get_parents(dag)]
+                if not len(parents):
+                    continue
+                parents_and = " AND ".join(term_to_predicate(parent) + "(p)" for parent in parents)
+                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1" \
+                                .format(term_to_predicate(term), parents_and))
+            with open(join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
+                fp.write("\n".join(lines))
+
+            # Interaction implies same function within the same level
+            aspect_terms_by_level = defaultdict(set)
+            for term in dag.get_terms_by_level():
+                if term.namespace == aspect:
+                    aspect_terms_by_level[term.level].add(term)
+
+            lines = []
+            for level in sorted(aspect_terms_by_level):
+                head = " OR ".join("({}(p) AND {}(q))" \
+                                    .format(term_to_predicate(term),
+                                            term_to_predicate(term))
+                                   for term in aspect_terms_by_level[level])
+                lines.append("forall p forall q forall pq [(BOUND(pq)) AND (IN(p,q,pq)) => {}];LEARN;L1;MINIMUM_TNORM;1;1;IN".format(head))
+            with open(join(self.dst, "sbr-rules-interaction_implies_same_{}_levelwise.txt".format(aspect)), "wb") as fp:
+                fp.write("\n".join(lines))
+
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, pp_pos, pp_neg,
                            p_to_i, pp_indices, folds):
         """Writes the SBR dataset."""
@@ -738,50 +787,8 @@ class SGDExperiment(_Experiment):
             return "{namespace}-lvl{level}-{id}-{name}".format(**d)
 
         self._write_sbr_datapoints(p_to_i, pp_indices)
-
         self._write_sbr_predicates(dag)
-
-        # Write the rules
-        for aspect in ("biological_process", "cellular_component", "molecular_function"):
-
-            # Parents imply the OR of the children
-            lines = []
-            for term in dag._id_to_term.itervalues():
-                if term.namespace != aspect:
-                    continue
-                children = [child for child, _ in term.get_children(dag)]
-                if not len(children):
-                    continue
-                children_or = " OR ".join(term_to_predicate(child) + "(p)" for child in children)
-                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(term_to_predicate(term), children_or))
-            with open(join(self.dst, "sbr-rules-{}-term_implies_or_of_children.txt".format(aspect)), "wb") as fp:
-                fp.write("\n".join(lines))
-
-            # Children imply their parents
-            lines = []
-            for term in dag._id_to_term.itervalues():
-                if term.namespace != aspect:
-                    continue
-                parents = [parent for parent, _ in term.get_parents(dag)]
-                if not len(parents):
-                    continue
-                parents_and = " AND ".join(term_to_predicate(parent) + "(p)" for parent in parents)
-                lines.append("forall p [({}(p)) => ({})];LEARN;L1;LUKASIEWICZ_TNORM;1;1".format(term_to_predicate(term), parents_and))
-            with open(join(self.dst, "sbr-rules-{}-term_implies_and_of_parents.txt".format(aspect)), "wb") as fp:
-                fp.write("\n".join(lines))
-
-            # Interaction implies same function within the same level
-            aspect_terms_by_level = defaultdict(set)
-            for term in dag.get_terms_by_level():
-                if term.namespace == aspect:
-                    aspect_terms_by_level[term.level].add(term)
-
-            lines = []
-            for level in sorted(aspect_terms_by_level):
-                head = " OR ".join("({}(p) AND {}(q))".format(term_to_predicate(term), term_to_predicate(term)) for term in aspect_terms_by_level[level])
-                lines.append("forall p forall q forall pq [(BOUND(pq)) AND (IN(p,q,pq)) => {}];LEARN;L1;MINIMUM_TNORM;1;1;IN".format(head))
-            with open(join(self.dst, "sbr-rules-interaction_implies_same_{}_levelwise.txt".format(aspect)), "wb") as fp:
-                fp.write("\n".join(lines))
+        self._write_sbr_rules(dag)
 
         def fold_to_ps(fold):
             return set(p for p, _, _ in fold) | set(q for _, q, _ in fold)
