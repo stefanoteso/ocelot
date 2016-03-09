@@ -432,72 +432,6 @@ class SGDExperiment(_Experiment):
 
 
 
-    def _dump_stats(self, ps, dag, p_to_term_ids, pp_pos_hq, pp_pos_lq, pp_neg,
-                    folds):
-        print "DATASET STATISTICS"
-
-        print "# proteins =", len(ps)
-        print "# hi-quality interactions =", len(pp_pos_hq)
-        print "# lo-quality interactions =", len(pp_pos_lq)
-        print "# negative interactions =", len(pp_neg)
-
-        term_ids = set()
-        for ids in p_to_term_ids.values():
-            term_ids.update(ids)
-        print "# annotated GO terms =", len(term_ids)
-
-        print "GO DAG STATISTICS"
-
-        level_to_term_ids = defaultdict(set)
-        level_to_annots = defaultdict(list)
-        level_to_ps = defaultdict(set)
-        for id_ in term_ids:
-            term = dag._id_to_term[id_]
-            assert len(term.proteins)
-            level_to_term_ids[term.level].add(id_)
-            level_to_annots[term.level].extend(list(term.proteins))
-            level_to_ps[term.level].update(term.proteins)
-
-        for level in level_to_annots:
-            num_terms = len(level_to_term_ids[level])
-            num_bins = len([id_ for id_ in level_to_term_ids[level] if id_.startswith("BN")])
-            num_annots = len(level_to_annots[level])
-            num_ps = len(level_to_ps[level])
-            print "level {} has {} terms (of which {} bins) with {} annotations over {} proteins".format(
-                level, num_terms, num_bins, num_annots, num_ps)
-
-        print "FOLD STATISTICS"
-        all_fold_ps = set()
-        for k, fold in enumerate(folds):
-            fold_ps = set()
-            fold_ps.update(p for [p, _, _] in fold)
-            fold_ps.update(q for [_, q, _] in fold)
-            all_fold_ps.update(fold_ps)
-
-            pos = set([(p, q) for (p, q, s) in fold if s])
-            neg = set([(p, q) for (p, q, s) in fold if not s])
-
-            inter = set((p, q) for (p, q, _) in fold if p in fold_ps and q in fold_ps)
-            intra = set((p, q) for (p, q, _) in fold if not p in fold_ps or not q in fold_ps)
-
-            print "# interactions in fold {}: {} over {} proteins (#pos={} #neg={} inter={} intra={})".format(
-                k, len(fold), len(fold_ps), len(pos), len(neg), len(inter), len(intra))
-
-        print "# proteins with GO annotations =", len(set(p for p in ps if p in p_to_term_ids and len(p_to_term_ids[p])))
-        print "# proteins in a fold =", len(all_fold_ps)
-
-        # XXX GO annotation cooccurrence
-
-        # XXX GO annotation balance in folds
-
-        # XXX draw full PPI (taken from the folds)
-
-        # XXX draw folds over the full PPI
-
-        return None,
-
-
-
     def _compute_folds(self, pp_pos_hq, pp_pos_lq, p_to_term_ids, num_folds=10):
         """Generates the folds.
 
@@ -520,6 +454,10 @@ class SGDExperiment(_Experiment):
         folds : list
             Each fold is a set of triples of the form (protein, protein, state).
         """
+
+        # XXX take into consideration INTRA interactions
+        # XXX take into consideration unbound proteins
+        # XXX take into consideration unannotated proteins
 
         def permute(l, rng):
             pi = list(rng.permutation(len(l)))
@@ -645,6 +583,72 @@ class SGDExperiment(_Experiment):
 #        check_folds(folds)
 
         return folds,
+
+
+
+    def _dump_stats(self, ps, dag, p_to_term_ids, pp_pos_hq, pp_pos_lq, pp_neg,
+                    folds):
+        print "DATASET STATISTICS"
+
+        print "# proteins =", len(ps)
+        print "# hi-quality interactions =", len(pp_pos_hq)
+        print "# lo-quality interactions =", len(pp_pos_lq)
+        print "# negative interactions =", len(pp_neg)
+
+        term_ids = set()
+        for ids in p_to_term_ids.values():
+            term_ids.update(ids)
+        print "# annotated GO terms =", len(term_ids)
+
+        print "GO DAG STATISTICS"
+
+        level_to_term_ids = defaultdict(set)
+        level_to_annots = defaultdict(list)
+        level_to_ps = defaultdict(set)
+        for id_ in term_ids:
+            term = dag._id_to_term[id_]
+            assert len(term.proteins)
+            level_to_term_ids[term.level].add(id_)
+            level_to_annots[term.level].extend(list(term.proteins))
+            level_to_ps[term.level].update(term.proteins)
+
+        for level in level_to_annots:
+            num_terms = len(level_to_term_ids[level])
+            num_bins = len([id_ for id_ in level_to_term_ids[level] if id_.startswith("BN")])
+            num_annots = len(level_to_annots[level])
+            num_ps = len(level_to_ps[level])
+            print "level {} has {} terms (of which {} bins) with {} annotations over {} proteins".format(
+                level, num_terms, num_bins, num_annots, num_ps)
+
+        print "FOLD STATISTICS"
+        all_fold_ps = set()
+        for k, fold in enumerate(folds):
+            fold_ps = set()
+            fold_ps.update(p for [p, _, _] in fold)
+            fold_ps.update(q for [_, q, _] in fold)
+            all_fold_ps.update(fold_ps)
+
+            pos = set([(p, q) for (p, q, s) in fold if s])
+            neg = set([(p, q) for (p, q, s) in fold if not s])
+
+            inter = set((p, q) for (p, q, _) in fold if p in fold_ps and q in fold_ps)
+            intra = set((p, q) for (p, q, _) in fold if not p in fold_ps or not q in fold_ps)
+
+            print "# interactions in fold {}: {} over {} proteins (#pos={} #neg={} inter={} intra={})".format(
+                k, len(fold), len(fold_ps), len(pos), len(neg), len(inter), len(intra))
+
+        print "# proteins with GO annotations =", len(set(p for p in ps if p in p_to_term_ids and len(p_to_term_ids[p])))
+        print "# proteins in a fold =", len(all_fold_ps)
+
+        # XXX GO annotation cooccurrence
+
+        # XXX GO annotation balance in folds
+
+        # XXX draw full PPI (taken from the folds)
+
+        # XXX draw folds over the full PPI
+
+        return None,
 
 
     def _compute_p_colocalization_kernel(self, ps):
