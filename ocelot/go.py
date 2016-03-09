@@ -222,6 +222,12 @@ class GODag(object):
     include_alt_ids : bool, defaults to ``False``
         Whether to include alternative term IDs in the dictionary.
     """
+    ASPECTS = [
+        "biological_process",
+        "cellular_component",
+        "molecular_function"
+    ]
+
     def __init__(self, path, keep_obsolete=False, include_alt_ids=False):
         self._id_to_term = {}
         self._path = path
@@ -431,15 +437,9 @@ class GODag(object):
         min_annot : int, optional, defaults to ``None``
             Terms with fewer annotations than this are discarded.
         """
-        ALL_ASPECTS = [
-            "biological_process",
-            "cellular_component",
-            "molecular_function"
-        ]
-
         if aspects is None:
-            aspects = ALL_ASPECTS
-        elif any(aspect not in ALL_ASPECTS for aspect in aspects):
+            aspects = self.ASPECTS
+        elif any(aspect not in self.ASPECTS for aspect in aspects):
             raise ValueError("invalid GO aspect.")
 
         # Store all terms that we wish to keep
