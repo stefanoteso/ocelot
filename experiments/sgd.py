@@ -686,29 +686,24 @@ class SGDExperiment(_Experiment):
 
 
 
-    def _compute_pp_kernel(self, ps, pp_pos, pp_neg, submatrix):
+    def _compute_p_pp_order(self, ps, pp_pos, pp_neg):
+        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
+
         pps = set()
         pps.update(pp_pos)
         pps.update(pp_neg)
+        pp_indices = [(p_to_i[p], p_to_i[q] for p, q in sorted(pps)
 
-        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
-        pp_indices = (p_to_i[p1], p_to_i[p2]) for p1, p2 in sorted(pps)]
-        matrix = self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
+        return p_to_i, pp_indices
 
-        return matrix, pp_indices
-
+    def _compute_pp_kernel(self, pp_indices, submatrix):
+        return self._compute_kernel(PairwiseKernel, pp_indices, submatrix),
 
 
-    def _write_sbr_dataset(self, ps, dag, p_to_term_ids, folds):
+
+    def _write_sbr_dataset(self, ps, dag, p_to_term_ids, pp_pos, pp_neg,
+                           p_to_i, pp_indices, folds):
         """Writes the SBR dataset."""
-
-        # Figure out how the pairs are laid out in the pairwise kernels
-        p_to_i = {p: i for i, p in enumerate(ps)}
-
-        pps = set()
-        for fold in folds:
-            pps.update((p1, p2) for p1, p2, _ in fold)
-        pps = sorted(pps)
 
         def term_to_predicate(term):
             assert len(term.namespace)
@@ -722,9 +717,14 @@ class SGDExperiment(_Experiment):
             return "{namespace}-lvl{level}-{id}-{name}".format(**d)
 
         # Write the datapoints, including proteins and protein pairs
+        # XXX remove proteins not in folds
+        i_to_p = {i: p for p, i in p_to_i.iteritems()}
+
         lines = []
-        lines.extend("{};PROTEIN;1:1".format(p) for p in ps)
-        lines.extend("{}-{};PPAIR;1:1".format(pp[0], pp[1]) for pp in pps)
+        for p, i in sorted(p_to_i.items(), key=lambda p_i: p_i[-1]):
+            lines.append("{};PROTEIN".format(p))
+        for i, j in pp_indices:
+            lines.append("{}-{};PPAIR".format(p_to_i[i], p_to_i[j]))
         with open(join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
@@ -927,9 +927,13 @@ class SGDExperiment(_Experiment):
                   ],
                   ['__dummy_p_kernels']),
 
+            Stage(self._compute_p_pp_order,
+                  ['filtered_ps', 'pp_pos_hq', 'pp_neg'],
+                  ['filtered_p_to_i', 'pp_indices']),
+
             Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'p_average_kernel'],
-                  ['pp_average_kernel', 'pp_indices']),
+                  ['filtered_ps', 'pp_indices', 'p_average_kernel'],
+                  ['pp_average_kernel']),
 
             Stage(lambda *args, **kwargs: None,
                   [
@@ -939,7 +943,7 @@ class SGDExperiment(_Experiment):
 
             Stage(self._write_sbr_dataset,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'folds'],
+                   'pp_pos_hq', 'pp_neg', 'pp_indices', 'folds'],
                   ['__dummy_sbr']),
         )
 
