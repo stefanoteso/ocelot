@@ -686,15 +686,16 @@ class SGDExperiment(_Experiment):
 
 
 
-    def _compute_pp_kernel(self, ps, folds, submatrix):
-        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
-
+    def _compute_pp_kernel(self, ps, pp_pos, pp_neg, submatrix):
         pps = set()
-        for fold in folds:
-            pps.update((p1, p2) for p1, p2, _ in fold)
+        pps.update(pp_pos)
+        pps.update(pp_neg)
 
-        pp_indices = [(p_to_i[p1], p_to_i[p2]) for p1, p2 in sorted(pps)]
-        return self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
+        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
+        pp_indices = (p_to_i[p1], p_to_i[p2]) for p1, p2 in sorted(pps)]
+        matrix = self._compute_kernel(PairwiseKernel, pp_indices, submatrix)
+
+        return matrix, pp_indices
 
 
 
@@ -927,8 +928,8 @@ class SGDExperiment(_Experiment):
                   ['__dummy_p_kernels']),
 
             Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'folds', 'p_average_kernel'],
-                  ['pp_colocalization_kernel']),
+                  ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'p_average_kernel'],
+                  ['pp_average_kernel', 'pp_indices']),
 
             Stage(lambda *args, **kwargs: None,
                   [
