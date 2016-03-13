@@ -36,7 +36,7 @@ for path in _ini_paths:
         break
 
 if len(config.sections()) == 0:
-    print "Writing default config to '{}'".format(path)
+    print "Writing default config to '{}'".format(_ini_paths[0])
     with open(_ini_paths[0], "wb") as fp:
         fp.writelines(_DEFAULT_INI)
     config.read(_ini_paths[0])
