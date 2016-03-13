@@ -44,9 +44,8 @@ class IntersectionKernel(Kernel):
 class CorrelationKernel(Kernel):
     """An explicit dot product kernel over z-scores.
 
-    Entities with no measurements should be set to all-zeroes. NaNs on the
-    diagonal are substituted by ones, while NaNs not on the diagonal are
-    substituted by zeros.
+    Entities with no measurements should be set to all-zeroes. NaNs (that
+    occur when the variance is zero) are substituted with zeros.
 
     Parameters
     ----------
@@ -55,9 +54,7 @@ class CorrelationKernel(Kernel):
     """
     def _compute_all(self):
         corr = np.corrcoef(np.array(self._entities, dtype=self.dtype))
-        nans = np.isnan(corr).nonzero()
-        for i, j in zip(nans[0], nans[1]):
-            corr[i,j] = 1.0 if i == j else 0.0
+        corr[np.isnan(corr).nonzero()] = 0.0
         return corr
 
 class SparseLinearKernel(Kernel):
@@ -149,7 +146,7 @@ def _test_results(Kernel, data, *args, **kwargs):
     for phis, expected in data:
         kernel = Kernel(phis, *args, **kwargs)
         output = kernel.compute()
-        assert (output == expected).all()
+        assert (np.abs(output - expected) < 1e-6).all()
 
 class _TestLinearKernel(object):
     def test_result(self):
@@ -164,8 +161,8 @@ class _TestCorrelationKernel(object):
     def test_result(self):
         DATA = (
             ((np.array([0, 0]), np.array([0, 0])), np.array([[0, 0], [0, 0]])),
-            ((np.array([1, 0]), np.array([0, 1])), np.array([[2, -2], [-2, 2]])),
-            ((np.array([1, 0]), np.array([1, 0])), np.array([[2, 2], [2, 2]])),
+            ((np.array([1, 0]), np.array([0, 1])), np.array([[1, -1], [-1, 1]])),
+            ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
         )
         _test_results(CorrelationKernel, DATA, do_normalize = False)
 
