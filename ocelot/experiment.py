@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
 
 import os
+from collections import namedtuple
 from SPARQLWrapper import SPARQLWrapper, JSON
 from sklearn.utils import check_random_state
 from sklearn.svm import SVC
 from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
 
-import .ontology as O
-from . import split_tr_ts
+import ontology as O
+from ocelot import *
+from ocelot.services import _cls
 
 Stage = namedtuple("Stage", ["f", "inputs", "outputs"])
+
+PHONY = lambda *args, **kwargs: None,
 
 class Scheduler(object):
     """A simple make-like scheduler.
@@ -145,7 +149,7 @@ class Endpoint(object):
     """
     def __init__(self, uri, graph):
         self.endpoint, self.graph = SPARQLWrapper(uri), graph
-        ans = self.query(u"ASK WHERE {{ GRAPH <{default_graph}> {{ ?s ?p ?o }} }}")
+        ans = self.query(u"ASK WHERE {{ GRAPH <{graph}> {{ ?s ?p ?o }} }}")
         if not ans[u"boolean"]:
             raise ValueError("no graph '{}' in '{}'".format(graph, uri))
 
@@ -181,10 +185,10 @@ class Endpoint(object):
         prefixes = ""
         for shortcut, namespace in O.BINDINGS:
             prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
-        query = prefixes + query.format(default_graph=self.default_graph)
-        self.ep.setQuery(query)
-        self.ep.setReturnFormat(JSON)
-        return self.ep.query().convert()
+        query = prefixes + query.format(graph=self.graph)
+        self.endpoint.setQuery(query)
+        self.endpoint.setReturnFormat(JSON)
+        return self.endpoint.query().convert()
 
     def iterquery(self, query, n=None):
         """Performs a query and yields the parsed results.
@@ -235,10 +239,8 @@ class Experiment(object):
         self.src, self.dst = src, dst
 
         self.endpoint = endpoint
-
         self._scheduler = Scheduler(stages, self.dst)
-
-        self._rng = check_random_state(seed)
+        self._rng = check_random_state(rng)
 
     def run(self, targets=None, context={}, force=False):
         """Executes the targets with the given context.
@@ -255,6 +257,15 @@ class Experiment(object):
         targets = ["__all"] if targets is None else targets
         self._scheduler.run(targets, context=context, force=force)
 
+    @staticmethod
+    def _compute_kernel(self, Kernel, *args, **kwargs):
+        """Wrapper to compute a kernel and fix it up."""
+        tol = kwargs.pop("tol", 1e-10)
+        kernel = Kernel(*args, **kwargs)
+        kernel.check_and_fixup(tol)
+        return kernel.compute(),
+
+    @staticmethod
     def evaluate_svm(self, folds, ys, kernel, C=1.0):
         results = []
         for k, (ts_indices, tr_indices) in enumerate(folds):
@@ -271,8 +282,3 @@ class Experiment(object):
 
             results.append((sup, f1, pr, rc, auc(fpr, tpr)))
         return results
-
-    def _compute_kernel(self, Kernel, *args, **kwargs):
-        kernel = Kernel(*args, **kwargs)
-        kernel.check_and_fixup(kwargs.get("tol", 1e-10))
-        return kernel.compute(),
