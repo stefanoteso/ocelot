@@ -3,9 +3,9 @@
 
 import os, random
 import numpy as np
-import ocelot, experiments
-
 from collections import namedtuple
+import ocelot
+import experiments
 
 def _checkdir(path):
     """Checks if a path identifies a directory."""
@@ -144,17 +144,15 @@ def _run_experiment(args):
     if args.go_aspects is not None:
         go_aspects = args.go_aspects.split(",")
 
+    endpoint = ocelot.Endpoint(args.endpoint, args.default_graph)
+
     for id_, Experiment in _filter_targets(ALL_TARGETS, args.targets):
-        experiment = Experiment(args.src, args.dst,
-                                endpoint = args.endpoint,
-                                default_graph = args.default_graph,
-                                force_update = args.force_update,
-                                go_aspects = go_aspects,
-                                max_go_depth = args.max_go_depth,
-                                min_go_annot = args.min_go_annot,
-                                dump_stats = args.dump_stats,
-                                seed = rng)
-        experiment.run()
+        experiment = Experiment(args.src, args.dst, endpoint=endpoint,
+                                go_aspects=go_aspects,
+                                max_go_depth=args.max_go_depth,
+                                min_go_annot=args.min_go_annot,
+                                rng=rng)
+        experiment.run(force=args.force_update)
 
 def main():
     import argparse as ap
@@ -194,8 +192,6 @@ def main():
                         help="[run-experiment] restrict GO annotations/predictions to terms with at most this depth (default: None)")
     parser.add_argument("--min-go-annot", type=int, default=None,
                         help="[run-experiment] restrict GO annotations/predictions to term with at least this many annotations (default: None)")
-    parser.add_argument("-S", "--dump-stats", action="store_true",
-                        help="[run-experiment] dump statistics along the way (default: False)")
 
     args = parser.parse_args()
 
