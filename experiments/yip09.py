@@ -2,10 +2,10 @@
 
 import os
 import numpy as np
-from ocelot.services import _cls, iterate_csv
+from ocelot.services import _cls
 from ocelot.kernels import *
 from ocelot.converters.yip09 import *
-from . import _Experiment
+from ocelot import Stage, Experiment
 from .yeast import *
 
 _KERNEL_RELPATHS_PAIRWISE = (
@@ -18,7 +18,7 @@ _KERNEL_RELPATHS_PAIRWISE = (
     "p-random-kernel-pairwise",
 )
 
-class YipExperiment(_Experiment):
+class YipExperiment(Experiment):
     """Reproduce the experiment in [Yip09]_.
 
     We re-use the same labels and folds as the original dataset, but use a new
