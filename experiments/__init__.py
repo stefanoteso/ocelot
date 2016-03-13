@@ -9,22 +9,25 @@ from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
 
 import ocelot.ontology as O
 from ocelot.scheduler import Scheduler
+from ocelot import split_tr_ts
 
 class _Experiment(object):
     """Base class for all experiments.
 
-    :param src: source directory of all databases.
-    :param dst: destination directory for the results.
-    :param endpoint: URI of the SPARQL endpoint.
-    :param default_graph: URI of the default graph.
-    :param force_update: whether to discard the cache contents (default: ``False``).
-    :param seed: the random seed (default: ``None``).
-
-    .. todo::
-        Add support for standard SVM.
-
-    .. todo::
-        Add support for SBR.
+    Parameters
+    ----------
+    src : str
+        Directory where the raw database data is held.
+    dst : str
+        Directory where the results will be held.
+    endpoint : str
+        URI of the SPARQL endpoint.
+    default_graph : str
+        URI of the default graph.
+    force_update: bool, optional. (defaults to False)
+        Whether to ignore cached results altogether.
+    seed : int or np.random.RandomStream or None, optional. (defaults to None)
+        RNG.
     """
     def __init__(self, src, dst, endpoint, default_graph, force_update = False,
                  seed = None, *args, **kwargs):
@@ -90,49 +93,22 @@ class _Experiment(object):
                 assert len(bindings) == n, bindings
             yield bindings
 
-    @staticmethod
-    def _split_vector(ys, tr_indices, ts_indices):
-        return ys[np.ix_(tr_indices)], ys[np.ix_(ts_indices)]
-
-    @staticmethod
-    def _split_matrix(k, tr_indices, ts_indices, mode = "shogun"):
-        k_tr = k[np.ix_(tr_indices, tr_indices)]
-        if mode == "shogun":
-            k_ts = k[np.ix_(tr_indices, ts_indices)]
-        elif mode == "sklearn":
-            k_ts = k[np.ix_(ts_indices, tr_indices)]
-        else:
-            raise ValueError("invalid mode '{}'".format(mode))
-        return k_tr, k_ts
-
-    @staticmethod
-    def _eval_perf(test_ys, pred_ys):
-        fpr, tpr, _ = roc_curve(test_ys, pred_ys)
-        pr, rc, f1, sup = precision_recall_fscore_support(test_ys, pred_ys)
-        return sup, f1, pr, rc, auc(fpr, tpr)
-
-    def eval_svm(self, folds, ys, kernel, c = 1.0):
+    def evaluate_svm(self, folds, ys, kernel, C=1.0):
         results = []
-        for k, (test_indices, train_indices) in enumerate(folds):
-            gram = kernel.compute()
+        for k, (ts_indices, tr_indices) in enumerate(folds):
+            model = SVC(C=C, kernel="precomputed", class_weight="auto")
 
-            # Split the labels between training and test, and compute the
-            # per-class costs on the training labels
-            train_ys, test_ys = self._split_vector(ys,
-                                                   train_indices,
-                                                   test_indices)
-            train_gram, test_gram = self._split_matrix(gram,
-                                                       train_indices,
-                                                       test_indices,
-                                                       mode = "sklearn")
-            model = SVC(C = c, kernel = "precomputed", class_weight = "auto")
+            tr_ys, ts_ys = split_tr_ts(ys, tr_indices, ts_indices)
+            tr_matrix, ts_matrix = split_tr_ts(kernel.compute(),
+                                               tr_indices, ts_indices)
             model.fit(train_gram, train_ys)
-            pred_ys = model.predict(test_gram)
-            results.append(self._eval_perf(test_ys, pred_ys))
-        return results
+            pr_ys = model.predict(test_gram)
 
-    def eval_mkl(self, folds, ys, kernels, c = 1.0):
-        raise NotImplementedError
+            fpr, tpr, _ = roc_curve(ts_ys, pr_ys)
+            pr, rc, f1, sup = precision_recall_fscore_support(ts_ys, pr_ys)
+
+            results.append((sup, f1, pr, rc, auc(fpr, tpr)))
+        return results
 
     def _compute_kernel(self, Kernel, *args, **kwargs):
         kernel = Kernel(*args, **kwargs)
