@@ -138,8 +138,6 @@ def _run_experiment(args):
         "sgd" : experiments.SGDExperiment,
     }
 
-    rng = np.random.RandomState(args.seed)
-
     go_aspects = None
     if args.go_aspects is not None:
         go_aspects = args.go_aspects.split(",")
@@ -151,7 +149,7 @@ def _run_experiment(args):
                                 go_aspects=go_aspects,
                                 max_go_depth=args.max_go_depth,
                                 min_go_annot=args.min_go_annot,
-                                rng=rng)
+                                rng=args.seed)
         experiment.run(force=args.force_update)
 
 def main():
