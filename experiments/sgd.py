@@ -9,10 +9,8 @@ from ocelot.services import _cls, CDHit
 from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.utils import permute
-from ocelot import Experiment, Stage
+from ocelot import Experiment, Stage, PHONY
 from .yeast import *
-
-
 
 class SGDExperiment(Experiment):
     """New experiment based on SGD and iPfam.
@@ -23,6 +21,14 @@ class SGDExperiment(Experiment):
 
     Parameters
     ----------
+    src :
+        See ocelot.Experiment
+    dst :
+        See ocelot.Experiment
+    endpoint :
+        See ocelot.Experiment
+    rng :
+        See ocelot.Experiment
     go_aspects : list, optional
         List of GO aspects to retain, defaults to None (all of them).
     max_go_depth : int
@@ -30,20 +36,125 @@ class SGDExperiment(Experiment):
     min_go_annot : int
         All GO terms with fewer annotations than this are ignored, defaults to
         None
-    All other parameters are passed to the parent class.
     """
     def __init__(self, *args, **kwargs):
-        self._go_aspects = kwargs.get("go_aspects", None)
-        self._max_go_depth = kwargs.get("max_go_depth", None)
-        self._min_go_annot = kwargs.get("min_go_annot", None)
-        super(SGDExperiment, self).__init__(*args, **kwargs)
+        STAGES = [
 
+            Stage(self._load_sgd_resources,
+                  [], ['ps', 'p_to_feat', 'p_to_seq', 'p_to_term_ids']),
 
+            Stage(self._filter_ps,
+                  ['ps', 'p_to_seq', 'min_sequence_len', 'cdhit_threshold'],
+                  ['filtered_ps']),
+
+            Stage(self._get_go_annotations,
+                  ['filtered_ps', 'p_to_term_ids'],
+                  ['filtered_dag', 'filtered_p_to_term_ids']),
+
+            Stage(self._get_positive_pins,
+                  ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
+
+            Stage(self._get_negative_pin,
+                  ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
+                  ['pp_neg']),
+
+            Stage(self._compute_folds,
+                  ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'filtered_p_to_term_ids'],
+                  ['folds']),
+
+            Stage(self._dump_stats,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'folds'],
+                  ['__dummy_stats']),
+
+            Stage(self._compute_p_colocalization_kernel,
+                  ['filtered_ps'], ['p_colocalization_kernel']),
+
+            Stage(self._compute_p_gene_expression_kernel,
+                  ['filtered_ps', 'p_to_feat'], ['p_gene_expression_kernel']),
+
+            Stage(self._compute_p_complex_kernel,
+                  ['filtered_ps', 'p_to_feat'], ['p_complex_kernel']),
+
+            Stage(self._compute_p_interpro_kernel,
+                  ['filtered_ps'], ['p_interpro_kernel']),
+
+            Stage(self._compute_p_interpro_count_kernel,
+                  ['filtered_ps'], ['p_interpro_count_kernel']),
+
+            Stage(self._compute_p_pssm_kernel,
+                  ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
+
+            Stage(self._compute_average_kernel,
+                  [
+                    'p_colocalization_kernel',
+                    'p_gene_expression_kernel',
+                    'p_complex_kernel',
+                    'p_interpro_kernel',
+                    'p_pssm_kernel'
+                  ],
+                  ['p_average_kernel']),
+
+            Stage(PHONY,
+                  [
+                    'p_colocalization_kernel',
+                    'p_gene_expression_kernel',
+                    'p_complex_kernel',
+                    'p_interpro_kernel',
+                    'p_interpro_count_kernel',
+                    'p_pssm_kernel',
+                    'p_average_kernel',
+                  ],
+                  ['__dummy_p_kernels']),
+
+            Stage(self._compute_p_pp_order,
+                  ['filtered_ps', 'pp_pos_hq', 'pp_neg'],
+                  ['filtered_p_to_i', 'pp_indices']),
+
+            Stage(self._compute_pp_kernel,
+                  ['filtered_ps', 'pp_indices', 'p_average_kernel'],
+                  ['pp_average_kernel']),
+
+            Stage(PHONY,
+                  ['pp_average_kernel'],
+                  ['__dummy_pp_kernels']),
+
+            Stage(self._write_sbr_dataset,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'pp_pos_hq', 'pp_neg', 'pp_indices', 'folds'],
+                  ['__dummy_sbr']),
+
+            Stage(PHONY,
+                  ['__dummy_stats', '__dummy_p_kernels', '__dummy_pp_kernels',
+                   '__dummy_sbr'],
+                  ['__all']),
+        ]
+
+        self._go_aspects = kwargs.pop("go_aspects", None)
+        self._max_go_depth = kwargs.pop("max_go_depth", None)
+        self._min_go_annot = kwargs.pop("min_go_annot", None)
+        super(SGDExperiment, self).__init__(STAGES, *args, **kwargs)
+
+    def run(self, min_sequence_len=50, cdhit_threshold=0.75, *args, **kwargs):
+        """Run the yeast prediction experiment.
+
+        Parameters
+        ----------
+        min_sequence_len : int, optional
+            Minimum allowed sequence length, defaults to 50.
+        cdhit_threshold : float, optional
+            CD-HIT sequence similarity threshold, defaults to 0.75.
+        """
+        context = {
+            "min_sequence_len": min_sequence_len,
+            "cdhit_threshold": cdhit_threshold,
+        }
+        super(SGDExperiment, self).run(context=context, *args, **kwargs)
 
     def _get_sgd_ids(self):
         query = """
         SELECT ?orf ?seq
-        FROM <{default_graph}>
+        FROM <{graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
@@ -51,13 +162,13 @@ class SGDExperiment(Experiment):
         }}
         """
         ids = set(bindings[u"orf"].split(".")[-1]
-                  for bindings in self.iterquery(query, n=1))
+                  for bindings in self.endpoint.iterquery(query, n=1))
         return sorted(list(ids))
 
     def _get_sgd_id_to_seq(self):
         query = """
         SELECT ?orf ?seq
-        FROM <{default_graph}>
+        FROM <{graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
@@ -66,7 +177,7 @@ class SGDExperiment(Experiment):
         }}
         """
         sgd_id_to_seq = {}
-        for bindings in self.iterquery(query, n=2):
+        for bindings in self.endpoint.iterquery(query, n=2):
             sgd_id = bindings[u"orf"].split(".")[-1]
             sgd_id_to_seq[sgd_id] = bindings[u"seq"]
         return sgd_id_to_seq
@@ -122,7 +233,7 @@ class SGDExperiment(Experiment):
 
         query = """
         SELECT ?orf ?fun ?ecode
-        FROM <{default_graph}>
+        FROM <{graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
@@ -134,7 +245,7 @@ class SGDExperiment(Experiment):
         }}
         """
         sgd_id_to_fun = defaultdict(set)
-        for bindings in self.iterquery(query, n=3):
+        for bindings in self.endpoint.iterquery(query, n=3):
             sgd_id  = bindings[u"orf"].split(".")[-1]
             fun     = bindings[u"fun"].split("#")[-1]
             ecode   = bindings[u"ecode"]
@@ -145,7 +256,7 @@ class SGDExperiment(Experiment):
     def _get_sgd_id_to_feat(self):
         query = """
         SELECT ?orf ?feat
-        FROM <{default_graph}>
+        FROM <{graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
@@ -155,7 +266,7 @@ class SGDExperiment(Experiment):
         }}
         """
         sgd_id_to_feat = {}
-        for bindings in self.iterquery(query, n=2):
+        for bindings in self.endpoint.iterquery(query, n=2):
             sgd_id = bindings[u"orf"].split(".")[-1]
             feat   = bindings[u"feat"].split(".")[-1]
             if not sgd_id in sgd_id_to_feat:
@@ -170,7 +281,7 @@ class SGDExperiment(Experiment):
     def _get_sgd_id_to_context(self):
         query = """
         SELECT ?orf ?chrom ?strand ?start ?stop
-        FROM <{default_graph}>
+        FROM <{graph}>
         WHERE {{
             ?orf a ocelot:sgd_id ;
                  ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
@@ -182,7 +293,7 @@ class SGDExperiment(Experiment):
         }}
         """
         p_to_context = {}
-        for bindings in self.iterquery(query, n=5):
+        for bindings in self.endpoint.iterquery(query, n=5):
             orf     = bindings[u"orf"].split(".")[-1]
             chrom   = bindings[u"chrom"].split(".")[-1]
             strand  = bindings[u"strand"]
@@ -196,7 +307,7 @@ class SGDExperiment(Experiment):
     def _get_sgd_pin(self, ps=None, manual_only=False):
         query = """
         SELECT DISTINCT ?orf1 ?orf2
-        FROM <{default_graph}>
+        FROM <{graph}>
         WHERE {{
             ?orf1 a ocelot:sgd_id ;
                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
@@ -218,7 +329,7 @@ class SGDExperiment(Experiment):
                 ocelot:sgd_int_has_type ocelot:sgd_int_type.physical_interactions .
         }}"""
         pp_pos = set()
-        for bindings in self.iterquery(query, n=2):
+        for bindings in self.endpoint.iterquery(query, n=2):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
             pp_pos.update([(p1,p2), (p2,p1)])
@@ -270,7 +381,7 @@ class SGDExperiment(Experiment):
     def _get_string_pin(self, ps=None):
         query = """
         SELECT DISTINCT ?orf1 ?orf2
-        FROM <{default_graph}>
+        FROM <{graph}>
         WHERE {{
             ?orf1 a ocelot:sgd_id ;
                 ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
@@ -285,7 +396,7 @@ class SGDExperiment(Experiment):
             ?id1 ?mode ?id2 .
         }}"""
         pp_pos = set()
-        for bindings in self.iterquery(query, n=2):
+        for bindings in self.endpoint.iterquery(query, n=2):
             p1 = bindings[u"orf1"].split(".")[-1]
             p2 = bindings[u"orf2"].split(".")[-1]
             pp_pos.update([(p1,p2), (p2,p1)])
@@ -849,112 +960,3 @@ class SGDExperiment(Experiment):
                                train_set)
 
         return True,
-
-
-
-    def run(self, min_sequence_len=50, cdhit_threshold=0.75):
-        """Run the yeast prediction experiment.
-
-        Parameters
-        ----------
-        min_sequence_len : int, optional
-            Minimum allowed sequence length, defaults to 50.
-        cdhit_threshold : float, optional
-            CD-HIT sequence similarity threshold, defaults to 0.75.
-        """
-        STAGES = (
-
-            Stage(self._load_sgd_resources,
-                  [], ['ps', 'p_to_feat', 'p_to_seq', 'p_to_term_ids']),
-
-            Stage(self._filter_ps,
-                  ['ps', 'p_to_seq', 'min_sequence_len', 'cdhit_threshold'],
-                  ['filtered_ps']),
-
-            Stage(self._get_go_annotations,
-                  ['filtered_ps', 'p_to_term_ids'],
-                  ['filtered_dag', 'filtered_p_to_term_ids']),
-
-            Stage(self._get_positive_pins,
-                  ['filtered_ps'], ['pp_pos_hq', 'pp_pos_lq']),
-
-            Stage(self._get_negative_pin,
-                  ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
-                  ['pp_neg']),
-
-            Stage(self._compute_folds,
-                  ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'filtered_p_to_term_ids'],
-                  ['folds']),
-
-            Stage(self._dump_stats,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'folds'],
-                  ['__dummy_stats']),
-
-            Stage(self._compute_p_colocalization_kernel,
-                  ['filtered_ps'], ['p_colocalization_kernel']),
-
-            Stage(self._compute_p_gene_expression_kernel,
-                  ['filtered_ps', 'p_to_feat'], ['p_gene_expression_kernel']),
-
-            Stage(self._compute_p_complex_kernel,
-                  ['filtered_ps', 'p_to_feat'], ['p_complex_kernel']),
-
-            Stage(self._compute_p_interpro_kernel,
-                  ['filtered_ps'], ['p_interpro_kernel']),
-
-            Stage(self._compute_p_interpro_count_kernel,
-                  ['filtered_ps'], ['p_interpro_count_kernel']),
-
-            Stage(self._compute_p_pssm_kernel,
-                  ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
-
-            Stage(self._compute_average_kernel,
-                  [
-                    'p_colocalization_kernel',
-                    'p_gene_expression_kernel',
-                    'p_complex_kernel',
-                    'p_interpro_kernel',
-                    'p_pssm_kernel'
-                  ],
-                  ['p_average_kernel']),
-
-            Stage(lambda *args, **kwargs: None,
-                  [
-                    'p_colocalization_kernel',
-                    'p_gene_expression_kernel',
-                    'p_complex_kernel',
-                    'p_interpro_kernel',
-                    'p_interpro_count_kernel',
-                    'p_pssm_kernel',
-                    'p_average_kernel',
-                  ],
-                  ['__dummy_p_kernels']),
-
-            Stage(self._compute_p_pp_order,
-                  ['filtered_ps', 'pp_pos_hq', 'pp_neg'],
-                  ['filtered_p_to_i', 'pp_indices']),
-
-            Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'pp_indices', 'p_average_kernel'],
-                  ['pp_average_kernel']),
-
-            Stage(lambda *args, **kwargs: None,
-                  [
-                    'pp_average_kernel',
-                  ],
-                  ['__dummy_pp_kernels']),
-
-            Stage(self._write_sbr_dataset,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_neg', 'pp_indices', 'folds'],
-                  ['__dummy_sbr']),
-        )
-
-        TARGETS = ('__dummy_stats', '__dummy_p_kernels', '__dummy_sbr')
-
-        context = {
-            "min_sequence_len": min_sequence_len,
-            "cdhit_threshold": cdhit_threshold,
-        }
-        self._scheduler.run(STAGES, TARGETS, context=context)
