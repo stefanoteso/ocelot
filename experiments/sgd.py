@@ -8,14 +8,13 @@ from textwrap import dedent
 from ocelot.services import _cls, CDHit
 from ocelot.go import GODag
 from ocelot.kernels import *
-from ocelot.scheduler import Stage
 from ocelot.utils import permute
-from . import _Experiment
+from ocelot import Experiment, Stage
 from .yeast import *
 
 
 
-class SGDExperiment(_Experiment):
+class SGDExperiment(Experiment):
     """New experiment based on SGD and iPfam.
 
     This experiment is structured exactly the same as the Yip et al. [Yip09]_
@@ -474,8 +473,15 @@ class SGDExperiment(_Experiment):
     def _compute_folds(self, ps, pp_pos, pp_neg, p_to_term_ids, num_folds=10):
         """Generates the folds.
 
-        The interactions are split into folds according to their functions.
-        No two protein-protein interactions can occur in two distinct folds.
+        Folds are composed of *pairs* of (known interacting or assumed
+        non-interacting) proteins.
+
+        Protein pairs are split evenly according to their function.
+
+        No two pairs can occur in distinct folds.
+
+        However, individual proteins may occur in different folds, and some
+        proteins may not occur altogether.
 
         Parameters
         ----------
@@ -605,6 +611,7 @@ class SGDExperiment(_Experiment):
                 level, num_terms, num_bins, num_annots, num_ps)
 
         print "FOLD STATISTICS"
+
         all_fold_ps = set()
         for k, fold in enumerate(folds):
             fold_ps = set()
