@@ -2,7 +2,7 @@
 
 from os.path import join
 import numpy as np
-import itertools as it
+from itertools import product
 from collections import Counter
 from glob import glob
 
@@ -20,9 +20,14 @@ class SGDGeneExpressionKernel(Kernel):
 
         `<ftp://downloads.yeastgenome.org/expression/microarray/all_spell_exprconn_pcl.tar.gz>`_
 
-    :param p_to_i: map between ORF feature names to indices in the kernel matrix.
-    :param src: path to the data source directory.
-    :param experiments: list of microarray experiments to use.
+    Parameters
+    ----------
+    p_to_i : dict
+        Map ORF feature name -> index.
+    src : str
+        Path to the data directory.
+    experiments : list
+        List of microarray experiments to use.
     """
     def __init__(self, p_to_i, src, experiments, *args, **kwargs):
         self._wc = join(src, "SGD", "microarray", "*", "*.pcl")
@@ -63,9 +68,14 @@ class YeastProteinComplexKernel(Kernel):
 
         $src/yeast/ppi/CYC2008_complex.tab
 
-    :param p_to_i: map between ORF feature names to indices in the kernel matrix.
-    :param src: path to the data source directory.
-    :param gamma: parameter of the diffusion kernel.
+    Parameters
+    ----------
+    p_to_i : dict
+        Map ORF feature name -> index.
+    src : str
+        Path to the data directory.
+    gamma : float
+        Diffusion parameter.
     """
     def __init__(self, p_to_i, src, *args, **kwargs):
         self._path = join(src, "yeast", "ppi", "CYC2008_complex.tab")
@@ -90,7 +100,7 @@ class YeastProteinComplexKernel(Kernel):
         adjmatrix = np.zeros((len(self), len(self)), dtype=self.dtype)
         for _, orfs in complex_to_orfs.iteritems():
             orf_indices = [p_to_i[orf] for orf in orfs if orf in p_to_i]
-            for i, j in it.product(orf_indices, orf_indices):
+            for i, j in product(orf_indices, orf_indices):
                 if i != j:
                     adjmatrix[i,j] = 1
         return DiffusionKernel(adjmatrix).compute()
