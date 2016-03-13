@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-import numpy as np
 from SPARQLWrapper import SPARQLWrapper, JSON
 from sklearn.utils import check_random_state
 from sklearn.svm import SVC
@@ -17,10 +16,21 @@ class Scheduler(object):
 
     Parameters
     ----------
+    stages : list
+        List of Stage objects.
     dst : str
         Directory where the results will be put.
     """
-    def __init__(self, dst):
+    def __init__(self, stages, dst):
+        target_to_stage = {}
+        for stage in stages:
+            assert len(stage.outputs), \
+                "stage '{}' produces no output".format(stage)
+            for target in stage.outputs:
+                assert not target in target_to_stage, \
+                    "two stages produce the same target '{}'".format(target)
+                target_to_stage[target] = stage
+        self._target_to_stage = target_to_stage
         self.dst = dst
 
     def _resolve_save(self, basename, what):
@@ -43,21 +53,20 @@ class Scheduler(object):
             pass
         raise IOError("can not load '{}'".format(relpath))
 
-    def _resolve(self, target_to_stage, target, context, force_update):
+    def _resolve(self, target, context, force):
         """Resolves a stage.
 
-        That is, it runs the stage by first making sure that all its
-        dependencies are satisfied, recursively.
+        It runs each target by first making sure that all its dependencies are
+        satisfied, recursively. Dependencies and results are gathered in a
+        single big dict, the context.
 
         Parameters
         ----------
-        target_to_stage : dict
-            Map from target to Stage.
         target : str
             Target to resolve.
         context : dict
             Map from dependency to value.
-        force_update: bool
+        force: bool
             Whether to ignore the cache contents.
 
         Returns
@@ -65,11 +74,11 @@ class Scheduler(object):
         ret : dict
             Map from dependency to value, computed by the target stage.
         """
-        stage = target_to_stage[target]
+        stage = self._target_to_stage[target]
 
         # Try to load the target from the cache. If all dependencies are
         # cached, we do not want to recurse deeper in the dependency graph
-        if not force_update:
+        if not force:
             ret, all_loaded = {}, True
             for output in stage.outputs:
                 try:
@@ -84,7 +93,7 @@ class Scheduler(object):
         print _cls(self), ": resolving deps for '{}'".format(target)
         for input_ in stage.inputs:
             if not input_ in context:
-                outputs = self._resolve(target_to_stage, input_, context, force_update)
+                outputs = self._resolve(input_, context, force)
                 for input_ in outputs:
                     assert not input_ in context
                 context.update(outputs)
@@ -103,20 +112,25 @@ class Scheduler(object):
 
         return ret
 
-    def run(self, stages, targets, context={}, force_update=False):
-        """Runs the whole thing."""
-        # Map dependencies to stages
-        target_to_stage = {}
-        for stage in stages:
-            for target in stage.outputs:
-                assert not target in target_to_stage, \
-                    "two stages produce the same target '{}'".format(target)
-                target_to_stage[target] = stage
+    def run(self, targets, context={}, force=False):
+        """Runs the whole thing.
 
-        # Resolve for all targets
+        Parameters
+        ----------
+        targets : list of str
+            List of targets to be resolved.
+        context : dict, optional. (defaults to {})
+            Map from dependencies to values.
+        force : bool, optional. (defaults to False)
+            Whether to ignore the cache.
+
+        Returns
+        -------
+        context : dict
+            The context, updated with the values of the targets.
+        """
         for target in targets:
-            self._resolve(target_to_stage, target, context, force_update)
-
+            self._resolve(target, context, force)
         return context
 
 class Endpoint(object):
@@ -135,8 +149,24 @@ class Endpoint(object):
         if not ans[u"boolean"]:
             raise ValueError("no graph '{}' in '{}'".format(graph, uri))
 
+    @staticmethod
+    def _cast(d):
+        """Converts SPARQLWrapper values to standard Python values."""
+        if d[u"type"] in (u"uri", u"bnode", u"literal"):
+            return d[u"value"]
+        elif d[u"type"] == u"typed-literal":
+            if d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+                return int(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#float":
+                return float(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#double":
+                return float(d[u"value"])
+            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
+                return d[u"value"]
+        raise NotImplementedError("can not cast '{}'".format(d.items()))
+
     def query(self, query):
-        """Performs a query at the given endpoint.
+        """Performs a query.
 
         Parameters
         ----------
@@ -156,26 +186,23 @@ class Endpoint(object):
         self.ep.setReturnFormat(JSON)
         return self.ep.query().convert()
 
-    @staticmethod
-    def _cast(d):
-        if d[u"type"] in (u"uri", u"bnode", u"literal"):
-            return d[u"value"]
-        elif d[u"type"] == u"typed-literal":
-            if d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
-                return int(d[u"value"])
-            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#float":
-                return float(d[u"value"])
-            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#double":
-                return float(d[u"value"])
-            elif d[u"datatype"] == u"http://www.w3.org/2001/XMLSchema#integer":
-                return d[u"value"]
-        raise NotImplementedError("can not cast '{}'".format(d.items()))
+    def iterquery(self, query, n=None):
+        """Performs a query and yields the parsed results.
 
-    def iterquery(self, query, n = None):
+        Parameters
+        ----------
+        query : str
+            SPARQL query.
+
+        Returns
+        -------
+        bindings : dict
+            Map from variable name to value.
+        """
         ans = self.query(query)
         assert ans and len(ans) and "results" in ans
         for bindings in ans["results"]["bindings"]:
-            bindings = { k: self._cast(v) for k, v in bindings.iteritems() }
+            bindings = {k: self._cast(v) for k, v in bindings.iteritems()}
             if not n is None:
                 assert len(bindings) == n, bindings
             yield bindings
@@ -185,44 +212,48 @@ class Experiment(object):
 
     Parameters
     ----------
+    stages : list
+        List of Stage objects.
     src : str
         Directory where the raw database data is held.
     dst : str
         Directory where the results will be held.
-    endpoint : str
-        URI of the SPARQL endpoint.
-    default_graph : str
-        URI of the default graph.
-    force_update: bool, optional. (defaults to False)
-        Whether to ignore cached results altogether.
-    seed : int or np.random.RandomStream or None, optional. (defaults to None)
+    endpoint : Endpoint
+        The SPARQL endpoint.
+    rng : np.random.RandomStream or int or None, optional. (defaults to None)
         RNG.
     """
-    def __init__(self, src, dst, endpoint, default_graph, force_update = False,
-                 seed = None, *args, **kwargs):
-        self._rng = check_random_state(seed)
+    def __init__(self, stages, src, dst, endpoint, rng=None):
         try:
             os.mkdir(dst)
         except:
-            # something will fail later on if dst does not exist
             pass
         if not (src and os.path.isdir(src)):
             raise ValueError("'{}' is not a valid directory".format(src))
         if not (dst and os.path.isdir(dst)):
             raise ValueError("'{}' is not a valid directory".format(dst))
         self.src, self.dst = src, dst
-        if not endpoint:
-            raise ValueError("no endpoint given.")
-        if not default_graph:
-            raise ValueError("no default graph given.")
-        self.ep = SPARQLWrapper(endpoint)
-        self.default_graph = default_graph
-        if not self._check_graph(default_graph):
-            raise ValueError("no graph '{}' at endpoint '{}'".format(default_graph, endpoint))
-        self.force_update = force_update
 
-        self._scheduler = Scheduler(self.dst)
+        self.endpoint = endpoint
 
+        self._scheduler = Scheduler(stages, self.dst)
+
+        self._rng = check_random_state(seed)
+
+    def run(self, targets=None, context={}, force=False):
+        """Executes the targets with the given context.
+
+        Parameters
+        ----------
+        targets : list, optional. (defaults to ["__all"])
+            List of targets to execute.
+        context : dict, optional. (defaults to {})
+            Context.
+        force: bool, optional. (defaults to False)
+            Whether to ignore cached results altogether.
+        """
+        targets = ["__all"] if targets is None else targets
+        self._scheduler.run(targets, context=context, force=force)
 
     def evaluate_svm(self, folds, ys, kernel, C=1.0):
         results = []
@@ -245,6 +276,3 @@ class Experiment(object):
         kernel = Kernel(*args, **kwargs)
         kernel.check_and_fixup(kwargs.get("tol", 1e-10))
         return kernel.compute(),
-
-    def run(self):
-        raise NotImplementedError()
