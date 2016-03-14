@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
 import os
+import cPickle as pickle
 from collections import namedtuple
 from SPARQLWrapper import SPARQLWrapper, JSON
 from sklearn.utils import check_random_state
-from sklearn.svm import SVC
-from sklearn.metrics import precision_recall_fscore_support, roc_curve, auc
 
-import ontology as O
 from ocelot import *
+from ocelot.ontology import BINDINGS
 from ocelot.services import _cls
 
 Stage = namedtuple("Stage", ["f", "inputs", "outputs"])
@@ -183,7 +182,7 @@ class Endpoint(object):
             List of triples.
         """
         prefixes = ""
-        for shortcut, namespace in O.BINDINGS:
+        for shortcut, namespace in BINDINGS:
             prefixes += "PREFIX {}: <{}>\n".format(shortcut, unicode(namespace))
         query = prefixes + query.format(graph=self.graph)
         self.endpoint.setQuery(query)
@@ -258,27 +257,10 @@ class Experiment(object):
         self._scheduler.run(targets, context=context, force=force)
 
     @staticmethod
-    def _compute_kernel(self, Kernel, *args, **kwargs):
+    def _compute_kernel(Kernel, *args, **kwargs):
         """Wrapper to compute a kernel and fix it up."""
+        # TODO move the logic to ocelot.Kernel
         tol = kwargs.pop("tol", 1e-10)
         kernel = Kernel(*args, **kwargs)
         kernel.check_and_fixup(tol)
         return kernel.compute(),
-
-    @staticmethod
-    def evaluate_svm(self, folds, ys, kernel, C=1.0):
-        results = []
-        for k, (ts_indices, tr_indices) in enumerate(folds):
-            model = SVC(C=C, kernel="precomputed", class_weight="auto")
-
-            tr_ys, ts_ys = split_tr_ts(ys, tr_indices, ts_indices)
-            tr_matrix, ts_matrix = split_tr_ts(kernel.compute(),
-                                               tr_indices, ts_indices)
-            model.fit(train_gram, train_ys)
-            pr_ys = model.predict(test_gram)
-
-            fpr, tpr, _ = roc_curve(ts_ys, pr_ys)
-            pr, rc, f1, sup = precision_recall_fscore_support(ts_ys, pr_ys)
-
-            results.append((sup, f1, pr, rc, auc(fpr, tpr)))
-        return results
