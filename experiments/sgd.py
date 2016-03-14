@@ -41,7 +41,8 @@ class SGDExperiment(Experiment):
         STAGES = [
 
             Stage(self._load_sgd_resources,
-                  [], ['ps', 'p_to_feat', 'p_to_seq', 'p_to_term_ids']),
+                  [],
+                  ['ps', 'p_to_feat', 'p_to_seq', 'p_to_term_ids']),
 
             Stage(self._filter_ps,
                   ['ps', 'p_to_seq', 'min_sequence_len', 'cdhit_threshold'],
@@ -58,6 +59,11 @@ class SGDExperiment(Experiment):
                   ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
                   ['pp_neg']),
 
+            Stage(self._dump_raw_data,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'pp_pos_hq', 'pp_neg', ],
+                  ['__dump_raw']),
+
             Stage(self._compute_folds,
                   ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'filtered_p_to_term_ids'],
                   ['folds']),
@@ -68,22 +74,28 @@ class SGDExperiment(Experiment):
                   ['__dummy_stats']),
 
             Stage(self._compute_p_colocalization_kernel,
-                  ['filtered_ps'], ['p_colocalization_kernel']),
+                  ['filtered_ps'],
+                  ['p_colocalization_kernel']),
 
             Stage(self._compute_p_gene_expression_kernel,
-                  ['filtered_ps', 'p_to_feat'], ['p_gene_expression_kernel']),
+                  ['filtered_ps', 'p_to_feat'],
+                  ['p_gene_expression_kernel']),
 
             Stage(self._compute_p_complex_kernel,
-                  ['filtered_ps', 'p_to_feat'], ['p_complex_kernel']),
+                  ['filtered_ps', 'p_to_feat'],
+                  ['p_complex_kernel']),
 
             Stage(self._compute_p_interpro_kernel,
-                  ['filtered_ps'], ['p_interpro_kernel']),
+                  ['filtered_ps'],
+                  ['p_interpro_kernel']),
 
             Stage(self._compute_p_interpro_count_kernel,
-                  ['filtered_ps'], ['p_interpro_count_kernel']),
+                  ['filtered_ps'],
+                  ['p_interpro_count_kernel']),
 
             Stage(self._compute_p_pssm_kernel,
-                  ['filtered_ps', 'p_to_seq'], ['p_pssm_kernel']),
+                  ['filtered_ps', 'p_to_seq'],
+                  ['p_pssm_kernel']),
 
             Stage(self._compute_average_kernel,
                   [
@@ -125,7 +137,7 @@ class SGDExperiment(Experiment):
                   ['__dummy_sbr']),
 
             Stage(PHONY,
-                  ['__dummy_stats', '__dummy_p_kernels', '__dummy_pp_kernels',
+                  ['__dump_raw', '__dummy_stats', '__dummy_p_kernels', '__dummy_pp_kernels',
                    '__dummy_sbr'],
                   ['__all']),
         ]
@@ -580,6 +592,79 @@ class SGDExperiment(Experiment):
         for p, q, state in interactions:
             assert not(p, q, not state) in interactions, \
                 "folds are inconsistent"
+
+    def _term_to_predicate(self, term):
+        assert len(term.namespace)
+        assert term.level >= 0
+        d = {
+            "namespace": term.namespace,
+            "level": term.level,
+            "id": term.id.replace(":", "-"),
+            "name": term.name.replace(" ", "-").replace(":", "-").replace(",", "")
+        }
+        return "{namespace}-lvl{level}-{id}-{name}".format(**d)
+
+    def _write_sbr_functions(self, path, ps, dag, p_to_term_ids):
+        aspect_to_term_ids = defaultdict(set)
+        for term in dag._id_to_term.itervalues():
+            aspect_to_term_ids[term.namespace].add(term.id)
+
+        lines = []
+        for p in ps:
+
+            # Skip proteins with no function
+            if not p in p_to_term_ids:
+                print "{} has no annotations".format(p)
+                continue
+            assert len(p_to_term_ids[p]) > 0
+
+            # Write out the individual aspects
+            for aspect in aspect_to_term_ids:
+
+                annotations = {term_id for term_id in aspect_to_term_ids[aspect]
+                               if term_id in p_to_term_ids[p]}
+
+                # Skip aspects with no annotation
+                if not len(annotations):
+                    print "{} has not annotations in {}, skipping".format(p, aspect)
+                    continue
+
+                # Write out the protein per-aspect annotations
+                for term_id in annotations:
+                    pred = self._term_to_predicate(dag._id_to_term[term_id])
+                    lines.append("{}({})={}".format(pred, p, 1))
+
+                for term_id in set(aspect_to_term_ids[aspect]) - annotations:
+                    pred = self._term_to_predicate(dag._id_to_term[term_id])
+                    lines.append("{}({})={}".format(pred, p, 0))
+
+        with open(path, "wb") as fp:
+            fp.write("\n".join(lines))
+
+    def _write_sbr_interactions(self, path, fold, with_in=True):
+        _01 = {True:"1", False:"0"}
+
+        lines = []
+        for p, q, state in fold:
+            lines.append("BOUND({}-{})={}".format(p, q, _01[state]))
+
+        if with_in:
+            for p, q, _ in fold:
+                lines.append("IN({},{},{}-{})=1".format(p, q, p, q))
+
+        with open(path, "wb") as fp:
+            fp.write("\n".join(lines))
+
+    def _dump_raw_data(self, ps, dag, p_to_term_ids, pp_pos, pp_neg):
+        pps = set()
+        pps.update((p, q, True) for p, q in pp_pos)
+        pps.update((p, q, False) for p, q in pp_neg)
+
+        self._write_sbr_functions(join(self.dst, "sbr-full-functions.txt"),
+                                  ps, dag, p_to_term_ids)
+        self._write_sbr_interactions(join(self.dst, "sbr-full-interactions.txt"),
+                                     pps, with_in=False)
+        return None,
 
     def _compute_folds(self, ps, pp_pos, pp_neg, p_to_term_ids, num_folds=10):
         """Generates the folds.
