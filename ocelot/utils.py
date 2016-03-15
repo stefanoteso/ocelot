@@ -22,10 +22,6 @@ def permute(l, rng=None):
     perm = list(rng.permutation(len(l)))
     return [l[perm[i]] for i in range(len(l))]
 
-def powerset(iterable):
-    l = list(iterable)
-    return it.chain(from_iterable(it.combinations(l, r) for r in xrange(len(l) + 1)))
-
 def split_tr_ts(array, indices0, indices1):
     if array.ndim == 1:
         return array[indices0], array[indices1]
