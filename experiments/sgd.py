@@ -10,7 +10,7 @@ from ocelot.services import _cls, CDHit
 from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.utils import permute
-from ocelot import Experiment, Stage, PHONY
+from ocelot import Experiment, Stage, PHONY, compute_ppi_folds
 from .yeast import *
 
 class SGDExperiment(Experiment):
@@ -65,7 +65,7 @@ class SGDExperiment(Experiment):
                    'pp_pos_hq', 'pp_neg', ],
                   ['__dump_raw']),
 
-            Stage(self._compute_folds,
+            Stage(lambda *args, **kwargs: (compute_ppi_folds(*args, **kwargs),),
                   ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'filtered_p_to_term_ids'],
                   ['folds']),
 
@@ -493,15 +493,6 @@ class SGDExperiment(Experiment):
         self._print_go_stats(dag, "preprocessing")
 
         return dag, dag.get_p_to_term_ids()
-
-
-    def _check_ps_pps(self, ps, pps):
-        """Checks that the protein pairs are (i) symmetric, and (ii) entirely
-        contained in the list of proteins."""
-        assert all((q, p) in pps for (p, q) in pps), \
-            "pairs are not symmetric"
-        assert all(p in ps for p, _ in pps), \
-            "singletons and pairs do not match"
 
 
     def _get_positive_pins(self, ps):

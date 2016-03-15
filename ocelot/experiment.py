@@ -264,3 +264,98 @@ class Experiment(object):
         kernel = Kernel(*args, **kwargs)
         kernel.check_and_fixup(tol)
         return kernel.compute(),
+
+def _distribute_pps(folds, pps, state, pp_to_feats):
+
+    # Map from individual features to pairs
+    feat_to_pps = defaultdict(set)
+    for pp, feats in pp_to_feats.iteritems():
+        if not len(feats):
+            feat_to_pps["unannotated"].add(pp)
+        else:
+            for feat in feats:
+                feat_to_pps[feat].add(pp)
+
+    # Distribute the interactions among the folds
+    while len(feat_to_pps):
+
+        # Shuffle the folds
+        folds = permute(folds, self._rng)
+
+        # Pick the term with the least unallocated pairs
+        cur_feat, symm_pps = min(feat_to_pps.iteritems(),
+                                    key=lambda id_pps: len(id_pps[-1]))
+
+        print "distributing interactions with term {} (# interactions = {})".format(cur_feat, len(symm_pps))
+
+        # Desymmetrize the pps to add
+        asymm_pps = set()
+        for p, q in symm_pps:
+            if not (q, p) in asymm_pps:
+                asymm_pps.add((p, q))
+
+        # Evenly distribute the associated pairs among all folds.
+        for i, (p, q) in enumerate(sorted(asymm_pps)):
+            folds[i % len(folds)].update([(p, q, state), (q, p, state)])
+
+        # Update term_to_pps by removing all interactions that we
+        # just allocated
+        new_feat_to_pps = {}
+        for feat in feat_to_pps:
+            # Skip the term we just processed (it's done, right?)
+            if feat == cur_feat:
+                continue
+            new_pps = set(pp for pp in feat_to_pps[feat]
+                          if not pp in symm_pps)
+            if not len(new_pps):
+                continue
+            new_feat_to_pps[feat] = new_pps
+        feat_to_pps = new_feat_to_pps
+
+def _check_ppi_folds(ps, pps):
+    assert all((q, p) in pps for (p, q) in pps), \
+        "pairs are not symmetric"
+    assert all(p in ps for p, _ in pps), \
+        "singletons and pairs do not match"
+
+def compute_ppi_folds(ps, pp_pos, pp_neg, p_to_feats, num_folds=10):
+    """Generates interaction-based folds.
+
+    Folds are composed of *pairs* of (known interacting or assumed
+    non-interacting) proteins. Guarantees that:
+
+    - Protein pairs are split evenly according to the feature vectors.
+    - The same pair can not occur in distinct folds.
+    - The same protein *may* occur in distinct folds.
+    - Some proteins may not appear in any fold.
+
+    Parameters
+    ----------
+    ps : list
+        Ordered list of proteins.
+    pp_pos : set
+        Positive interactions.
+    pp_neg : set
+        Negative interactions.
+    p_to_feats : dict
+        Map between proteins to features.
+    num_folds : int, optional. (defaults to 10)
+        Number of folds.
+
+    Returns
+    -------
+    folds : list
+        Each fold is a set of triples of the form (protein, protein, state).
+    """
+    folds = [set() for _ in range(num_folds)]
+
+    pp_to_feats = {}
+    for p, q in pps:
+        p_feats = p_to_feats.get(p, set())
+        q_feats = p_to_feats.get(q, set())
+        pp_to_feats[(p, q)] = p_feats | q_feats
+
+    _distribute_pps(folds, pp_pos, pp_to_feats, True)
+    _distribute_pps(folds, pp_neg, pp_to_feats, False)
+    _check_folds(ps, pp_pos | pp_neg, folds)
+    return folds
