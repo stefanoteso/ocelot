@@ -2,6 +2,7 @@
 
 import sys, re, copy
 import numpy as np
+import networkx as nx
 from collections import defaultdict
 from ocelot.services import _cls
 from copy import deepcopy
@@ -277,10 +278,8 @@ class GODag(object):
             for term in level_to_terms[level]:
                 yield term
 
-    def draw(self, path, fontname="Verdana"):
+    def write_graphml(self, path):
         """Draws the annotated DAG to a PNG file."""
-        import networkx as nx
-        import matplotlib.pyplot as plt
 
         NAMESPACE_TO_NS = {
             "biological_process": "bp",
@@ -290,23 +289,24 @@ class GODag(object):
 
         graph = nx.DiGraph()
 
-        term_to_name = {}
+        tba = set()
         for term in self._id_to_term.values():
             if not len(term.proteins):
                 continue
-            name = NAMESPACE_TO_NS[term.namespace] + "_" + \
-                   term.id.replace(":", "")
-            term_to_name[term] = name
-            graph.add_node(name)
+            tba.add(term.id)
+            graph.add_node(term.id, aspect=term.namespace, level=term.level,
+                           num_proteins=len(term.proteins),
+                           is_bin=term.id.startswith("BN:"))
 
         for term in self._id_to_term.values():
-            for parent, _ in term.get_parents(self):
-                if term in term_to_name and parent in term_to_name:
-                    graph.add_edge(term_to_name[term], term_to_name[parent])
+            if not term.id in tba:
+                continue
+            for parent, relation in term.get_parents(self, relations=["is_a", "bin_for"]):
+                assert parent.id in tba
+                graph.add_edge(term.id, parent.id, relation=relation)
 
-        layout = nx.spring_layout(graph)
-        nx.draw(graph, layout)
-        plt.savefig(path)
+        nx.write_graphml(graph, path)
+
 
     def _check_term_parent_annotations(self):
         for term in self._id_to_term.itervalues():
