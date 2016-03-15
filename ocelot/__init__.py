@@ -1,5 +1,6 @@
 from experiment import *
 from services import *
+from fasta import *
 from converters import *
 from features import *
 from kernels import *
