@@ -1,23 +1,11 @@
 #!/usr/bin/env python2
 # -*- coding: utf8 -*-
 
-import os, random
+from os.path import join, abspath
 import numpy as np
 from collections import namedtuple
 import ocelot
 import experiments
-
-def _checkdir(path):
-    """Checks if a path identifies a directory."""
-    return path and os.path.isdir(os.path.abspath(path))
-
-def _filter_targets(targets, ids):
-    """Returns the targets identified by `ids`."""
-    if ids is None:
-        ids = targets.keys()
-    elif not all(id_ in targets for id_ in ids):
-        raise ValueError("invalid target id")
-    return [(id_, targets[id_]) for id_ in ids]
 
 def _make_rdf(args):
     """Builds the RDF dataset.
@@ -28,9 +16,9 @@ def _make_rdf(args):
     :param args.force_update: force updating the RDF files even if they already
                               exist.
     """
-    if not _checkdir(args.src):
+    if not ocelot.checkdir(args.src):
         raise ValueError("Source directory '{}' does not exist".format(args.src))
-    if not _checkdir(args.dst):
+    if not ocelot.checkdir(args.dst):
         raise ValueError("Target directory '{}' does not exist".format(args.dst))
 
     Target = namedtuple("Target", ("Converter", "kwargs"))
@@ -57,7 +45,8 @@ def _make_rdf(args):
         "yip09"     : Target(ocelot.Yip09Converter, {}),
         "cafa13"    : Target(ocelot.CAFA13Converter, {}),
     }
-    for id_, target in _filter_targets(ALL_TARGETS, args.targets):
+    for id_ in ocelot.validate(ALL_TARGETS.keys(), args.targets):
+        target = ALL_TARGETS[id_]
         target.kwargs["basename"] = id_
         converter = target.Converter(args.src, args.dst,
                                      force_update = args.force_update,
@@ -83,7 +72,7 @@ def _upload_rdf(args):
     """
     from glob import glob
 
-    if not _checkdir(args.src):
+    if not ocelot.checkdir(args.src):
         raise ValueError("RDF directory '{}' does not exist".format(args.src))
     if args.default_graph is None:
         raise ValueError("upload-rdf requires a valid graph IRI")
@@ -91,7 +80,7 @@ def _upload_rdf(args):
     print "Uploading contents of '{}' into named graph <{}>".format(args.src, args.default_graph)
 
     turtles = []
-    for path in glob(os.path.join(os.path.abspath(args.src), "*.ttl")):
+    for path in glob(join(abspath(args.src), "*.ttl")):
         print "Adding '{}' to the upload list".format(path)
         turtles.append(path)
 
@@ -144,7 +133,8 @@ def _run_experiment(args):
 
     endpoint = ocelot.Endpoint(args.endpoint, args.default_graph)
 
-    for id_, Experiment in _filter_targets(ALL_TARGETS, args.targets):
+    for id_ in ocelot.validate(ALL_TARGETS.keys(), args.targets):
+        Experiment = ALL_TARGETS[id_]
         experiment = Experiment(args.src, args.dst, endpoint=endpoint,
                                 go_aspects=go_aspects,
                                 max_go_depth=args.max_go_depth,
