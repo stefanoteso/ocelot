@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+import networkx as nx
 from os.path import join
 from itertools import product
 from collections import defaultdict
@@ -798,6 +799,8 @@ class SGDExperiment(Experiment):
             level_to_annots[term.level].extend(list(term.proteins))
             level_to_ps[term.level].update(term.proteins)
 
+        # XXX per-aspect GO stats
+
         for level in level_to_annots:
             num_terms = len(level_to_term_ids[level])
             num_bins = len([id_ for id_ in level_to_term_ids[level] if id_.startswith("BN")])
@@ -810,32 +813,50 @@ class SGDExperiment(Experiment):
 
         p_to_folds = defaultdict(set)
         for k, fold in enumerate(folds):
-            fold_ps = set()
-            fold_ps.update(p for [p, _, _] in fold)
-            fold_ps.update(q for [_, q, _] in fold)
 
-            for p in fold_ps:
+            in_fold_ps, out_fold_ps = set(), set()
+            for l, other_fold in enumerate(folds):
+                s = in_fold_ps if l == k else out_fold_ps
+                s.update(p for p, _, _ in fold)
+                s.update(q for _, q, _ in fold)
+            unique_fold_ps = in_fold_ps - out_fold_ps
+
+            for p in in_fold_ps:
                 p_to_folds[p].add(k)
 
             num_pos = len({(p, q) for p, q, s in fold if s})
             num_neg = len({(p, q) for p, q, s in fold if not s})
 
-            print "# interactions in fold {}: {} over {} proteins (#pos={} #neg={} intra={} inter={})".format(
-                k, len(fold), len(fold_ps), len(pos), len(neg))
+            # XXX distance to perfection w.r.t. interactions
+
+            print dedent("""\
+                FOLD {} / {} :
+                    # interactions = {} : #pos = {} #neg = {}
+                    # proteins unique to this fold = {}\
+                """).format(k, num_pos + num_neg, len(folds), num_pos, num_neg, len(unique_fold_ps))
 
         print "# proteins with GO annotations =", len(set(p for p in ps if p in p_to_term_ids and len(p_to_term_ids[p])))
-        print "# proteins in a fold =", \
-                len({p for p, folds in p_to_folds.items() if len(folds)})
-        print "# proteins in at least 2 folds =", \
-                len({p for p, folds in p_to_folds.items() if len(folds) >= 2})
+
+        num_repeats_to_num_p = defaultdict(int)
+        for p, p_folds in p_to_folds.iteritems():
+            num_repeats_to_num_p[len(p_folds)] += 1
+        for num_repeats in sorted(num_repeats_to_num_p):
+            print "# proteins in exactly {} folds = {}".format(
+                num_repeats, num_repeats_to_num_p[num_repeats])
 
         # XXX GO annotation cooccurrence
 
-        # XXX GO annotation balance in folds
+        # Save the PPI and folds as graphml
+        graph = nx.Graph()
+        for k, fold in enumerate(folds):
+            for p, q, state in fold:
+                if not state:
+                    continue
+                graph.add_edge(p, q, fold=k)
+        nx.write_graphml(graph, join(self.dst, "pos_pin.graphml"))
 
-        # XXX draw full PPI (taken from the folds)
-
-        # XXX draw folds over the full PPI
+        # Save the GO annotations as graphml
+        dag.write_graphml(join(self.dst, "go_annotations.graphml"))
 
         return None,
 
