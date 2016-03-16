@@ -34,22 +34,6 @@ BACKGROUND_AA_FREQ = (
     0.03635438623143,   # Y
 )
 
-def _cls(obj):
-    return type(obj).__name__
-
-def _filter_targets(all_targets, targets):
-    if targets is None:
-        targets = all_targets
-    else:
-        for target in targets:
-            if not target in all_targets:
-                raise ValueError("invalid target '{}'".format(target))
-    return targets
-
-def powerset(iterable):
-    l = list(iterable)
-    return it.chain(from_iterable(it.combinations(l, r) for r in xrange(len(l) + 1)))
-
 def iterate_csv(path, num_skip = 0, **kwargs):
     """Thin wrapper around ``csv.DictReader`` with a couple more options."""
     import csv
