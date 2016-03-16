@@ -2,14 +2,14 @@
 
 import ocelot.ontology as O
 from ocelot.converters.base import Converter, iterate_csv
-from ocelot.services import FASTA
+from ocelot.fasta import read_fasta
 
 from rdflib import URIRef as U, BNode as B, Literal as L
 from glob import glob
 
 class PDBConverter(Converter):
     """Converter for `Protein Data Bank <http://www.rcsb.org/pdb/>`_.
-    
+
     Note that this converter does not actually convert the *structure* data,
     but only sequences and information about the database.
 
@@ -84,7 +84,7 @@ class PDBConverter(Converter):
 
     def _siphon_ps_ss(self, triples):
         ps, ss = {}, {}
-        for header, sequence in FASTA().read(self._get_path("ss.txt")):
+        for header, sequence in read_fasta(self._get_path("ss.txt")):
             pdbid, chain, content = header.split(":")
 
             key = (pdbid, chain)

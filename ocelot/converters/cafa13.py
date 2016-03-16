@@ -4,7 +4,8 @@ import os
 
 import ocelot.ontology as O
 from ocelot.converters.base import Converter
-from ocelot.services import iterate_csv, FASTA
+from ocelot.fasta import read_fasta
+from ocelot.services import iterate_csv
 
 from rdflib import URIRef as U, Literal as L, BNode as B
 
@@ -30,8 +31,7 @@ class CAFA13Converter(Converter):
         return os.path.join(self.src, "CAFA13", "CAFATrainingData", *args)
 
     def _siphon_go(self, triples):
-        # reader = FASTA()
-        # p_seq = list(reader.read(path))
+        # p_seq = read_fasta(path))
         # assert len(p_seq) = 118411
         # for p, seq in p_seq:
         #     p = O.uri(O.CAFA13_ID, p)

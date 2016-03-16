@@ -2,7 +2,7 @@
 
 import ocelot.ontology as O
 from ocelot.converters.base import Converter, iterate_csv
-from ocelot.services import FASTA
+from ocelot.fasta import read_fasta
 
 from rdflib import URIRef as U, BNode as B, Literal as L
 
@@ -157,7 +157,7 @@ class SGDConverter(Converter):
 
     def _siphon_sequences(self, triples):
         """Converts the `orf_trans_all.fasta` file."""
-        for header, sequence in FASTA().read(self._get_path("orf_trans_all.fasta")):
+        for header, sequence in read_fasta(self._get_path("orf_trans_all.fasta")):
             assert "SGDID:" in header
 
             sgd_ids = filter(lambda word: word.startswith("SGDID:"),

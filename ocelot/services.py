@@ -4,6 +4,7 @@ import os, errno, hashlib
 import numpy as np
 import multiprocessing as mp
 import itertools as it
+from ocelot.fasta import write_fasta
 
 # The amino acid alphabet (sorted lexicographically).
 AMINOACIDS = ("A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P",
@@ -58,47 +59,6 @@ def iterate_csv(path, num_skip = 0, **kwargs):
                 num_skip -= 1
                 continue
             yield row_as_dict
-
-class FASTA(object):
-    """A simple wrapper around FASTA files."""
-    def read(self, path):
-        """Reads the contents of a FASTA file.
-
-        .. note::
-
-            End-of-sequence symbols ``"*"`` are stripped from the end
-            of the sequence. No other sequence transformation is done.
-
-        :param path: path to the FASTA file to be read.
-        :returns: pairs of the form ``(header, sequence)``, as a generator.
-        """
-        with open(path, "rt") as fp:
-            header = None
-            sequence = None
-            for line in fp:
-                line = line.strip()
-                if len(line) == 0:
-                    continue
-                elif line[0] == ">":
-                    if not header is None:
-                        assert(sequence)
-                        yield header, sequence.rstrip("*")
-                    header = line[1:]
-                    sequence = ""
-                else:
-                    sequence += line
-            yield header, sequence.rstrip("*")
-
-    def write(self, path, data):
-        """Writes a FASTA file.
-
-        :param path: path to the FASTA file to be written.
-        :param data: a list of ``(header, sequence)`` pairs.
-        """
-        with open(path, "wt") as fp:
-            for header, sequence in data:
-                fp.write(">{}\n{}\n".format(header.lstrip(">"), sequence))
-
 
 class PCL(object):
     """Thin wrapper around `PCL <http://smd.princeton.edu/help/formats.shtml#pcl>`_
@@ -213,8 +173,7 @@ class CDHit(object):
         :param threshold: clustering threshold (default: ``0.9``).
         :returns: list of cluster representatives, list of clusters 
         """
-        fasta = FASTA()
-        fasta.write("temp.fasta", pairs)
+        write_fasta("temp.fasta", pairs)
         args = [ "-i {}".format("temp.fasta"),
                  "-o {}".format("temp.cdhit"),
                  "-c {}".format(kwargs.get("threshold", 0.8)) ]
@@ -456,7 +415,7 @@ class ReProf(object):
             Add support for modeldir.
             Use temporary files, remove them after the fact.
         """
-        FASTA().write("temp.fasta", [("temp", sequence)])
+        write_fasta("temp.fasta", [("temp", sequence)])
         args = [ "-i {}".format("temp.fasta"),
                  "-o {}".format("temp.reprof") ]
         ret, out, err = self.reprof.run(args)
@@ -496,7 +455,7 @@ class SignalP(object):
         :param min_sp_len: minimum signal peptide predicted length.
         :returns: WRITEME
         """
-        FASTA().write("temp.fasta", [("temp", sequence)])
+        write_fasta("temp.fasta", [("temp", sequence)])
         args = [ "-f {}".format("long"),
                  "-s {}".format(kwargs.get("sp_network", "best")),
                  "-t {}".format(kwargs.get("organism", "euk")),
