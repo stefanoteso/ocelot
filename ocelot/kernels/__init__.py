@@ -2,8 +2,6 @@
 
 import numpy as np
 
-from ..services import _cls
-
 class Kernel(object):
     """Base kernel class.
 
@@ -80,7 +78,7 @@ class Kernel(object):
         ls = np.linalg.eigvalsh(matrix)
         if ls[0] < 0.0:
             assert ls[0] < threshold, "matrix is too non-PSD: minimum eigenvalue is '{}'".format(ls[0])
-            print _cls(self), ": preconditioning by 10*(ls[0] = '{}')".format(ls[0])
+            print "preconditioning by 10*(ls[0] = '{}')".format(ls[0])
             matrix += np.identity(matrix.shape[0]) * -10.0 * ls[0]
             eigvals = np.linalg.eigvalsh(matrix)
             assert eigvals[0] > -threshold, "eigenvalues are too non-negative, even after preconditioning: {}".format(eigvals)

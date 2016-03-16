@@ -2,7 +2,6 @@
 
 import ocelot.ontology as O
 from ocelot.converters.base import Converter, iterate_csv
-from ocelot.services import _cls
 
 class STRINGConverter(Converter):
     """Converter for `STRING <http://string-db.org/>`_.

@@ -8,7 +8,6 @@ from sklearn.utils import check_random_state
 
 from ocelot import *
 from ocelot.ontology import BINDINGS
-from ocelot.services import _cls
 
 Stage = namedtuple("Stage", ["f", "inputs", "outputs"])
 
@@ -39,7 +38,7 @@ class Scheduler(object):
     def _resolve_save(self, basename, what):
         """Saves something as basename.pickle in self.dst."""
         relpath = os.path.join(self.dst, basename) + ".pickle"
-        print _cls(self), ": saving '{}'".format(relpath)
+        print "saving '{}'".format(relpath)
         try:
             with open(relpath, "wb") as fp:
                 pickle.dump(what, fp, protocol=2)
@@ -87,13 +86,13 @@ class Scheduler(object):
                 try:
                     ret[output] = self._resolve_load(output)
                 except Exception, e:
-                    print _cls(self), ": failed to load dependency ({}), recursing".format(e)
+                    print "failed to load dependency ({}), recursing".format(e)
                     all_loaded = False
             if all_loaded:
                 return ret
 
         # Resolve all dependencies
-        print _cls(self), ": resolving deps for '{}'".format(target)
+        print "resolving deps for '{}'".format(target)
         for input_ in stage.inputs:
             if not input_ in context:
                 outputs = self._resolve(input_, context, force)
@@ -102,7 +101,7 @@ class Scheduler(object):
                 context.update(outputs)
 
         # Now that all dependencies are satisfied, compute the target
-        print _cls(self), ": about to run '{}'".format(stage.f)
+        print "about to run '{}'".format(stage.f)
         results = stage.f(*[context[input_] for input_ in stage.inputs])
         assert len(results) == len(stage.outputs), \
             "declared and actual outputs differ: {} vs {}".format(len(results), len(stage.outputs))

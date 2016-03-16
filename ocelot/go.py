@@ -4,7 +4,6 @@ import sys, re, copy
 import numpy as np
 import networkx as nx
 from collections import defaultdict
-from ocelot.services import _cls
 from copy import deepcopy
 
 class GOTerm(object):

@@ -2,7 +2,6 @@
 
 import os
 import numpy as np
-from ocelot.services import _cls
 from ocelot.kernels import *
 from ocelot.converters.yip09 import *
 from ocelot import Stage, Experiment
@@ -248,7 +247,7 @@ class YipExperiment(Experiment):
         return self._compute_xxi_y(rrs, self._get_rris, "rri")
 
     def _compute_xxi_y(self, pairs, get_interactions, name):
-        print _cls(self), ": retrieving {} interactions".format(name)
+        print "retrieving {} interactions".format(name)
         pos_ints, neg_ints = get_interactions()
         print " #{}+={} #{}-={}".format(name, len(pos_ints), name, len(neg_ints))
 
@@ -257,8 +256,7 @@ class YipExperiment(Experiment):
             ys = np.loadtxt(path)
             assert len(ys) == (len(pos_ints) + len(neg_ints))
         except Exception, e:
-            print _cls(self), ":", e
-            print _cls(self), ": computing {} y".format(name)
+            print "computing {} y".format(name)
             ys = []
             for i, pair in enumerate(pairs):
                 if pair in pos_ints:
@@ -359,7 +357,7 @@ class YipExperiment(Experiment):
                             ps, self.dst,
                             do_pairwise = True, pairs = pp_indices)
 
-        print _cls(self), ": computing average kernel"
+        print "computing average kernel"
         avg_matrix = self._compute_average_kernel(_KERNEL_RELPATHS_PAIRWISE[:-1])
         kernel = DummyKernel(avg_matrix)
         kernel.check_and_fixup(1e-10)
@@ -433,7 +431,7 @@ class YipExperiment(Experiment):
         # as drop-in replacements in the existing SBR/yip experiment.
         converter = Yip09Converter(self.src, None, basename = "yip09")
 
-        print _cls(self), ": retrieving entities and entity pairs"
+        print "retrieving entities and entity pairs"
         ps, ds, rs = converter.get_entities()
         pps, dds, rrs = converter.get_pairs()
         print " #ps={}, #ds={}, #rs={}".format(len(ps), len(ds), len(rs))

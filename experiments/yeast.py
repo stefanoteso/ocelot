@@ -7,7 +7,7 @@ from collections import Counter
 from glob import glob
 
 from ocelot.kernels import *
-from ocelot.services import _cls, iterate_csv, PCL, InterProTSV
+from ocelot.services import iterate_csv, PCL, InterProTSV
 
 class SGDGeneExpressionKernel(Kernel):
     """A yeast-specific correlation kernel on gene expression data.
@@ -45,7 +45,7 @@ class SGDGeneExpressionKernel(Kernel):
         p_to_i = self._entities
         self._matrix = np.zeros((len(self), len(self)), dtype=self.dtype)
         for path in self._get_pcl_paths():
-            print _cls(self), ": processing '{}'".format(path)
+            print "processing '{}'".format(path)
             p_to_levels, num_conditions = pcl.read(path)
             exp_levels, num_missing = [], 0
             for p, i in sorted(p_to_i.iteritems(), key = lambda p_i: p_i[1]):
@@ -56,8 +56,8 @@ class SGDGeneExpressionKernel(Kernel):
                     num_missing += 1
                 exp_levels.append(p_levels)
             if num_missing > 0:
-                 print _cls(self), ": '{}' has no measurements for '{}/{}' proteins" \
-                                    .format(path, num_missing, len(self))
+                 print "'{}' has no measurements for '{}/{}' proteins" \
+                        .format(path, num_missing, len(self))
             self._matrix += CorrelationKernel(exp_levels, do_normalize=False).compute()
         return self._matrix
 
@@ -158,8 +158,8 @@ class InterProKernel(Kernel):
             all_hits.append(hits)
 
         if num_missing > 0:
-            print _cls(self), ": no interpro domains for '{}/{}' proteins" \
-                                .format(num_missing, len(self))
+            print "no interpro domains for '{}/{}' proteins" \
+                    .format(num_missing, len(self))
 
         if self._mode == "match":
             return SetKernel(all_hits).compute()

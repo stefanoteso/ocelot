@@ -6,7 +6,7 @@ from os.path import join
 from itertools import product
 from collections import defaultdict
 from textwrap import dedent
-from ocelot.services import _cls, CDHit
+from ocelot.services import CDHit
 from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.utils import permute
@@ -242,7 +242,7 @@ class SGDExperiment(Experiment):
         #    "IEA",  # Inferred from Electronic Annotation (IEA)
         ]
 
-        print _cls(self), ": allowed GO ECs are '{}'".format(ECODES_TO_KEEP)
+        print "allowed GO ECs are '{}'".format(ECODES_TO_KEEP)
 
         query = """
         SELECT ?orf ?fun ?ecode
@@ -373,16 +373,16 @@ class SGDExperiment(Experiment):
             return "http://www.yeastgenome.org/locus/{}/go".format(p)
 
         ps = self._get_sgd_ids()
-        print _cls(self), ": found {} proteins (validated ORFs)".format(len(ps))
+        print "found {} proteins (validated ORFs)".format(len(ps))
 
         p_to_feat = self._get_sgd_id_to_feat()
-        print _cls(self), ": found {} proteins with known SGD feature".format(len(p_to_feat))
+        print "found {} proteins with known SGD feature".format(len(p_to_feat))
 
         p_to_seq = self._get_sgd_id_to_seq()
-        print _cls(self), ": found {} proteins with known SGD sequence".format(len(p_to_seq))
+        print "found {} proteins with known SGD sequence".format(len(p_to_seq))
 
         p_to_term_ids = self._get_sgd_id_to_term_ids()
-        print _cls(self), ": found {} proteins with known GO terms".format(len(p_to_term_ids))
+        print "found {} proteins with known GO terms".format(len(p_to_term_ids))
 
         for p in ps:
             assert p in p_to_seq, "'{}' has no sequence".format(p)
@@ -429,18 +429,18 @@ class SGDExperiment(Experiment):
 
         # Filter out sequences shorter than min_sequence_len residues
         filtered_ps = filter(lambda p: len(p_to_seq[p]) >= min_sequence_len, ps)
-        print _cls(self), ": found {} proteins with at least {} residues" \
+        print "found {} proteins with at least {} residues" \
                 .format(len(ps), min_sequence_len)
 
         # Cluster the filtered sequences with CD-HIT
         filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
         _, clusters = CDHit().run(filtered_p_seq, threshold=cdhit_threshold)
-        print _cls(self), ": found {} clusters of proteins at CD-HIT threshold {}" \
+        print "found {} clusters of proteins at CD-HIT threshold {}" \
                 .format(len(clusters), cdhit_threshold)
 
         # Take one protein from each cluster
         filtered_ps = [list(cluster)[0][0] for cluster in clusters]
-        print _cls(self), ": there are {} filtered proteins".format(len(filtered_ps))
+        print "there are {} filtered proteins".format(len(filtered_ps))
 
         return sorted(filtered_ps),
 
@@ -462,15 +462,15 @@ class SGDExperiment(Experiment):
         num_annot_terms = len(set(id_ for id_, ps in id_to_ps.iteritems()
                                   if len(ps) > 0))
 
-        print _cls(self), ": {}/{} annotated proteins" \
+        print "{}/{} annotated proteins" \
                             .format(num_annot_ps, num_ps)
-        print _cls(self), ": {}/{} annotated terms" \
+        print "{}/{} annotated terms" \
                             .format(num_annot_terms, num_terms)
 
     def _get_go_annotations(self, filtered_ps, p_to_term_ids):
         """Load the GO OBO file, fill it in, and prune it."""
 
-        print _cls(self), ": processing GO annotations (aspects={} max_depth={} min_annot={})" \
+        print "processing GO annotations (aspects={} max_depth={} min_annot={})" \
                             .format(self._go_aspects, self._min_go_annot,
                                     self._max_go_depth)
 
@@ -502,21 +502,21 @@ class SGDExperiment(Experiment):
         # Query the high-quality protein-protein interactions
         pp_pos_hq = self._get_sgd_pin(ps=ps, manual_only=True)
         density = float(len(pp_pos_hq)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} hi-quality PPIs (density = {})" \
+        print "found {} hi-quality PPIs (density = {})" \
                 .format(len(pp_pos_hq), density)
         self._check_ps_pps(ps, pp_pos_hq)
 
         # Query all (high+low-quality) protein-protein interactions
         pp_pos_lq = self._get_sgd_pin(ps=ps, manual_only=False)
         density = float(len(pp_pos_lq)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} lo-quality PPIs (density = {})" \
+        print "found {} lo-quality PPIs (density = {})" \
                 .format(len(pp_pos_lq), density)
         self._check_ps_pps(ps, pp_pos_lq)
 
         # Query (literally) all protein-protein actions annotated in STRING
         pp_pos_string = self._get_string_pin(ps=ps)
         density = float(len(pp_pos_string)) / (len(ps) * (len(ps) - 1))
-        print _cls(self), ": found {} STRING-quality PPIs (density = {})" \
+        print "found {} STRING-quality PPIs (density = {})" \
                 .format(len(pp_pos_string), density)
         self._check_ps_pps(ps, pp_pos_string)
 
@@ -531,7 +531,7 @@ class SGDExperiment(Experiment):
         positive PIN minus a set of candidate interactions (of any kind,
         really).
         """
-        print _cls(self), ": sampling {} negative interactions".format(len(pp_pos_hq))
+        print "sampling {} negative interactions".format(len(pp_pos_hq))
         pp_neg = set()
         while len(pp_neg) != len(pp_pos_hq):
             i, j = self._rng.randint(len(ps), size=2)
@@ -540,7 +540,7 @@ class SGDExperiment(Experiment):
                (p, q) not in pp_pos_hq and \
                (p, q) not in pp_neg:
                 pp_neg.update([(p, q), (q, p)])
-        print _cls(self), ": got {} negative interactions".format(len(pp_neg))
+        print "got {} negative interactions".format(len(pp_neg))
 
         self._check_ps_pps(ps, pp_neg)
         return pp_neg,
@@ -746,18 +746,18 @@ class SGDExperiment(Experiment):
                     new_term_id_to_pps[term_id] = new_pps
                 term_id_to_pps = new_term_id_to_pps
 
-        print _cls(self), ": generating {} folds...".format(num_folds)
+        print "generating {} folds...".format(num_folds)
         folds = [set() for _ in range(num_folds)]
 
-        print _cls(self), ": adding {} positive interactions...".format(len(pp_pos))
+        print "adding {} positive interactions...".format(len(pp_pos))
         distribute_pps(folds, pp_pos, True, p_to_term_ids)
-        print _cls(self), ": adding {} negative interactions...".format(len(pp_neg))
+        print "adding {} negative interactions...".format(len(pp_neg))
         distribute_pps(folds, pp_neg, False, p_to_term_ids)
 
         # XXX proteins that do not interact (or non-interact) with anybody
         # do not appear in the folds.
 
-        print _cls(self), ": checking fold sanity..."
+        print "checking fold sanity..."
         self._check_folds(ps, pp_pos | pp_neg, folds)
 
         return folds,
@@ -1034,8 +1034,7 @@ class SGDExperiment(Experiment):
             ps_in_train_set = fold_to_ps(train_set) - \
                 (ps_in_test_set | ps_in_validation_set)
 
-            print _cls(self), \
-                "fold {} examples: #ps = {}, {}, {}; #pps = {}, {}, {}" \
+            print "fold {} examples: #ps = {}, {}, {}; #pps = {}, {}, {}" \
                     .format(k, len(ps_in_train_set),
                             len(ps_in_validation_set), len(ps_in_test_set),
                             len(train_set), len(validation_set),
