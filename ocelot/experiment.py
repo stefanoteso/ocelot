@@ -11,7 +11,7 @@ from ocelot.ontology import BINDINGS
 
 Stage = namedtuple("Stage", ["f", "inputs", "outputs"])
 
-PHONY = lambda *args, **kwargs: None,
+PHONY = lambda *args, **kwargs: (None,)
 
 class Scheduler(object):
     """A simple make-like scheduler.
@@ -101,7 +101,7 @@ class Scheduler(object):
                 context.update(outputs)
 
         # Now that all dependencies are satisfied, compute the target
-        print "about to run '{}'".format(stage.f)
+        print "about to run '{}'".format(stage)
         results = stage.f(*[context[input_] for input_ in stage.inputs])
         assert len(results) == len(stage.outputs), \
             "declared and actual outputs differ: {} vs {}".format(len(results), len(stage.outputs))
