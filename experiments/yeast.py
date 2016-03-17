@@ -1,65 +1,50 @@
 # -*- coding: utf-8 -*-
 
-from os.path import join
+from os.path import join, basename
 import numpy as np
 from itertools import product
 from collections import Counter
 from glob import glob
 
 from ocelot.kernels import *
-from ocelot.services import iterate_csv, PCL, InterProTSV
+from ocelot.microarray import read_pcl, GeneExprKernel
+from ocelot.services import iterate_csv, InterProTSV
 
-class SGDGeneExpressionKernel(Kernel):
-    """A yeast-specific correlation kernel on gene expression data.
+class SGDGeneExprKernel(GeneExprKernel):
+    """A yeast-specific gene expression kernel.
 
-    It uses the microarray files located at::
+    It uses the PCL files located at::
 
-        $src/yeast/microarray/*.pcl
+        ${src}/SGD/microarray/${experiments}/*.pcl
 
-    The data can be obtained from:
-
-        `<ftp://downloads.yeastgenome.org/expression/microarray/all_spell_exprconn_pcl.tar.gz>`_
+    The data can be obtained from [1]_.
 
     Parameters
     ----------
-    p_to_i : dict
-        Map ORF feature name -> index.
+    gene_to_i : dict
+        Map from gene names to indices in the Gram matrix. There should be
+        a key for each target gene.
     src : str
-        Path to the data directory.
+        WRITEME
     experiments : list
-        List of microarray experiments to use.
+        WRITEME
     """
-    def __init__(self, p_to_i, src, experiments, *args, **kwargs):
-        self._wc = join(src, "SGD", "microarray", "*", "*.pcl")
-        self._experiments = experiments
-        super(SGDGeneExpressionKernel, self).__init__(p_to_i, *args, **kwargs)
+    def __init__(self, gene_to_i, src, experiments, *args, **kwargs):
+        microarrays = self._load(src, experiments)
+        super(SGDGeneExprKernel, self).__init__(gene_to_i, microarrays,
+                                                *args, **kwargs)
 
-    def _get_pcl_paths(self):
-        for path in glob(self._wc):
-            if not any(exp in path for exp in self._experiments):
+    def _load(self, src, experiments):
+        microarrays = []
+        basepath = join(src, "SGD", "microarray")
+        for path in glob(join(basepath, "*")):
+            experiment = basename(path)
+            if not experiment in experiments:
                 continue
-            yield path
-
-    def _compute_all(self):
-        pcl = PCL()
-        p_to_i = self._entities
-        self._matrix = np.zeros((len(self), len(self)), dtype=self.dtype)
-        for path in self._get_pcl_paths():
-            print "processing '{}'".format(path)
-            p_to_levels, num_conditions = pcl.read(path)
-            exp_levels, num_missing = [], 0
-            for p, i in sorted(p_to_i.iteritems(), key = lambda p_i: p_i[1]):
-                try:
-                    p_levels = p_to_levels[p].astype(self.dtype)
-                except:
-                    p_levels = np.zeros((num_conditions,), dtype=self.dtype)
-                    num_missing += 1
-                exp_levels.append(p_levels)
-            if num_missing > 0:
-                 print "'{}' has no measurements for '{}/{}' proteins" \
-                        .format(path, num_missing, len(self))
-            self._matrix += CorrelationKernel(exp_levels, do_normalize=False).compute()
-        return self._matrix
+            for pcl in glob(join(path, "*.pcl")):
+                print "loading '{}'".format(pcl)
+                microarrays.append(read_pcl(pcl))
+        return microarrays
 
 class YeastProteinComplexKernel(Kernel):
     """A yeast-specific diffusion kernel on protein complexes.
