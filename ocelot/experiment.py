@@ -349,7 +349,7 @@ def compute_ppi_folds(ps, pp_pos, pp_neg, p_to_feats, num_folds=10):
     folds = [set() for _ in range(num_folds)]
 
     pp_to_feats = {}
-    for p, q in pps:
+    for p, q in pp_pos | pp_neg:
         p_feats = p_to_feats.get(p, set())
         q_feats = p_to_feats.get(q, set())
         pp_to_feats[(p, q)] = p_feats | q_feats
