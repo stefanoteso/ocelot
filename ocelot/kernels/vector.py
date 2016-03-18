@@ -93,9 +93,6 @@ class SetKernel(Kernel):
 class ColocalizationKernel(Kernel):
     """An exponential (gaussian-of-differences) kernel over genetic contexts.
 
-    The distance between two proteins (or, rather, genes) is taken to
-    be the distance between their centroids.
-
     Please note that we do distinguish between same-strand and
     different-strand proteins (i.e., their distances are computed the same
     way), while this may have a rather serious biological implications.
@@ -113,7 +110,7 @@ class ColocalizationKernel(Kernel):
            eukaryotes*, 2003.
     """
     def __init__(self, contexts, *args, **kwargs):
-        self._gamma = kwargs.get("gamma", 1.0)
+        self._gamma = kwargs.pop("gamma", 1.0)
         super(ColocalizationKernel, self).__init__(contexts, *args, **kwargs)
 
     def _compute_all(self):
@@ -124,22 +121,21 @@ class ColocalizationKernel(Kernel):
 
         matrix = np.zeros((len(self), len(self)), dtype=self.dtype)
         for contexts in chromosome_to_contexts.itervalues():
+
             # Figure out the maximum distance between genes
-            max_d = None
+            dists = []
             for (i, pos_i), (j, pos_j) in it.product(contexts, contexts):
                 if i <= j:
                     continue
-                d = np.abs(pos_i - pos_j)
-                if d > max_d or max_d is None:
-                    max_d = d
-            assert not max_d is None, "can not determine max distance between contexts"
+                dists.append(np.abs(pos_i - pos_j))
+            max_dist = max(dists)
+
             # Compute the kernel matrix
             for (i, pos_i), (j, pos_j) in it.product(contexts, contexts):
                 if i < j:
                     continue
-                matrix[i,j] = \
-                matrix[j,i] = \
-                     np.exp(-self._gamma * (np.abs(pos_i - pos_j) / max_d))
+                matrix[i,j] = matrix[j,i] = \
+                     np.exp(-self._gamma * (np.abs(pos_i - pos_j) / max_dist))
         return matrix
 
 def _test_results(Kernel, data, *args, **kwargs):
