@@ -9,7 +9,10 @@ from . import Kernel
 class LinearKernel(Kernel):
     """An explicit dot product kernel.
 
-    :param entities: list of real-valued vectors.
+    Parameters
+    ----------
+    phis : collection
+        Ordered collection of real-valued vectors.
     """
     def _compute_all(self):
         phis = np.array(self._entities)
@@ -18,9 +21,10 @@ class LinearKernel(Kernel):
 class RandomKernel(LinearKernel):
     """A linear kernel over random normally distributed features.
 
-    For debugging only."""
+    For debugging only.
+    """
     def _compute_all(self):
-        phis = np.random.normal(0, 1, size = (len(self), 10))
+        phis = np.random.normal(0, 1, size=(len(self), 10))
         return np.dot(phis, phis.T)
 
 class IntersectionKernel(Kernel):
@@ -32,7 +36,11 @@ class IntersectionKernel(Kernel):
         additive kernels (e.g. the chi-square kernel) can run circles around
         this naive implementation.
 
-    :param entities: list of real-valued vectors (e.g. histograms)."""
+    Parameters
+    ----------
+    phis : collection
+        Ordered collection of real-valued vectors (e.g. histograms).
+    """
     def _compute_all(self):
         k = np.zeros((num, num))
         phis = np.array(self._entities)
@@ -49,7 +57,7 @@ class CorrelationKernel(Kernel):
 
     Parameters
     ----------
-    entities : collection
+    measurements : collection
         Ordered collection of real-valued vectors.
     """
     def _compute_all(self):
@@ -60,8 +68,11 @@ class CorrelationKernel(Kernel):
 class SparseLinearKernel(Kernel):
     """A sparse linear kernel.
 
-    :param entities: list of dictionaries whose keys are the indices and the
-        corresponding values are the weights associated to the indices.
+    Parameters
+    ----------
+    sparse_vectors : collection
+        Ordered collection of dictionaries. Keys in a dictionary are feature
+        indices, while values are the actual feature values.
     """
     def _compute_all(self):
         num = len(self)
@@ -78,7 +89,10 @@ class SparseLinearKernel(Kernel):
 class SetKernel(Kernel):
     """A generic set kernel.
 
-    :param entities: list of sets.
+    Parameters
+    ----------
+    sets : collection
+        Ordered collection of sets.
     """
     def _compute_all(self):
         num = len(self)
@@ -151,7 +165,7 @@ class _TestLinearKernel(object):
             ((np.array([1, 0]), np.array([0, 1])), np.array([[1, 0], [0, 1]])),
             ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
         )
-        _test_results(LinearKernel, DATA, do_normalize = False)
+        _test_results(LinearKernel, DATA, do_normalize=False)
 
 class _TestCorrelationKernel(object):
     def test_result(self):
@@ -160,7 +174,7 @@ class _TestCorrelationKernel(object):
             ((np.array([1, 0]), np.array([0, 1])), np.array([[1, -1], [-1, 1]])),
             ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
         )
-        _test_results(CorrelationKernel, DATA, do_normalize = False)
+        _test_results(CorrelationKernel, DATA, do_normalize=False)
 
 class _TestSparseLinearKernel(object):
     def test_results(self):
@@ -170,7 +184,7 @@ class _TestSparseLinearKernel(object):
             (({0:1.0}, {1:1.0}), np.array([[1, 0], [0, 1]])),
             (({0:1.0, 1:1.0}, {0:1.0, 1:1.0}), np.array([[2, 2], [2, 2]])),
         )
-        _test_results(SparseLinearKernel, DATA, do_normalize = False)
+        _test_results(SparseLinearKernel, DATA, do_normalize=False)
 
 class _TestSetKernel(object):
     def test_results(self):
@@ -180,4 +194,4 @@ class _TestSetKernel(object):
             ((set([0]), set([0])), np.array([[1, 1], [1, 1]])),
             ((set(["a", "b"]), set(["a", "b"])), np.array([[2, 2], [2, 2]])),
         )
-        _test_results(SetKernel, DATA, do_normalize = False)
+        _test_results(SetKernel, DATA, do_normalize=False)
