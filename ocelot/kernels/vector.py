@@ -42,8 +42,8 @@ class IntersectionKernel(Kernel):
         Ordered collection of real-valued vectors (e.g. histograms).
     """
     def _compute_all(self):
-        k = np.zeros((num, num))
-        phis = np.array(self._entities)
+        k = np.zeros((num, num), dtype=self.dtype)
+        phis = np.array(self._entities, dtype=self.dtype)
         for i in xrange(phis.shape[0]):
             for j in xrange(i, phis.shape[0]):
                 k[i,j] = np.sum(np.minimum(phi[i], phi[j]))
