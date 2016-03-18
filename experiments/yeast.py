@@ -2,13 +2,14 @@
 
 from os.path import join, basename
 import numpy as np
+import pandas as pd
 from itertools import product
-from collections import Counter
+from collections import defaultdict, Counter
 from glob import glob
 
 from ocelot.kernels import *
 from ocelot.microarray import read_pcl, GeneExprKernel
-from ocelot.services import iterate_csv, InterProTSV
+from ocelot.services import InterProTSV
 
 class SGDGeneExprKernel(GeneExprKernel):
     """A yeast-specific gene expression kernel.
@@ -51,7 +52,7 @@ class YeastProteinComplexKernel(Kernel):
 
     It uses the protein complex file located at::
 
-        $src/yeast/ppi/CYC2008_complex.tab
+        ${src}/yeast/ppi/CYC2008_complex.tab
 
     Parameters
     ----------
@@ -59,36 +60,27 @@ class YeastProteinComplexKernel(Kernel):
         Map ORF feature name -> index.
     src : str
         Path to the data directory.
-    gamma : float
+    beta : float
         Diffusion parameter.
     """
-    def __init__(self, p_to_i, src, *args, **kwargs):
+    def __init__(self, p_to_i, src, beta=1.0, *args, **kwargs):
         self._path = join(src, "yeast", "ppi", "CYC2008_complex.tab")
+        self._beta = beta
         super(YeastProteinComplexKernel, self).__init__(p_to_i, *args, **kwargs)
 
-    def _read_complex_to_orf(self):
-        FIELDS = ("ORF", "_", "COMPLEX")
-        complex_to_orfs = {}
-        for row in iterate_csv(self._path, delimiter = "\t", num_skip = 1,
-                               fieldnames = FIELDS):
-            orf, cplex = row["ORF"], row["COMPLEX"]
-            if not cplex in complex_to_orfs:
-                complex_to_orfs[cplex] = set()
-            complex_to_orfs[cplex].add(orf)
-        return complex_to_orfs
-
     def _compute_all(self):
+        df = pd.read_csv(self._path, sep="\t")
+        complex_to_orfs = defaultdict(set)
+        for _, row in df.iterrows():
+            complex_to_orfs[row.Complex].add(row.ORF)
+
         p_to_i = self._entities
+        matrix = np.zeros((len(self), len(self)), dtype=self.dtype)
+        for orfs_in_complex in complex_to_orfs.itervalues():
+            indices = [p_to_i[orf] for orf in orfs_in_complex if orf in p_to_i]
+            matrix[np.ix_(indices, indices)] = 1
 
-        complex_to_orfs = self._read_complex_to_orf()
-
-        adjmatrix = np.zeros((len(self), len(self)), dtype=self.dtype)
-        for _, orfs in complex_to_orfs.iteritems():
-            orf_indices = [p_to_i[orf] for orf in orfs if orf in p_to_i]
-            for i, j in product(orf_indices, orf_indices):
-                if i != j:
-                    adjmatrix[i,j] = 1
-        return DiffusionKernel(adjmatrix).compute()
+        return DiffusionKernel(matrix, beta=self._beta).compute()
 
 class InterProKernel(Kernel):
     """A simple domain kernel built around InterPro.
