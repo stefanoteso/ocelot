@@ -24,7 +24,7 @@ class RandomKernel(LinearKernel):
     For debugging only.
     """
     def _compute_all(self):
-        phis = np.random.normal(0, 1, size=(len(self), 10))
+        phis = np.random.normal(0, 1, size=(len(self), 10)).astype(self.dtype)
         return np.dot(phis, phis.T)
 
 class IntersectionKernel(Kernel):
