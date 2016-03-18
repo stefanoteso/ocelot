@@ -15,7 +15,7 @@ class LinearKernel(Kernel):
         Ordered collection of real-valued vectors.
     """
     def _compute_all(self):
-        phis = np.array(self._entities)
+        phis = np.array(self._entities, dtype=self.dtype)
         return np.dot(phis, phis.T)
 
 class RandomKernel(LinearKernel):
