@@ -3,7 +3,7 @@
 import os
 import cPickle as pickle
 import numpy as np
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from SPARQLWrapper import SPARQLWrapper, JSON
 from sklearn.utils import check_random_state
 
@@ -295,7 +295,7 @@ def compute_p_folds(ps, p_to_features, num_folds=10, rng=None):
 
     return folds
 
-def _distribute_pps(folds, pps, state, pp_to_feats):
+def _distribute_pps(folds, pps, pp_to_feats, state, rng):
 
     # Map from individual features to pairs
     feat_to_pps = defaultdict(set)
@@ -310,7 +310,7 @@ def _distribute_pps(folds, pps, state, pp_to_feats):
     while len(feat_to_pps):
 
         # Shuffle the folds
-        folds = permute(folds, self._rng)
+        folds = permute(folds, rng)
 
         # Pick the term with the least unallocated pairs
         cur_feat, symm_pps = min(feat_to_pps.iteritems(),
@@ -348,7 +348,7 @@ def _check_ppi_folds(ps, pps):
     assert all(p in ps for p, _ in pps), \
         "singletons and pairs do not match"
 
-def compute_ppi_folds(ps, pp_pos, pp_neg, p_to_feats, num_folds=10):
+def compute_ppi_folds(ps, pp_pos, pp_neg, p_to_feats, num_folds=10, rng=None):
     """Generates interaction-based folds.
 
     Folds are composed of *pairs* of (known interacting or assumed
@@ -385,7 +385,7 @@ def compute_ppi_folds(ps, pp_pos, pp_neg, p_to_feats, num_folds=10):
         q_feats = p_to_feats.get(q, set())
         pp_to_feats[(p, q)] = p_feats | q_feats
 
-    _distribute_pps(folds, pp_pos, pp_to_feats, True)
-    _distribute_pps(folds, pp_neg, pp_to_feats, False)
+    _distribute_pps(folds, pp_pos, pp_to_feats, True, rng)
+    _distribute_pps(folds, pp_neg, pp_to_feats, False, rng)
     _check_folds(ps, pp_pos | pp_neg, folds)
     return folds
