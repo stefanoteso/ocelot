@@ -2,12 +2,14 @@
 
 import os
 import cPickle as pickle
+import numpy as np
 from collections import namedtuple
 from SPARQLWrapper import SPARQLWrapper, JSON
 from sklearn.utils import check_random_state
 
 from ocelot import *
 from ocelot.ontology import BINDINGS
+from ocelot.utils import permute
 
 Stage = namedtuple("Stage", ["f", "inputs", "outputs"])
 
@@ -263,6 +265,35 @@ class Experiment(object):
         kernel.check_and_fixup(tol)
         kernel.draw(os.path.join(self.dst, png_path))
         return kernel.compute(),
+
+def compute_p_folds(ps, p_to_features, num_folds=10, rng=None):
+    """Generates balanced protein folds.
+
+    Parameters
+    ----------
+    ps : list
+        Ordered collection of protein IDs.
+    p_to_features : dict
+        Map from protein IDs to sets of features.
+
+    Returns
+    -------
+    folds : list
+        A partition of the proteins as a list of sets of protein IDs.
+    """
+    ps = permute(ps, rng=rng)
+    num_ps_per_fold = len(ps) // num_folds
+
+    folds, base = [], 0
+    for k in range(num_folds):
+        ps_in_fold = set(ps[base:base + num_ps_per_fold])
+        base += num_ps_per_fold
+        if k == num_folds - 1:
+            ps_in_fold.update(ps[base:])
+        folds.append(ps_in_fold)
+    assert sum(map(len, folds)) == len(ps)
+
+    return folds
 
 def _distribute_pps(folds, pps, state, pp_to_feats):
 
