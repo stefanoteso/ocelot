@@ -6,9 +6,9 @@ from os.path import join
 from itertools import product
 from collections import defaultdict
 from textwrap import dedent
-from ocelot.services import CDHit
 from ocelot.go import GODag
 from ocelot.kernels import *
+from ocelot.fasta import cdhit
 from ocelot.utils import permute
 from ocelot import Experiment, Stage, PHONY, compute_ppi_folds
 from .yeast import *
@@ -433,7 +433,7 @@ class SGDExperiment(Experiment):
 
         # Cluster the filtered sequences with CD-HIT
         filtered_p_seq = zip(filtered_ps, [p_to_seq[p] for p in filtered_ps])
-        _, clusters = CDHit().run(filtered_p_seq, threshold=cdhit_threshold)
+        _, clusters = cdhit(filtered_p_seq, threshold=cdhit_threshold)
         print "found {} clusters of proteins at CD-HIT threshold {}" \
                 .format(len(clusters), cdhit_threshold)
 
