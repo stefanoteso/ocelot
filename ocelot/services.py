@@ -4,7 +4,7 @@ import os, errno, hashlib
 import numpy as np
 import multiprocessing as mp
 import itertools as it
-from ocelot.fasta import write_fasta
+from ocelot.fasta import read_fasta, write_fasta
 
 # The amino acid alphabet (sorted lexicographically).
 AMINOACIDS = ("A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P",
@@ -187,7 +187,7 @@ class CDHit(object):
                     members.add((header, perc))
             clusters.append(members)
 
-        return [ k for k, v in fasta.read("temp.cdhit") ], clusters
+        return [ k for k, v in read_fasta("temp.cdhit") ], clusters
 
 # The amino acid alphabet (sorted as in PSSM files).
 AMINOACIDS_PSSM = ("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K",
