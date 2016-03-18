@@ -312,9 +312,8 @@ class SGDExperiment(Experiment):
             strand  = bindings[u"strand"]
             start   = bindings[u"start"]
             stop    = bindings[u"stop"]
-            assert strand in ("C", "W")
             p_to_context[orf] = \
-                (chrom, min(start, stop) + 0.5 * np.fabs(start - stop))
+                (chrom, strand, start, stop)
         return p_to_context
 
     def _get_sgd_pin(self, ps=None, manual_only=False):
@@ -855,7 +854,12 @@ class SGDExperiment(Experiment):
 
     def _compute_p_colocalization_kernel(self, ps):
         p_to_context = self._get_sgd_id_to_context()
-        contexts = [p_to_context[p] for p in ps]
+        contexts = []
+        for p in ps:
+            assert p in p_to_context
+            chromosome, strand, start, stop = p_to_context[p]
+            middle = min(start, stop) + 0.5 * abs(start - stop)
+            contexts.append((chromosome, middle))
         return self.compute_kernel(ColocalizationKernel,
                                     "p_colocalization_kernel",
                                     contexts, gamma=1.0)
