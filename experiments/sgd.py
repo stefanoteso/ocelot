@@ -10,7 +10,7 @@ from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.fasta import cdhit
 from ocelot.utils import permute
-from ocelot import Experiment, Stage, PHONY, compute_ppi_folds
+from ocelot import Experiment, Stage, PHONY, compute_p_folds, compute_ppi_folds
 from .yeast import *
 
 class SGDExperiment(Experiment):
@@ -65,13 +65,17 @@ class SGDExperiment(Experiment):
                    'pp_pos_hq', 'pp_neg', ],
                   ['__dump_raw']),
 
+            Stage(lambda *args, **kwargs: (compute_p_folds(*args, **kwargs),),
+                  ['filtered_ps', 'filtered_p_to_term_ids'],
+                  ['p_folds']),
+
             Stage(lambda *args, **kwargs: (compute_ppi_folds(*args, **kwargs),),
                   ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'filtered_p_to_term_ids'],
-                  ['folds']),
+                  ['pp_folds']),
 
             Stage(self._dump_stats,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'folds'],
+                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'pp_folds'],
                   ['__dummy_stats']),
 
             Stage(self._compute_p_colocalization_kernel,
@@ -134,7 +138,7 @@ class SGDExperiment(Experiment):
 
             Stage(self._write_sbr_dataset,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_neg', 'pp_indices', 'folds'],
+                   'pp_pos_hq', 'pp_neg', 'pp_indices', 'pp_folds'],
                   ['__dummy_sbr']),
 
             Stage(PHONY,
@@ -493,6 +497,12 @@ class SGDExperiment(Experiment):
 
         return dag, dag.get_p_to_term_ids()
 
+    @staticmethod
+    def _check_ps_pps(ps, pps):
+        assert all((q, p) in pps for (p, q) in pps), \
+            "pairs are not symmetric"
+        assert all(p in ps for p, _ in pps), \
+            "singletons and pairs do not match"
 
     def _get_positive_pins(self, ps):
         """Computes the high-quality positive interactions, high+low-quality
