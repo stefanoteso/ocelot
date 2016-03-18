@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-def read_fasta(self, path):
+def read_fasta(path):
     """Reads a FASTA file (generator).
 
     Start-of-header symbols and end-of-sequence symbols (a.k.a. "*") are
