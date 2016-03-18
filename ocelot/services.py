@@ -133,62 +133,6 @@ class Binary(object):
         ret = pipe.wait()
         return ret, out, err
 
-class CDHit(object):
-    """A wrapper around the local `cdhit <http://weizhongli-lab.org/cd-hit/>`_
-    installation.
-
-    :param path: path to the ``cdhit`` binary (default: ``/usr/bin/cdhit``)
-
-    .. todo:
-        Use tempfile.
-
-    .. todo:
-        Get rid of the temporary files.
-
-    .. todo:
-        Add support for the gazillion missing options.
-    """
-    def __init__(self, path = "/usr/bin/cdhit"):
-        self.cdhit = Binary(path)
-    def run(self, pairs, **kwargs):
-        """Cluster protein sequences using CD-HIT.
-
-        :param pairs: pairs of the form ``(id, sequence)``.
-        :param threshold: clustering threshold (default: ``0.9``).
-        :returns: list of cluster representatives, list of clusters 
-        """
-        write_fasta("temp.fasta", pairs)
-        args = [ "-i {}".format("temp.fasta"),
-                 "-o {}".format("temp.cdhit"),
-                 "-c {}".format(kwargs.get("threshold", 0.8)) ]
-        ret, out, err = self.cdhit.run(args)
-        if ret != 0:
-            raise RuntimeError("cdhit exited with errno '{}'".format(ret))
-
-        with open("temp.cdhit.clstr") as fp:
-            clusters = []
-            members = None
-            for line in fp:
-                if line.startswith(">"):
-                    if not members is None:
-                        clusters.append(members)
-                    members = set()
-                else:
-                    words = line.split()
-                    if len(words) == 4:
-                        _, _, header, _ = words
-                        perc = 1.0
-                    elif len(words) == 5:
-                        _, _, header, _, perc = words
-                        perc = float(perc.strip("%")) / 100.0
-                    else:
-                        raise SyntaxError("unexpected line '{}'".format(line))
-                    header = header[1:-3]
-                    members.add((header, perc))
-            clusters.append(members)
-
-        return [ k for k, v in read_fasta("temp.cdhit") ], clusters
-
 # The amino acid alphabet (sorted as in PSSM files).
 AMINOACIDS_PSSM = ("A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K",
                    "M", "F", "P", "S", "T", "W", "Y", "V")
