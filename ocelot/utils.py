@@ -23,12 +23,15 @@ def permute(l, rng=None):
     perm = list(rng.permutation(len(l)))
     return [l[perm[i]] for i in range(len(l))]
 
-def split_tr_ts(array, indices0, indices1):
+def split_tr_ts(array, indices0, indices1=None):
+    if indices1 is None:
+        indices1 = sorted(set(range(len(array.shape[0]))) - set(indices0))
     if array.ndim == 1:
         return array[indices0], array[indices1]
     elif array.ndim == 2:
-        return array[np.ix_(tr_indices, tr_indices)], \
-               array[np.ix_(ts_indices, tr_indices)]
+        assert array.shape[0] == array.shape[1]
+        return array[np.ix_(indices1, indices1)], \
+               array[np.ix_(indices0, indices1)]
     else:
         raise ValueError("invalid ndim")
 
