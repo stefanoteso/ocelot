@@ -255,13 +255,13 @@ class Experiment(object):
         targets = ["__all"] if targets is None else targets
         self._scheduler.run(targets, context=context, force=force)
 
-    @staticmethod
-    def _compute_kernel(Kernel, *args, **kwargs):
+    def compute_kernel(self, Kernel, png_path, *args, **kwargs):
         """Wrapper to compute a kernel and fix it up."""
         # TODO move the logic to ocelot.Kernel
         tol = kwargs.pop("tol", 1e-10)
         kernel = Kernel(*args, **kwargs)
         kernel.check_and_fixup(tol)
+        kernel.draw(os.path.join(self.dst, png_path))
         return kernel.compute(),
 
 def _distribute_pps(folds, pps, state, pp_to_feats):

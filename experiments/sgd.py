@@ -852,14 +852,18 @@ class SGDExperiment(Experiment):
         return None,
 
 
+
     def _compute_p_colocalization_kernel(self, ps):
         p_to_context = self._get_sgd_id_to_context()
         contexts = [p_to_context[p] for p in ps]
-        return self._compute_kernel(ColocalizationKernel, contexts, gamma=1.0)
+        return self.compute_kernel(ColocalizationKernel,
+                                    "p_colocalization_kernel",
+                                    contexts, gamma=1.0)
 
     def _compute_p_gene_expression_kernel(self, ps, p_to_feat):
         feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
-        return self._compute_kernel(SGDGeneExprKernel,
+        return self.compute_kernel(SGDGeneExprKernel,
+                                    "p_gene_expression_kernel",
                                     feat_to_i, self.src,
                                     ["Gasch_2000_PMID_11102521",
                                      "Spellman_1998_PMID_9843569"],
@@ -867,25 +871,24 @@ class SGDExperiment(Experiment):
 
     def _compute_p_complex_kernel(self, ps, p_to_feat):
         feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
-        return self._compute_kernel(YeastProteinComplexKernel,
+        return self.compute_kernel(YeastProteinComplexKernel,
+                                    "p_complex_kernel",
                                     feat_to_i, self.src)
 
     def _compute_p_interpro_kernel(self, ps):
-        return self._compute_kernel(InterProKernel, ps,
-                                    join(self.src, "interpro"), mode="match")
+        return self.compute_kernel(InterProKernel, "p_interpro_match_kernel",
+                                    ps, join(self.src, "interpro"), mode="match")
 
     def _compute_p_interpro_count_kernel(self, ps):
-        return self._compute_kernel(InterProKernel, ps,
-                                    join(self.src, "interpro"), mode="count")
+        return self.compute_kernel(InterProKernel, "p_interpro_count_kernel",
+                                    ps, join(self.src, "interpro"), mode="count")
 
     def _compute_p_pssm_kernel(self, ps, p_to_seq):
-        return self._compute_kernel(PSSMKernel, ps, p_to_seq,
+        return self.compute_kernel(PSSMKernel, "p_pssm_kernel", ps, p_to_seq,
                                     join(self.src, "pssm"), k=4, threshold=6.0)
 
     def _compute_average_kernel(self, *matrices):
         return sum(matrices) / len(matrices),
-
-
 
     def _compute_p_pp_order(self, ps, pp_pos, pp_neg):
         p_to_i = {p: i for i, p in enumerate(sorted(ps))}
@@ -898,7 +901,8 @@ class SGDExperiment(Experiment):
         return p_to_i, pp_indices
 
     def _compute_pp_kernel(self, pp_indices, submatrix):
-        return self._compute_kernel(PairwiseKernel, pp_indices, submatrix),
+        return self.compute_kernel(PairwiseKernel, "pp_average_kernel",
+                                   pp_indices, submatrix),
 
 
     def _write_sbr_datapoints(self, p_to_i, pp_indices):
