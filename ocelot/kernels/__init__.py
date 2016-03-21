@@ -56,7 +56,7 @@ class Kernel(object):
         Relies on `self._compute_all`.
         """
         if self._matrix is None:
-            self._matrix = self._compute_all()
+            self._matrix = np.array(self._compute_all())
             if self._do_normalize:
                 self._matrix = self._normalize(self._matrix)
         return self._matrix
