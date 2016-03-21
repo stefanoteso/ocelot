@@ -172,9 +172,7 @@ def run_psiblast(sequence, db="nr", evalue=10.0, matrix="BLOSUM62",
 
     return read_pssm(basename + ".ascii-pssm")
 
-def run_all_vs_all_blast(sequences_or_fasta,
-                         mkblast="/usr/bin/mkblast",
-                         blastp="/usr/bin/blastp")
+def run_blastall(sequences, mkblast="/usr/bin/mkblast", blastp="/usr/bin/blastp"):
 
     # ncbi-blast-2.2.24+/bin/makeblastdb -in good_proteins.fasta -dbtype prot -out my_prot_blast_db
     args = [
