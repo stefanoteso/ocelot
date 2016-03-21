@@ -1,0 +1,190 @@
+\documentclass{bioinfo}
+\copyrightyear{2016}
+\pubyear{2016}
+
+\usepackage{hyperref}
+
+\begin{document}
+\firstpage{1}
+
+\title[short Title]{Integrated Prediction of Protein Function and Interactions}
+\author[Sample \textit{et~al}]{Claudio Sacc\`a\,$^{1}$, Stefano Teso\,$^{2}$, Michelangelo Diligenti\,$^{1*}$, and Andrea Passerini\,$^2$\footnote{to whom correspondence should be addressed}}
+\address{
+    $^{1}$Dipartimento di Ingegneria dell'Informazione e Scienze Matematiche, University of Siena, Siena, Italy\\
+    $^{2}$Dipartimento di Ingegneria e Scienza dell'Informazione, University of Trento, Trento, Italy
+}
+\history{Received on XXXXX; revised on XXXXX; accepted on XXXXX}
+\editor{Associate Editor: XXXXXXX}
+
+\maketitle
+
+\begin{abstract}
+
+\section{Motivation:}
+We want to win obvious improvement of prediction accuracy so we can publish
+and get money!
+
+\section{Results:}
+Not my problem!
+
+\section{Availability:}
+Elsewhere!
+
+\section{Contact:} \href{Andrea Passerini}{passerini@disi.unitn.it}
+\end{abstract}
+
+
+
+\section{Introduction}
+
+Fix this dot:
+$$ \odot $$
+
+
+
+\section{Approach}
+
+Fool you into fixing the dot, then run away with the money/girls/fast car.
+
+\section{Background}
+
+\paragraph{Function}
+
+\paragraph{Interactions}
+
+\paragraph{Hybrid competitors?}
+
+\begin{methods}
+
+
+
+\section{Methods}
+
+\subsection{Dataset}
+
+\begin{itemize}
+    \item Dataset taken from manually curated portions of the SGD database. We
+    consider all validated ORFs at least 50 residues long.
+
+    \item Sequences are filtered with CD-HIT with a threshold of 80.
+
+    \item GO annotations: taken from BioGRID, we keep manual annotations only.
+
+    \item Interactions: taken from BioGRID via SGD. Extracted from the
+    literature.
+
+    \item Negative interactions sampled from the complement of the known
+    positive interactions, minus the STRING database to avoid possible
+    positives.
+
+\end{itemize}
+
+
+
+\section{Experimental analysis}
+
+\begin{itemize}
+
+    \item Two comparisons with GOstrut:
+
+    \begin{itemize}
+
+        \item Compare GOstrut and SBR with our kernel
+
+        \item Compare GOstrut and SBR with their kernel
+
+        \item Potentially figure out the best combination of kernels
+
+    \end{itemize}
+
+    \item Genome-wide experiment
+
+\end{itemize}
+
+
+
+\section{Empirical Analysis}
+
+\subsection{Versus GOstrut: our kernels}
+
+\begin{itemize}
+
+    \item Genetic context (colocalization) kernel
+
+    \item Coexpression kernel
+
+    \item Complex kernel
+
+    \item Domain kernel
+
+    \item Complex kernel
+
+    \item Profile kernel
+
+    \item Average kernel
+
+\end{methods}
+
+\subsection{Versus GOstrut: their kernels}
+
+\begin{itemize}
+
+    \item All-vs-all blast linear kernel
+
+    \item Localization kernel with Wolf PSort
+
+    \item Transmembrane helices linear kernel
+
+    \item N- and C- termini composition kernel
+
+    \item Low-complexity segment kernel
+
+    \item PPI kernel XXX
+
+    \item Gene expression kernel XXX
+
+    \item Co-mention kernel XXX
+
+\end{methods}
+
+\subsection{Genome-wide experiment on yeast}
+
+\begin{itemize}
+
+    \item Huge number of possible interactions; we can not possibly hope
+    to compute the full pairwise Gram matrix
+
+    \item As long as we do not have rules between interactions, we only need
+    the train-train and train-test portion of the Gram matrix.
+
+\end{itemize}
+
+
+\section{Discussion}
+
+WRITEME
+
+
+
+\section{Conclusion}
+
+WRITEME
+
+
+
+\section*{Acknowledgements}
+
+WRITEME
+
+
+
+\paragraph{Funding\textcolon}
+
+WRITEME
+
+
+
+\bibliographystyle{unsrt} % FIXME use bioinformatics.bst
+\bibliography{document}
+
+\end{document}
