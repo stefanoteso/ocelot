@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import hashlib
+import multiprocessing as mp
+from os import makedirs
+from os.path import join
 from ocelot.utils import run_binary
 
 def read_fasta(path):
@@ -109,3 +113,61 @@ def cdhit(pairs, threshold=0.8, cdhit_path="/usr/bin/cdhit"):
         raise RuntimeError("cdhit exited with errno '{}'".format(ret))
 
     return _read_cdhit_results("temp.cdhit")
+
+def run_psiblast(sequence, db="nr", evalue=10.0, matrix="BLOSUM62",
+                 num_iters=2, num_threads=0, cache="/tmp/psiblast",
+                 psiblast="/usr/bin/psiblast"):
+    """Runs NCBI PSI-Blast.
+
+    Parameters
+    ----------
+    sequence : str
+        Sequence to align.
+    db : str, optional. (defaults to "nr")
+        Name of or path to the BLAST database.
+    evalue : float, optional. (defaults to 10)
+        E-value.
+    matrix : str, optional. (defaults to "BLOSUM62")
+        Similarity matrix.
+    num_iters : int, optional. (defaults to 2)
+        Number of BLAST iterations, minimum 2.
+    num_threads : int, optional. (defaults to 0)
+        Number of threads to use. Non-positive means all.
+    cache : str, optional. (defaults to "/tmp/psiblast")
+        Path to temporary directory.
+    psiblast : str, optional. (defaults to "/usr/bin/psiblast")
+        Path to the psiblast binary.
+    """
+    try:
+        makedirs(cache)
+    except OSError, e:
+        if e.errno != errno.EEXIST:
+            raise RuntimeError("can not create cache directory '{}': {}" \
+                                .format(cache, e))
+
+    h = hashlib.md5()
+    h.update("_".join([sequence, db, evalue, matrix, num_iters]))
+    basename = join(cache, h.hexdigest())
+
+    write_fasta(basename + ".f", [("temp", sequence)])
+
+    if num_threads <= 0:
+        num_threads = mp.count_cpus()
+
+    args = [
+        "-query {}".format(basename + ".f"),
+        "-out {}".format(basename + ".f.out"),
+        "-out_pssm {}".format(basename + ".pssm"),
+        "-out_ascii_pssm {}".format(basename + ".ascii-pssm"),
+        "-db {}".format(db),
+        "-evalue {}".format(evalue),
+        "-matrix {}".format(matrix),
+        "-num_iterations {}".format(num_iters),
+        "-num_threads {}".format(num_threads),
+    ]
+
+    ret, out, err = Binary("psiblast").run(args)
+    if ret != 0:
+        raise RuntimeError("psiblast exited with error '{}': {}".format(ret, err))
+
+    return read_pssm(basename + ".ascii-pssm")
