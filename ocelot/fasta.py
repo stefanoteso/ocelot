@@ -171,3 +171,28 @@ def run_psiblast(sequence, db="nr", evalue=10.0, matrix="BLOSUM62",
         raise RuntimeError("psiblast exited with error '{}': {}".format(ret, err))
 
     return read_pssm(basename + ".ascii-pssm")
+
+def run_all_vs_all_blast(sequences_or_fasta,
+                         mkblast="/usr/bin/mkblast",
+                         blastp="/usr/bin/blastp")
+
+    # ncbi-blast-2.2.24+/bin/makeblastdb -in good_proteins.fasta -dbtype prot -out my_prot_blast_db
+    args = [
+        "-in sequences.fasta",
+        "-dbtype prot",
+        "-out sequences",
+    ]
+    ret, out, err = run_binary(mkblast, args)
+    if ret != 0:
+        raise RuntimeError("mkblast exited with errno '{}'".format(ret))
+
+    args = [
+        "-db {}".format(db),
+        "-query {}".format("sequences.fasta"),
+        "-outfmt {}".format(6),
+        "-out".format("allvsall.tsv"),
+        "-num_threads {}".format(num_threads),
+    ]
+    ret, out, err = run_binary(blastp, args)
+    if ret != 0:
+        raise RuntimeError("mkblast exited with errno '{}'".format(ret))
