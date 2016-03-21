@@ -44,46 +44,6 @@ def iterate_csv(path, num_skip = 0, **kwargs):
                 continue
             yield row_as_dict
 
-class PCL(object):
-    """Thin wrapper around `PCL <http://smd.princeton.edu/help/formats.shtml#pcl>`_
-    gene expression files.
-
-    The file is simply a TSV where the first three columns are fixed,
-    followed by a variable number of columns (one per condition).
-    """
-    def read(self, path):
-        """Reads a PCL file into a dictionary.
-
-        .. note::
-
-            This class uses the ``NAME`` column, rather than the ``YORF`` colum,
-            as the key to the dictionary. The ``YORF``'s tend not to be unique
-            within the file.
-
-        .. note::
-
-            This class currently ignores the ``GWEIGHT``.
-
-        :param path: path to the PCL file.
-        :returns: a {``name``: ``expression-levels``} dictionary.
-        """
-        FIELDS = ("ORF", "NAME", "GWEIGHT")
-        orf_to_expression = {}
-        num_conditions = -1
-        for row in iterate_csv(path, delimiter = "\t", fieldnames = FIELDS,
-                               num_skip = 2):
-            orf = row["NAME"]
-            assert not orf in orf_to_expression, orf
-
-            expression_levels = map(float, row[None])
-            if num_conditions < 0:
-                num_conditions = len(expression_levels)
-            else:
-                assert num_conditions == len(expression_levels)
-
-            orf_to_expression[orf] = np.array(expression_levels)
-        return orf_to_expression, num_conditions
-
 class InterProTSV(object):
     """Reader for `InterPro <http://www.ebi.ac.uk/interpro/>`_ tab-separated values files.
 
