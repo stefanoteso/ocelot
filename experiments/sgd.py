@@ -10,7 +10,7 @@ from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.fasta import cdhit
 from ocelot.utils import permute
-from ocelot import Experiment, Stage, PHONY, compute_p_folds, compute_ppi_folds
+from ocelot import Experiment, Stage, PHONY, compute_p_folds, compute_pp_folds
 from .yeast import *
 
 class SGDExperiment(Experiment):
@@ -65,17 +65,17 @@ class SGDExperiment(Experiment):
                    'pp_pos_hq', 'pp_neg', ],
                   ['__dump_raw']),
 
-            Stage(lambda *args, **kwargs: (compute_p_folds(*args, **kwargs),),
+            Stage(lambda *args: compute_p_folds(*args, rng=self._rng),
                   ['filtered_ps', 'filtered_p_to_term_ids'],
-                  ['p_folds']),
+                  ['p_folds', 'p_fold_balance']),
 
-            Stage(lambda *args, **kwargs: (compute_ppi_folds(*args, **kwargs),),
-                  ['filtered_ps', 'pp_pos_hq', 'pp_neg', 'filtered_p_to_term_ids'],
+            Stage(lambda *args: (compute_pp_folds(*args, rng=self._rng),),
+                  ['p_folds', 'pp_pos_hq', 'pp_neg'],
                   ['pp_folds']),
 
             Stage(self._dump_stats,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'pp_folds'],
+                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'p_folds', 'pp_folds'],
                   ['__dummy_stats']),
 
             Stage(self._compute_p_colocalization_kernel,
@@ -138,7 +138,7 @@ class SGDExperiment(Experiment):
 
             Stage(self._write_sbr_dataset,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_neg', 'pp_indices', 'pp_folds'],
+                   'pp_pos_hq', 'pp_neg', 'pp_indices', 'p_folds', 'pp_folds'],
                   ['__dummy_sbr']),
 
             Stage(PHONY,
@@ -555,45 +555,6 @@ class SGDExperiment(Experiment):
         return pp_neg,
 
 
-    def _check_folds(self, ps, pps, folds):
-        """Checks that the folds make sense."""
-
-        # # All proteins must belong to at least a fold
-        # ps_in_folds = set()
-        # for fold in folds:
-        #     ps_in_folds.update(p for p, _, _ in fold)
-        #     ps_in_folds.update(q for _, q, _ in fold)
-        # assert len(ps_in_folds) == len(set(ps))
-        # del ps_in_folds
-
-        # All protein pairs must belong to at least a fold
-        pps_in_folds = set()
-        for fold in folds:
-            pps_in_folds.update((p, q) for p, q, _ in fold)
-        assert len(pps_in_folds) == len(set(pps))
-        del pps_in_folds
-
-        # Interactions must be symmetric
-        for k, fold in enumerate(folds):
-            assert all((q, p, state) in fold for (p, q, state) in fold), \
-                "fold {} is not symmetric".format(k)
-
-        # Folds must not overlap
-        for (k1, fold1), (k2, fold2) in product(enumerate(folds), enumerate(folds)):
-            if k1 >= k2:
-                continue
-            for (p1, q1, state1), (p2, q2, state) in product(fold1, fold2):
-                assert (p1, q1) != (p2, q2), \
-                    "folds {} and {} overlap".format(k1, k2)
-
-        # Interactions must be either positive or negative, but not both
-        interactions = set()
-        for fold in folds:
-            interactions.update(fold)
-        for p, q, state in interactions:
-            assert not(p, q, not state) in interactions, \
-                "folds are inconsistent"
-
     def _term_to_predicate(self, term):
         assert len(term.namespace)
         assert term.level >= 0
@@ -667,114 +628,8 @@ class SGDExperiment(Experiment):
                                      pps, with_in=False)
         return None,
 
-    def _compute_folds(self, ps, pp_pos, pp_neg, p_to_term_ids, num_folds=10):
-        """Generates the folds.
-
-        Folds are composed of *pairs* of (known interacting or assumed
-        non-interacting) proteins.
-
-        Protein pairs are split evenly according to their function.
-
-        No two pairs can occur in distinct folds.
-
-        However, individual proteins may occur in different folds, and some
-        proteins may not occur altogether.
-
-        Parameters
-        ----------
-        pp_pos : set
-            Positive interactions.
-        pp_neg : set
-            Negative interactions.
-        p_to_term_ids : dict
-            Map between proteins and GO terms IDs.
-        num_folds : int, optional
-            Number of folds, defaults to 10.
-
-        Returns
-        -------
-        folds : list
-            Each fold is a set of triples of the form (protein, protein, state).
-        """
-
-        # XXX take into consideration INTRA interactions
-        # XXX take into consideration unbound proteins
-        # XXX take into consideration unannotated proteins
-
-        def distribute_pps(folds, pps, state, p_to_term_ids):
-
-            # Map from pairs to term IDs
-            pp_to_term_ids = {}
-            for p, q in pps:
-                p_term_ids = p_to_term_ids.get(p, set())
-                q_term_ids = p_to_term_ids.get(q, set())
-                pp_to_term_ids[(p, q)] = p_term_ids | q_term_ids
-
-            # Map from term IDs to pairs
-            term_id_to_pps = defaultdict(set)
-            for pp, term_ids in pp_to_term_ids.iteritems():
-                if not len(term_ids):
-                    term_id_to_pps["unannotated"].add(pp)
-                else:
-                    for term_id in term_ids:
-                        term_id_to_pps[term_id].add(pp)
-
-            # Distribute the interactions among the folds
-            while len(term_id_to_pps):
-
-                # Shuffle the folds
-                folds = permute(folds, self._rng)
-
-                # Pick the term with the least unallocated pairs
-                cur_term_id, symm_pps = min(term_id_to_pps.iteritems(),
-                                            key=lambda id_pps: len(id_pps[-1]))
-
-                print "distributing interactions with term {} (# interactions = {})".format(cur_term_id, len(symm_pps))
-
-                # Desymmetrize the pps to add
-                asymm_pps = set()
-                for p, q in symm_pps:
-                    if not (q, p) in asymm_pps:
-                        asymm_pps.add((p, q))
-
-                # Evenly distribute the associated pairs among all folds.
-                for i, (p, q) in enumerate(sorted(asymm_pps)):
-                    folds[i % len(folds)].update([(p, q, state), (q, p, state)])
-
-                # Update term_to_pps by removing all interactions that we
-                # just allocated
-                new_term_id_to_pps = {}
-                for term_id in term_id_to_pps:
-                    # Skip the term we just processed (it's done, right?)
-                    if term_id == cur_term_id:
-                        continue
-                    new_pps = set(pp for pp in term_id_to_pps[term_id]
-                                  if not pp in symm_pps)
-                    if not len(new_pps):
-                        continue
-                    new_term_id_to_pps[term_id] = new_pps
-                term_id_to_pps = new_term_id_to_pps
-
-        print "generating {} folds...".format(num_folds)
-        folds = [set() for _ in range(num_folds)]
-
-        print "adding {} positive interactions...".format(len(pp_pos))
-        distribute_pps(folds, pp_pos, True, p_to_term_ids)
-        print "adding {} negative interactions...".format(len(pp_neg))
-        distribute_pps(folds, pp_neg, False, p_to_term_ids)
-
-        # XXX proteins that do not interact (or non-interact) with anybody
-        # do not appear in the folds.
-
-        print "checking fold sanity..."
-        self._check_folds(ps, pp_pos | pp_neg, folds)
-
-        return folds,
-
-
-
     def _dump_stats(self, ps, dag, p_to_term_ids, pp_pos_hq, pp_pos_lq, pp_neg,
-                    folds):
+                    p_folds, pp_folds):
         print "DATASET STATISTICS"
 
         print "# proteins =", len(ps)
@@ -809,46 +664,13 @@ class SGDExperiment(Experiment):
             print "level {} has {} terms (of which {} bins) with {} annotations over {} proteins".format(
                 level, num_terms, num_bins, num_annots, num_ps)
 
-        print "FOLD STATISTICS"
-
-        p_to_folds = defaultdict(set)
-        for k, fold in enumerate(folds):
-
-            in_fold_ps, out_fold_ps = set(), set()
-            for l, other_fold in enumerate(folds):
-                s = in_fold_ps if l == k else out_fold_ps
-                s.update(p for p, _, _ in fold)
-                s.update(q for _, q, _ in fold)
-            unique_fold_ps = in_fold_ps - out_fold_ps
-
-            for p in in_fold_ps:
-                p_to_folds[p].add(k)
-
-            num_pos = len({(p, q) for p, q, s in fold if s})
-            num_neg = len({(p, q) for p, q, s in fold if not s})
-
-            # XXX distance to perfection w.r.t. interactions
-
-            print dedent("""\
-                FOLD {} / {} :
-                    # interactions = {} : #pos = {} #neg = {}
-                    # proteins unique to this fold = {}\
-                """).format(k, num_pos + num_neg, len(folds), num_pos, num_neg, len(unique_fold_ps))
-
-        print "# proteins with GO annotations =", len(set(p for p in ps if p in p_to_term_ids and len(p_to_term_ids[p])))
-
-        num_repeats_to_num_p = defaultdict(int)
-        for p, p_folds in p_to_folds.iteritems():
-            num_repeats_to_num_p[len(p_folds)] += 1
-        for num_repeats in sorted(num_repeats_to_num_p):
-            print "# proteins in exactly {} folds = {}".format(
-                num_repeats, num_repeats_to_num_p[num_repeats])
+        # XXX fold statistics
 
         # XXX GO annotation cooccurrence
 
         # Save the PPI and folds as graphml
         graph = nx.Graph()
-        for k, fold in enumerate(folds):
+        for k, fold in enumerate(pp_folds):
             for p, q, state in fold:
                 if not state:
                     continue
@@ -991,7 +813,7 @@ class SGDExperiment(Experiment):
                 fp.write("\n".join(lines))
 
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, pp_pos, pp_neg,
-                           p_to_i, pp_indices, folds):
+                           p_to_i, pp_indices, p_folds, pp_folds):
         """Writes the SBR dataset."""
 
         def term_to_predicate(term):
@@ -1009,9 +831,6 @@ class SGDExperiment(Experiment):
         self._write_sbr_predicates(dag)
         self._write_sbr_rules(dag)
 
-        def fold_to_ps(fold):
-            return set(p for p, _, _ in fold) | set(q for _, q, _ in fold)
-
         def write_functions(path, ps, dag, p_to_term_ids):
             """Writes GO term predicates for each protein in the fold."""
             lines = []
@@ -1025,11 +844,11 @@ class SGDExperiment(Experiment):
             with open(path, "wb") as fp:
                 fp.write("\n".join(lines))
 
-        def write_interactions(path, fold):
+        def write_interactions(path, interactions):
             """Writes IN/3 and BOUND/2 predicates for all (p, q, state) tuples
             in the fold."""
             lines = []
-            for p, q, state in fold:
+            for p, q, state in interactions:
                 lines.append("IN({},{},{}-{})=1".format(p, q, p, q))
                 lines.append("BOUND({}-{})={}".format(p, q, {True:1, False:0}[state]))
             with open(path, "wb") as fp:
@@ -1038,39 +857,33 @@ class SGDExperiment(Experiment):
         p_to_term_ids = dag.get_p_to_term_ids()
 
         # Write the examples for each fold
-        for k, test_set in enumerate(folds):
-            l = (k + 1) % len(folds)
-            validation_set = folds[l]
+        for k, (test_ps, test_pps) in enumerate(zip(p_folds, pp_folds)):
 
-            train_set = set()
-            for i, fold in enumerate(folds):
+            l = (k + 1) % len(pp_folds)
+            valid_ps, valid_pps  = p_folds[l], pp_folds[l]
+
+            train_ps, train_pps = set(), set()
+            for i, (fold_ps, fold_pps) in enumerate(zip(p_folds, pp_folds)):
                 if i != k and i != l:
-                    train_set.update(fold)
+                    train_ps.update(fold_ps)
+                    train_pps.update(fold_pps)
 
-            ps_in_test_set = fold_to_ps(test_set)
-            ps_in_validation_set = fold_to_ps(validation_set) - ps_in_test_set
-            ps_in_train_set = fold_to_ps(train_set) - \
-                (ps_in_test_set | ps_in_validation_set)
-
-            print "fold {} examples: #ps = {}, {}, {}; #pps = {}, {}, {}" \
-                    .format(k, len(ps_in_train_set),
-                            len(ps_in_validation_set), len(ps_in_test_set),
-                            len(train_set), len(validation_set),
-                            len(test_set))
+            print "fold {}: test #ps={} #pps={}; valid #ps={} #pps={}; train #ps={} #pps={}" \
+                    .format(k, len(test_ps), len(test_pps), len(valid_ps),
+                            len(valid_pps), len(train_ps), len(train_pps))
 
             write_functions(join(self.dst, "sbr-fold{}-testset-fun.txt".format(k)),
-                            ps_in_test_set, dag, p_to_term_ids)
-            write_interactions(join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
-                               test_set)
-
+                            test_ps, dag, p_to_term_ids)
             write_functions(join(self.dst, "sbr-fold{}-validset-fun.txt".format(k)),
-                            ps_in_validation_set, dag, p_to_term_ids)
-            write_interactions(join(self.dst, "sbr-fold{}-validset-int.txt".format(k)),
-                               validation_set)
-
+                            valid_ps, dag, p_to_term_ids)
             write_functions(join(self.dst, "sbr-fold{}-trainset-fun.txt".format(k)),
-                            ps_in_train_set, dag, p_to_term_ids)
+                            train_ps, dag, p_to_term_ids)
+
+            write_interactions(join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
+                               test_pps)
+            write_interactions(join(self.dst, "sbr-fold{}-validset-int.txt".format(k)),
+                               valid_pps)
             write_interactions(join(self.dst, "sbr-fold{}-trainset-int.txt".format(k)),
-                               train_set)
+                               train_pps)
 
         return True,
