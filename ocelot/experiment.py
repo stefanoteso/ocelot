@@ -275,23 +275,49 @@ def compute_p_folds(ps, p_to_features, num_folds=10, rng=None):
         Ordered collection of protein IDs.
     p_to_features : dict
         Map from protein IDs to sets of features.
+    num_folds : int, optional. (defaults to 10)
+        Number of folds to generate.
+    rng : None or int or numpy.random.RandomStream, optional. (defaults to None)
+        The RNG.
 
     Returns
     -------
     folds : list
         A partition of the proteins as a list of sets of protein IDs.
     """
-    ps = permute(ps, rng=rng)
-    num_ps_per_fold = len(ps) // num_folds
+    # Map features to proteins that have them
+    feature_to_ps = defaultdict(set)
+    for p, features in p_to_features.iteritems():
+        if not len(features):
+            feature_to_ps["unannotated"].add(p)
+        else:
+            for feature in features:
+                feature_to_ps[feature].add(p)
 
-    folds, base = [], 0
-    for k in range(num_folds):
-        ps_in_fold = set(ps[base:base + num_ps_per_fold])
-        base += num_ps_per_fold
-        if k == num_folds - 1:
-            ps_in_fold.update(ps[base:])
-        folds.append(ps_in_fold)
-    assert sum(map(len, folds)) == len(ps)
+    # Build the folds
+    folds = [set() for _ in range(num_folds)]
+    while len(feature_to_ps):
+
+        # Pick the feature with the least unallocated proteins
+        best_feature, best_ps = min(feature_to_ps.iteritems(),
+                                    key=lambda feature_ps: len(feature_ps[-1]))
+
+        print "picked feature", best_feature, ", distributing", len(best_ps), "proteins"
+
+        # Evenly distribute the associated proteins among all folds
+        folds = permute(folds, rng)
+        for i, p in enumerate(sorted(best_ps)):
+            folds[i % num_folds].add(p)
+
+        # Update the map
+        new_feature_to_ps = {}
+        for feature, ps in feature_to_ps.iteritems():
+            if feature == best_feature:
+                continue
+            unallocated_ps = set(ps) - set(best_ps)
+            if len(unallocated_ps):
+                new_feature_to_ps[feature] = unallocated_ps
+        feature_to_ps = new_feature_to_ps
 
     return folds
 
