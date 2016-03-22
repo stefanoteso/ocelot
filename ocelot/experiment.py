@@ -266,6 +266,7 @@ class Experiment(object):
         kernel.draw(os.path.join(self.dst, png_path))
         return kernel.compute(),
 
+
 def compute_p_folds(ps, p_to_features, num_folds=10, rng=None):
     """Generates balanced protein folds.
 
@@ -319,99 +320,74 @@ def compute_p_folds(ps, p_to_features, num_folds=10, rng=None):
                 new_feature_to_ps[feature] = unallocated_ps
         feature_to_ps = new_feature_to_ps
 
-    return folds
+    # Check that the folds make sense
+    for p in ps:
+        assert sum(int(p in fold) for fold in folds) == 1
 
-def _distribute_pps(folds, pps, pp_to_feats, state, rng):
+    # Compute per-term fold unbalance
+    all_features = set()
+    for p, features in p_to_features.iteritems():
+        all_features.update(features)
 
-    # Map from individual features to pairs
-    feat_to_pps = defaultdict(set)
-    for pp, feats in pp_to_feats.iteritems():
-        if not len(feats):
-            feat_to_pps["unannotated"].add(pp)
+    p_to_i = {p: i for i, p in enumerate(ps)}
+    feature_to_j = {feature: i for i, feature in enumerate(all_features)}
+
+    phi = np.zeros((num_folds, len(feature_to_j)))
+    for k, fold in enumerate(folds):
+        for p in fold:
+            phi[k, [feature_to_j[feature] for feature in p_to_features[p]]] += 1
+    avg_phi = np.mean(phi, axis=0)
+    unbalance = np.sum(np.abs(phi - avg_phi), axis=1) / len(feature_to_j)
+
+    return folds, unbalance
+
+def _distribute_pps(p_folds, pps, state, rng):
+    pp_folds = defaultdict(set)
+
+    # De-symmetrize the interactions
+    asymm_pps = set()
+    for p, q in pps:
+        if not (q, p) in asymm_pps:
+            asymm_pps.add((p, q))
+
+    # Shuffle the interactions
+    asymm_pps = permute(sorted(asymm_pps), rng=rng)
+
+    # Assign them to folds sequentially
+    base, n = 0, len(asymm_pps) / len(p_folds)
+    for k in range(len(p_folds)):
+        if k == len(p_folds) - 1:
+            pp_folds[k].update({(p, q, state) for p, q in asymm_pps[n*k:]})
         else:
-            for feat in feats:
-                feat_to_pps[feat].add(pp)
+            pp_folds[k].update({(p, q, state) for p, q in asymm_pps[n*k:n*(k + 1)]})
 
-    # Distribute the interactions among the folds
-    while len(feat_to_pps):
+    # Symmetrize the folds
+    for pp_fold in pp_folds.itervalues():
+        pp_fold.update({(q, p, state) for p, q, state in pp_fold})
 
-        # Shuffle the folds
-        folds = permute(folds, rng)
+    return pp_folds
 
-        # Pick the term with the least unallocated pairs
-        cur_feat, symm_pps = min(feat_to_pps.iteritems(),
-                                    key=lambda id_pps: len(id_pps[-1]))
+def compute_pp_folds(p_folds, pp_pos, pp_neg, rng=None):
+    pp_folds_pos = _distribute_pps(p_folds, pp_pos, True,  rng)
+    pp_folds_neg = _distribute_pps(p_folds, pp_neg, False, rng)
 
-        print "distributing interactions with term {} (# interactions = {})".format(cur_feat, len(symm_pps))
+    pp_folds = []
+    for k in range(len(p_folds)):
+        pp_folds.append(pp_folds_pos[k] | pp_folds_neg[k])
 
-        # Desymmetrize the pps to add
-        asymm_pps = set()
-        for p, q in symm_pps:
-            if not (q, p) in asymm_pps:
-                asymm_pps.add((p, q))
+    print map(len, pp_folds)
 
-        # Evenly distribute the associated pairs among all folds.
-        for i, (p, q) in enumerate(sorted(asymm_pps)):
-            folds[i % len(folds)].update([(p, q, state), (q, p, state)])
+    for k in range(len(p_folds)):
+        num_pps_for_p = 0.0
+        for p in p_folds[k]:
+            for s, t, state in pp_folds[k]:
+                if s == p or t == p:
+                    num_pps_for_p += 1
+        avg_pps_for_p = num_pps_for_p / len(p_folds[k])
+        print avg_pps_for_p
 
-        # Update term_to_pps by removing all interactions that we
-        # just allocated
-        new_feat_to_pps = {}
-        for feat in feat_to_pps:
-            # Skip the term we just processed (it's done, right?)
-            if feat == cur_feat:
-                continue
-            new_pps = set(pp for pp in feat_to_pps[feat]
-                          if not pp in symm_pps)
-            if not len(new_pps):
-                continue
-            new_feat_to_pps[feat] = new_pps
-        feat_to_pps = new_feat_to_pps
+    for pp_fold in pp_folds:
+        assert all((q, p, state) in pp_fold for p, q, state in pp_fold), \
+            "pp folds are not symmetric"
 
-def _check_ppi_folds(ps, pps):
-    assert all((q, p) in pps for (p, q) in pps), \
-        "pairs are not symmetric"
-    assert all(p in ps for p, _ in pps), \
-        "singletons and pairs do not match"
-
-def compute_ppi_folds(ps, pp_pos, pp_neg, p_to_feats, num_folds=10, rng=None):
-    """Generates interaction-based folds.
-
-    Folds are composed of *pairs* of (known interacting or assumed
-    non-interacting) proteins. Guarantees that:
-
-    - Protein pairs are split evenly according to the feature vectors.
-    - The same pair can not occur in distinct folds.
-    - The same protein *may* occur in distinct folds.
-    - Some proteins may not appear in any fold.
-
-    Parameters
-    ----------
-    ps : list
-        Ordered list of proteins.
-    pp_pos : set
-        Positive interactions.
-    pp_neg : set
-        Negative interactions.
-    p_to_feats : dict
-        Map between proteins to features.
-    num_folds : int, optional. (defaults to 10)
-        Number of folds.
-
-    Returns
-    -------
-    folds : list
-        Each fold is a set of triples of the form (protein, protein, state).
-    """
-    folds = [set() for _ in range(num_folds)]
-
-    pp_to_feats = {}
-    for p, q in pp_pos | pp_neg:
-        p_feats = p_to_feats.get(p, set())
-        q_feats = p_to_feats.get(q, set())
-        pp_to_feats[(p, q)] = p_feats | q_feats
-
-    _distribute_pps(folds, pp_pos, pp_to_feats, True, rng)
-    _distribute_pps(folds, pp_neg, pp_to_feats, False, rng)
-    _check_folds(ps, pp_pos | pp_neg, folds)
-    return folds
+    return pp_folds
