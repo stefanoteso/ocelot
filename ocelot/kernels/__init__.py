@@ -4,6 +4,36 @@ import numpy as np
 
 _EPS = 1e-10
 
+def normalize_kernel(matrix):
+    """Computes the normalized kernel matrix.
+
+    NOTE: zero-valued diagonal elements are gracefully dealt with; but
+    negative diagonal elements will lead to NaNs (and asymmetric matrices
+    due to the NaN comparison rules).
+
+    .. math::
+
+        \\hat{k}_{ij} = k_{ij} / \\sqrt{k_ii k_jj}
+
+    Parameters
+    ----------
+    matrix : np.ndarray of shape (n, n)
+        The Gram matrix.
+    """
+    diag = matrix.diagonal()
+    num_zero_diag_entries = np.where(diag == 0)[0].shape[0]
+    if num_zero_diag_entries:
+        print "Warning: found zero-valued diagonal entries during normalization, will fix up INF to zeros."
+    z = 1.0 / np.sqrt(diag)
+    # We may get infinities if the diagonal is zero; in that case we
+    # *assume* that the corresponding non-diagonal entries are also zero,
+    # which implies that it is safe to turn the infinities to 1, as doing
+    # so retains the zeros on the non-diagonal entries.
+    z[np.isinf(z)] = 1.0
+    for i, row in enumerate(matrix):
+        matrix[i] = row * z * z[i]
+    return matrix
+
 def kernalign(matrix1, matrix2_or_y, indices=None):
     """Computes the kernel-kernel or kernel-target alignment [1]_:
 
@@ -63,29 +93,7 @@ class Kernel(object):
 
     @staticmethod
     def _normalize(matrix):
-        """Returns the normalized kernel matrix.
-
-        NOTE: zero-valued diagonal elements are gracefully dealt with; but
-        negative diagonal elements will lead to NaNs (and asymmetric matrices
-        due to the NaN comparison rules).
-
-        .. math::
-
-            `\hat{k}_{ij} = k_{ij} / \sqrt{k_ii k_jj}`
-        """
-        diag = matrix.diagonal()
-        num_zero_diag_entries = np.where(diag == 0)[0].shape[0]
-        if num_zero_diag_entries:
-            print "Warning: found zero-valued diagonal entries during normalization, will fix up INF to zeros."
-        z = 1.0 / np.sqrt(diag)
-        # We may get infinities if the diagonal is zero; in that case we
-        # *assume* that the corresponding non-diagonal entries are also zero,
-        # which implies that it is safe to turn the infinities to 1, as doing
-        # so retains the zeros on the non-diagonal entries.
-        z[np.isinf(z)] = 1.0
-        for i, row in enumerate(matrix):
-            matrix[i] = row * z * z[i]
-        return matrix
+        return normalize_kernel(matrix)
 
     def compute(self):
         """Computes the Gram matrix.
