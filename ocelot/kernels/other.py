@@ -5,6 +5,26 @@ import itertools as it
 
 from . import Kernel, DummyKernel
 
+class EmpiricalFeatures(object):
+    """The Empirical Kernel Map [Scholkopf99]_.
+
+    Given a fixed set of patterns :math:`(z_1, \\ldots, z_m)` and an input
+    pattern :math:`x`, the empirical kernel map is defined as:
+
+    .. math::
+
+        \\varphi(x) := (k(x,z_1), ..., k(x,z_m))
+
+    for any given sub-kernel :math:`k`.
+
+    NOTE: patterns and indices refer to elements in the sub-kernel.
+    """
+    def __init__(self, subkernel, patterns):
+        self.subkernel = subkernel
+        self.patterns = patterns
+    def compute(self, indices):
+        return self.subkernel.compute()[indices, self.patterns]
+
 class EmpiricalKernelMap(Kernel):
     """Empirical kernel map over an underlying kernel[1].
 
