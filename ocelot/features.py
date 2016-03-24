@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from scipy.stats import entropy
 from services import *
 
 # TODO add B (Asparagine or Aspartic Acid), Z (Glutamine or Glutamic Acid), J
@@ -44,7 +45,7 @@ def get_composition_phi(sequence, what=None):
     print aas
     return AA_INFO.loc[aas][what].values
 
-class ComplexityFeatures(object):
+def get_low_complexity_phi(sequence, windows=None, epsilon=1e-10):
     """Low-complexity region features.
 
     Low-complexity regions are correlated with packing density and
@@ -54,30 +55,38 @@ class ComplexityFeatures(object):
     Measured by computing the Shannon entropy over one or more windows of
     residues.
 
-    .. todo::
-
-        Implement priors.
+    Parameters
+    ----------
+    sequence :
+        The amino acid sequence.
+    windows : list, optional. (defaults to [8, ..., 128])
+        WRITEME
+    epsilon : float, optional. (defaults to 1e-10)
+        WRITEME
     """
-    def compute(self, sequence, window_sizes = [8,16,32,64,128], epsilon = 1e-10):
-        from scipy.stats import entropy
-        from math import fabs
-        phi = []
-        for window_size in window_sizes:
-            window_phi = []
-            padding = "?" * window_size
-            sequence_ = padding + sequence + padding
-            for i in xrange(len(sequence)):
-                i_min = len(padding) + i - window_size
-                i_max = len(padding) + i + window_size + 1
-                window = sequence_[i_min:i_max]
-                counts = [ float(len(filter(lambda res: res == aa, window))) + epsilon
-                           for aa in _OLCS ]
-                window_h = entropy(np.array(counts) / np.sum(counts))
-                if fabs(window_h) < epsilon:
-                    window_h = 0.0
-                window_phi.append(window_h)
-            phi.append(window_phi)
-        return np.array(phi).T
+    if windows is None:
+        windows = [8, 16, 32, 64, 128]
+    phi = []
+    for window in windows:
+        window_phi = []
+
+        padding = "?" * window
+        s = padding + sequence + padding
+        for i in range(len(sequence)):
+            i_min = len(padding) + i - window
+            i_max = len(padding) + i + window + 1
+            w = s[i_min:i_max]
+
+            counts = [len(filter(lambda res: res == aa, w)) + epsilon
+                      for aa in AMINOACIDS]
+
+            h = entropy(np.array(counts, dtype=np.float32) / sum(counts))
+            if np.abs(h) < epsilon:
+                h = 0.0
+            window_phi.append(h)
+
+        phi.append(window_phi)
+    return np.array(phi).T
 
 class SequenceFeatures(object):
     """Per-sequence features that wrap per-residue features.
