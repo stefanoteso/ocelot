@@ -117,6 +117,11 @@ def get_low_complexity_phi(sequence, windows=None, epsilon=1e-10):
         WRITEME
     epsilon : float, optional. (defaults to 1e-10)
         WRITEME
+
+    Returns
+    -------
+    phi : np.ndarray of shape (nres, nwindows)
+        Array with one residue per row, one window per column.
     """
     if windows is None:
         windows = [8, 16, 32, 64, 128]
@@ -202,6 +207,7 @@ def cdhit(pairs, threshold=0.8, cdhit_path="/usr/bin/cdhit"):
     exemplars : list
         WRITEME
     clusters : list
+        WRITEME
 
     References
     ----------
@@ -244,6 +250,11 @@ def run_psiblast(sequence, db="nr", evalue=10.0, matrix="BLOSUM62",
         Path to temporary directory.
     psiblast : str, optional. (defaults to "/usr/bin/psiblast")
         Path to the psiblast binary.
+
+    Returns
+    -------
+    pssm :
+        WRITEME
     """
     try:
         makedirs(cache)
