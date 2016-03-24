@@ -97,7 +97,6 @@ def get_composition_phi(sequence, what=None):
     if what is None:
         what = list(AA_INFO.columns)
     aas = [aa if aa in AA_INFO.index else "?" for aa in sequence.upper()]
-    print aas
     return AA_INFO.loc[aas][what].values
 
 def get_low_complexity_phi(sequence, windows=None, epsilon=1e-10):
