@@ -3,11 +3,10 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import entropy
-from os import makedirs
 from os.path import join
 import multiprocessing as mp
 import hashlib
-from ocelot.utils import run_binary
+from ocelot.utils import quietmkdir, run_binary
 
 
 # TODO add B (Asparagine or Aspartic Acid), Z (Glutamine or Glutamic Acid), J
@@ -256,12 +255,7 @@ def run_psiblast(sequence, db="nr", evalue=10.0, matrix="BLOSUM62",
     pssm :
         WRITEME
     """
-    try:
-        makedirs(cache)
-    except OSError, e:
-        if e.errno != errno.EEXIST:
-            raise RuntimeError("can not create cache directory '{}': {}" \
-                                .format(cache, e))
+    quietmkdir(cache)
 
     h = hashlib.md5()
     h.update("_".join([sequence, db, evalue, matrix, num_iters]))
