@@ -88,23 +88,25 @@ def get_low_complexity_phi(sequence, windows=None, epsilon=1e-10):
         phi.append(window_phi)
     return np.array(phi).T
 
-class SequenceFeatures(object):
-    """Per-sequence features that wrap per-residue features.
+def get_sequence_phi(get_phi, sequences, *args, **kwargs):
+    """Per-sequence average features.
 
-    :param Features: wrapped per-residue feature class.
+    Parameters
+    ----------
+    get_phi : callable
+        The feature construction function.
+    sequences : list
+        List of amino acid sequences.
+    All other parameters are passed to get_phi().
 
-    Additional parameters are forwarded to the wrapped class.
+    Returns
+    -------
+    phi : np.ndarray of shape (nsequences, nfeatures)
+        The per-sequence features, computed by averaging the per-residue
+        features.
     """
-    def __init__(self, Features, *args, **kwargs):
-        self.features = Features(*args, **kwargs)
-    def compute(self, sequences):
-        """Computes the per-sequence features.
-
-        :param sequences: `M` polypeptide sequence.
-        :returns: a `M*K` matrix, with `K` target features per row.
-        """
-        return np.array([ np.mean(self.features.compute(sequence), axis = 0)
-                          for sequence in sequences ])
+    return np.array([np.mean(get_phi(sequence, *args, **kwargs), axis=0)
+                     for sequence in sequences])
 
 class EmpiricalFeatures(object):
     """The Empirical Kernel Map [Scholkopf99]_.
