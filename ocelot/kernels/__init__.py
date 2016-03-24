@@ -2,6 +2,43 @@
 
 import numpy as np
 
+_EPS = 1e-10
+
+def kernalign(matrix1, matrix2_or_y, indices=None):
+    """Computes the kernel-kernel or kernel-target alignment [1]_:
+
+    .. math::
+        <matrix1, matrix2> / \\sqrt{ <matrix1, matrix1> <matrix2, matrix2> }
+
+    Parameters
+    ----------
+    matrix1 : np.ndarray of shape (n, n)
+        The Gram matrix.
+    matrix2_or_target : np.ndarray of shape (n, n) or (n,)
+        Either a second Gram matrix or a target vector. If the shape is (n,),
+        then matrix2 is the outer product :math:`target target^\\top`.
+    indices : ordered collection
+        Indices that define the empirical sample.
+
+    Returns
+    -------
+    alignment : float
+        The alignment.
+
+    References
+    ----------
+    .. [1] N. Cristianini et al. *On Kernel-Target Alignment*, 2001.
+    """
+    vec1 = matrix1.ravel()
+    if matrix2_or_y.ndim == 1:
+        vec2 = np.outer(matrix2_or_y, matrix2_or_y).ravel()
+    else:
+        vec2 = matrix2_or_y.ravel()
+    dot11 = np.dot(vec1, vec1)
+    dot12 = np.dot(vec1, vec2)
+    dot22 = np.dot(vec2, vec2)
+    return dot12 / (np.sqrt(dot11 * dot22) + _EPS)
+
 class Kernel(object):
     """Base kernel class.
 
