@@ -1,10 +1,11 @@
 # -*- coding: utf8 -*-
 
+from os.path import join
 import ocelot.ontology as O
 from ocelot.converters.base import Converter, iterate_csv
 
 class STRINGConverter(Converter):
-    """Converter for `STRING <http://string-db.org/>`_.
+    """Converter for the STRING database [1]_.
 
     The converter assumes that the data directory includes a ``STRING``
     directory with a species-specific STRING dup, laid out like this::
@@ -19,12 +20,16 @@ class STRINGConverter(Converter):
         COG.links.detailed.v${VERSION}.txt                  : TODO
         COG.mappings.v${VERSION}.txt                        : TODO
 
-    .. warning::
+    Parameters
+    ----------
+    taxa : list, optional. (defaults to "4932", which is S. Cerevisiae)
+        List of Tax IDs to process.
+    version : str, optional. (defaults to "9.1")
+        STRING DB version to process.
 
-        This converter is a STUB.
-
-    :param taxon: list of taxa to process (default: ``"4932"`` aka S. Cerevisiae).
-    :param version: STRING DB version to use (default: ``"9.1"``)
+    References
+    ----------
+    .. [1] `<http://string-db.org/>`_
     """
     def __init__(self, *args, **kwargs):
         SUBTARGETS = (
@@ -37,8 +42,7 @@ class STRINGConverter(Converter):
         self._version = kwargs.get("version", "9.1")
 
     def _get_path(self, basename):
-        import os
-        return os.path.join(self.src, "STRING", basename)
+        return join(self.src, "STRING", basename)
 
     def _siphon_aliases(self, triples):
         FIELDS = ("TAXON", "STRING_ID", "ALIAS_ID", "ALIAS_TYPE")
@@ -105,3 +109,34 @@ class STRINGConverter(Converter):
                     (string_id, O.STRING_ID_IN_NOG, cluster_id),
                     (cluster_id, O.RDF.type, O.COG_CLUSTER_ID)
                 ])
+
+def query_string_pin(endpoint, ps=None):
+    query = """
+    SELECT DISTINCT ?orf1 ?orf2
+    FROM <{graph}>
+    WHERE {{
+        ?orf1 a ocelot:sgd_id ;
+            ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+            ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
+        ?orf2 a ocelot:sgd_id ;
+            ocelot:sgd_id_has_type ocelot:sgd_feature_type.ORF ;
+            ocelot:sgd_id_has_qualifier ocelot:sgd_id_qualifier.Verified .
+        ?id1 a ocelot:STRING_ID ;
+            owl:sameAs ?orf1 .
+        ?id2 a ocelot:STRING_ID ;
+            owl:sameAs ?orf2 .
+        ?id1 ?mode ?id2 .
+    }}"""
+    pp_pos = set()
+    for bindings in endpoint.iterquery(query, n=2):
+        p1 = bindings[u"orf1"].split(".")[-1]
+        p2 = bindings[u"orf2"].split(".")[-1]
+        pp_pos.update([(p1,p2), (p2,p1)])
+    if not ps is None:
+        # Filter out all pairs that do not fall in ``ps``
+        ps, filtered_pp_pos = set(ps), set()
+        for (p1, p2) in pp_pos:
+            if p1 in ps and p2 in ps:
+                filtered_pp_pos.add((p1, p2))
+        pp_pos = filtered_pp_pos
+    return pp_pos
