@@ -2,7 +2,7 @@
 
 import ocelot.ontology as O
 from ocelot.converters.base import Converter, iterate_csv
-from ocelot.fasta import read_fasta
+from ocelot.sequences import read_fasta
 
 from rdflib import URIRef as U, BNode as B, Literal as L
 

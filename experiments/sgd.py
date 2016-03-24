@@ -8,7 +8,7 @@ from collections import defaultdict
 from textwrap import dedent
 from ocelot.go import GODag
 from ocelot.kernels import *
-from ocelot.fasta import cdhit
+from ocelot.sequences import cdhit
 from ocelot.utils import permute
 from ocelot import Experiment, Stage, PHONY, compute_p_folds, compute_pp_folds
 from .yeast import *

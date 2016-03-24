@@ -1,6 +1,6 @@
 from experiment import *
 from services import *
-from fasta import *
+from sequences import *
 from microarray import *
 from converters import *
 from features import *

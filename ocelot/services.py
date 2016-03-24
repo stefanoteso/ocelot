@@ -4,7 +4,7 @@ import os, errno, hashlib
 import numpy as np
 import multiprocessing as mp
 import itertools as it
-from ocelot.fasta import read_fasta, write_fasta
+from ocelot.sequences import read_fasta, write_fasta
 
 # The amino acid alphabet (sorted lexicographically).
 AMINOACIDS = ("A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P",
