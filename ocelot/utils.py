@@ -2,11 +2,20 @@
 
 import subprocess
 import numpy as np
+from os import makedirs
 from os.path import isdir, abspath
 from sklearn.utils import check_random_state
 
 def checkdir(path):
     return path and isdir(abspath(path))
+
+def quietmkdir(path):
+    try:
+        makedirs(cache)
+    except OSError, e:
+        if e.errno != errno.EEXIST:
+            raise RuntimeError("can not create cache directory '{}': {}" \
+                                .format(cache, e))
 
 def validate(valid, values):
     if values is None:
