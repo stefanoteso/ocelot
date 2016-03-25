@@ -32,6 +32,10 @@ def permute(l, rng=None):
     perm = list(rng.permutation(len(l)))
     return [l[perm[i]] for i in range(len(l))]
 
+def ispsd(matrix, tol=1e-6):
+    return (np.abs(matrix.T - matrix) < tol).all() and \
+           np.all(np.linalg.eigvalsh(matrix) >= 0.0)
+
 def split_tr_ts(array, indices0, indices1=None):
     if indices1 is None:
         indices1 = sorted(set(range(len(array.shape[0]))) - set(indices0))
