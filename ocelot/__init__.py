@@ -3,7 +3,6 @@ from services import *
 from sequences import *
 from microarray import *
 from converters import *
-from features import *
 from kernels import *
 from go import *
 from utils import *
