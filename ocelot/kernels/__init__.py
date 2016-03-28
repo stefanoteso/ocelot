@@ -1,10 +1,17 @@
 # -*- coding: utf8 -*-
 
 import numpy as np
+from ocelot.utils import ispsd
+
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+except ImportError:
+    pass
 
 _EPS = 1e-10
 
-def normalize_kernel(matrix):
+def kernnorm(matrix):
     """Computes the normalized kernel matrix.
 
     NOTE: zero-valued diagonal elements are gracefully dealt with; but
@@ -59,15 +66,28 @@ def kernalign(matrix1, matrix2_or_y, indices=None):
     ----------
     .. [1] N. Cristianini et al. *On Kernel-Target Alignment*, 2001.
     """
-    vec1 = matrix1.ravel()
     if matrix2_or_y.ndim == 1:
-        vec2 = np.outer(matrix2_or_y, matrix2_or_y).ravel()
+        matrix2 = np.outer(matrix2_or_y, matrix2_or_y).ravel()
     else:
-        vec2 = matrix2_or_y.ravel()
-    dot11 = np.dot(vec1, vec1)
-    dot12 = np.dot(vec1, vec2)
-    dot22 = np.dot(vec2, vec2)
+        matrix2 = matrix2_or_y.ravel()
+
+    if indices is not None:
+        matrix1 = matrix1[np.ix_(indices, indices)]
+        matrix2 = matrix2[np.ix_(indices, indices)]
+
+    matrix1, matrix2 = matrix1.ravel(), matrix2.ravel()
+    dot11 = np.dot(matrix1, matrix1)
+    dot12 = np.dot(matrix1, matrix2)
+    dot22 = np.dot(matrix2, matrix2)
     return dot12 / (np.sqrt(dot11 * dot22) + _EPS)
+
+def draw_kernel(matrix, path):
+    """Draws a Gram matrix."""
+    figsize=(matrix.shape[0] // 96, matrix.shape[1] // 96)
+    fig = plt.figure(figsize=figsize, dpi=96)
+    ax = fig.add_subplot(111)
+    ax.matshow(matrix, interpolation="nearest", cmap=cm.OrRd)
+    fig.savefig(path, bbox_inches="tight", pad_inches=0)
 
 class Kernel(object):
     """Base kernel class.
@@ -76,110 +96,98 @@ class Kernel(object):
     ----------
     entities : collection
         Ordered collection of arbitrary elements.
-    do_normalize : boo, optional (defaults to True)
-        Whether to normalize the Gram matrix.
+    normalize : bool, optional. (defaults to False)
+        Whether to normalize the kernel.
+    fixup : False or pair of floats. (defaults to False)
+        Whether to fixup the kernel, and by how much.
+    dtype : np.dtype, optional. (defaults to None)
+        WRITEME
     """
-    def __init__(self, entities, *args, **kwargs):
+    def __init__(self, entities, normalize=False, fixup=False, dtype=None):
+        if len(entities) < 2:
+            raise ValueError("kernel need at least two entities.")
         self._entities = entities
-        if not (len(self._entities) >= 2):
-            raise ValueError("kernels need at least two entities.")
-        self._do_normalize = kwargs.get("do_normalize", True)
-        self.dtype = kwargs.get("dtype", np.float32)
-        self._matrix = None
+        self._normalize = normalize
+        self._fixup = fixup
+        self.dtype = dtype
+
+    def ispsd(self, tol=1e-6):
+        return ispsd(self.compute(), tol=tol)
+
+    def normalize(self):
+        self._matrix = kernnorm(self.compute())
+
+    def fixup(self, asymm_tol=1e-6, nonpsd_tol=1e-6):
+        matrix = self.compute()
+
+        matrix = 0.5 * (matrix + matrix.T)
+        ls = np.linalg.eigvalsh(matrix)
+        if ls[0] < 0.0:
+            if ls[0] >= nonpsd_tol:
+                raise ValueError("matrix is too non-PSD '{}'".format(ls[0]))
+            matrix += np.eye(matrix.shape[0]) * -10.0 * ls[0]
+
+        self._matrix = matrix
+
+    def alignment(self, matrix_or_y, indices=None):
+        return kernalign(self.compute(), matrix_or_y, indices=indices)
+
+    def draw(self, path):
+        draw_kernel(self.compute(), path)
 
     def __len__(self):
         """Returns the number of entities."""
         return len(self._entities)
 
-    @staticmethod
-    def _normalize(matrix):
-        return normalize_kernel(matrix)
-
     def compute(self):
         """Computes the Gram matrix.
 
-        Relies on `self._compute_all`.
+        Calls `self._compute_all`.
         """
-        if self._matrix is None:
+        if not hasattr(self, "_matrix"):
             self._matrix = np.array(self._compute_all())
-            if self._do_normalize:
-                self._matrix = self._normalize(self._matrix)
+            if self._normalize:
+                self.normalize()
+            if self._fixup != False:
+                self.fixup(asymm_tol=self._fixup[0],
+                           nonpsd_tol=self._fixup[1])
         return self._matrix
-
-    def is_psd(self):
-        """Checks whether the Gram matrix is positive semi-definite."""
-        matrix = self.compute()
-        is_symmetric = (np.abs(matrix.T - matrix) < 1e-6).all()
-        is_semi_psd = np.all(np.linalg.eigvalsh(matrix) >= 0)
-        return is_symmetric and is_semi_psd
-
-    def check_and_fixup(self, threshold):
-        """Checks whether the Gram matrix is positive semi-definite and
-        preconditions it if it is slightly non-PSD."""
-        matrix = self.compute()
-        assert (np.abs(matrix.T - matrix) < 1e-6).all(), "not symmetric!"
-        matrix = 0.5 * (matrix + matrix.T)
-
-        ls = np.linalg.eigvalsh(matrix)
-        if ls[0] < 0.0:
-            assert ls[0] < threshold, "matrix is too non-PSD: minimum eigenvalue is '{}'".format(ls[0])
-            print "preconditioning by 10*(ls[0] = '{}')".format(ls[0])
-            matrix += np.identity(matrix.shape[0]) * -10.0 * ls[0]
-            eigvals = np.linalg.eigvalsh(matrix)
-            assert eigvals[0] > -threshold, "eigenvalues are too non-negative, even after preconditioning: {}".format(eigvals)
-
-    def draw(self, path):
-        """Draws the Gram matrix to a file."""
-        try:
-            import matplotlib.pyplot as plt
-            import matplotlib.cm as cm
-        except ImportError:
-            print "matplotlib is required; can not draw"
-            return
-        try:
-            fig = plt.figure(figsize = (len(self) / 96, len(self) / 96), dpi = 96)
-            ax = fig.add_subplot(1, 1, 1)
-            matrix = self.compute()
-            ax.matshow(matrix, interpolation = "nearest", cmap = cm.OrRd)
-            fig.savefig(path, bbox_inches="tight", pad_inches=0)
-        except Exception, e:
-            print "failed to draw kernel; skipping"
 
 class DummyKernel(Kernel):
     """A wrapper around ``np.ndarray``'s and files.
 
     Parameters
     ----------
-    arg : numpy.ndarray or str
+    matrix_or_path : numpy.ndarray or str
         Either a Gram matrix or a path to a file.
-    num : int
-        Number of elements in the Gram matrix.
-    check_psd : bool
-        Whether to raise an exception if the wrapped kernel is not PSD.
+    All other arguments are passed to the ``Kernel`` constructor.
     """
-    def __init__(self, arg, **kwargs):
-        arg = arg
-        num = kwargs.get("num")
-        check_psd = kwargs.get("check_psd")
-        if isinstance(arg, str):
-            matrix = np.loadtxt(arg)
-        else:
-            matrix = arg
+    def __init__(self, matrix_or_path, **kwargs):
+        try:
+            matrix_or_path.shape
+            matrix = matrix_or_path
+        except AttributeError:
+            matrix = np.loadtxt(matrix_or_path)
+
         if matrix.shape[0] != matrix.shape[1]:
-            raise ValueError("matrix is not symmetric '{}'".format(matrix.shape))
-        if not num is None and matrix.shape != (num, num):
-            raise ValueError("matrix has invalid shape '{}', was expecting ({},{})".format(matrix.shape, num, num))
+            raise ValueError("matrix is not square '{}'".format(matrix.shape))
+
         super(DummyKernel, self).__init__(range(matrix.shape[0]),
                                           **kwargs)
-        self._matrix = matrix
-        if check_psd and not self.is_psd():
-            raise ValueError("matrix is not PSD")
-        if self._do_normalize:
-            self._matrix = self._normalize(self._matrix)
+
+        self._matrix = matrix.astype(self.dtype)
+        if self._normalize:
+            self.normalize()
+        if self._fixup != False:
+            self.fixup(asymm_tol=self._fixup[0],
+                       nonpsd_tol=self._fixup[1])
+
+    def _compute_all(self):
+        return self._matrix
 
 class _TestKernel(object):
-    def _test(self, matrix, expected, do_normalize=True):
-        kernel = DummyKernel(np.array(matrix), do_normalize=do_normalize)
+    def _test(self, matrix, expected, normalize=True):
+        kernel = DummyKernel(np.array(matrix), normalize=normalize)
         output = kernel.compute()
         assert (np.abs(output - expected) < 1e-6).all()
 
