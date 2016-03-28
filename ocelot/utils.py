@@ -34,7 +34,7 @@ def permute(l, rng=None):
 
 def ispsd(matrix, tol=1e-6):
     return (np.abs(matrix.T - matrix) < tol).all() and \
-           np.all(np.linalg.eigvalsh(matrix) >= 0.0)
+           not np.any(np.linalg.eigvalsh(matrix) < 0.0)
 
 def split_tr_ts(array, indices0, indices1=None):
     if indices1 is None:
