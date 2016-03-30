@@ -165,7 +165,7 @@ class _TestLinearKernel(object):
             ((np.array([1, 0]), np.array([0, 1])), np.array([[1, 0], [0, 1]])),
             ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
         )
-        _test_results(LinearKernel, DATA, do_normalize=False)
+        _test_results(LinearKernel, DATA, normalize=False)
 
 class _TestCorrelationKernel(object):
     def test_result(self):
@@ -174,7 +174,7 @@ class _TestCorrelationKernel(object):
             ((np.array([1, 0]), np.array([0, 1])), np.array([[1, -1], [-1, 1]])),
             ((np.array([1, 0]), np.array([1, 0])), np.array([[1, 1], [1, 1]])),
         )
-        _test_results(CorrelationKernel, DATA, do_normalize=False)
+        _test_results(CorrelationKernel, DATA, normalize=False)
 
 class _TestSparseLinearKernel(object):
     def test_results(self):
@@ -184,7 +184,7 @@ class _TestSparseLinearKernel(object):
             (({0:1.0}, {1:1.0}), np.array([[1, 0], [0, 1]])),
             (({0:1.0, 1:1.0}, {0:1.0, 1:1.0}), np.array([[2, 2], [2, 2]])),
         )
-        _test_results(SparseLinearKernel, DATA, do_normalize=False)
+        _test_results(SparseLinearKernel, DATA, normalize=False)
 
 class _TestSetKernel(object):
     def test_results(self):
@@ -194,4 +194,4 @@ class _TestSetKernel(object):
             ((set([0]), set([0])), np.array([[1, 1], [1, 1]])),
             ((set(["a", "b"]), set(["a", "b"])), np.array([[2, 2], [2, 2]])),
         )
-        _test_results(SetKernel, DATA, do_normalize=False)
+        _test_results(SetKernel, DATA, normalize=False)
