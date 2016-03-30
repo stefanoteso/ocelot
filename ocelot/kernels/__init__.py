@@ -1,6 +1,7 @@
 # -*- coding: utf8 -*-
 
 import numpy as np
+import cPickle as pickle
 from ocelot.utils import ispsd
 
 try:
@@ -163,11 +164,9 @@ class DummyKernel(Kernel):
     All other arguments are passed to the ``Kernel`` constructor.
     """
     def __init__(self, matrix_or_path, **kwargs):
-        try:
-            matrix_or_path.shape
-            matrix = matrix_or_path
-        except AttributeError:
-            matrix = np.loadtxt(matrix_or_path)
+        matrix = self._load(matrix_or_path)
+        if matrix is None:
+            raise ValueError("invalid matrix_or_path")
 
         if matrix.shape[0] != matrix.shape[1]:
             raise ValueError("matrix is not square '{}'".format(matrix.shape))
@@ -181,6 +180,27 @@ class DummyKernel(Kernel):
         if self._fixup != False:
             self.fixup(asymm_tol=self._fixup[0],
                        nonpsd_tol=self._fixup[1])
+
+    @staticmethod
+    def _load(matrix_or_path):
+        matrix = None
+        try:
+            matrix_or_path.shape
+            matrix = matrix_or_path
+        except:
+            pass
+        try:
+            if matrix is None:
+                matrix = np.loadtxt(matrix_or_path)
+        except:
+            pass
+        try:
+            if matrix is None:
+                with open(matrix_or_path, "rb") as fp:
+                    matrix = pickle.load(fp)
+        except:
+            pass
+        return matrix
 
     def _compute_all(self):
         return self._matrix
