@@ -271,9 +271,9 @@ class ProfileKernel(_RecursivePrefixStringKernel):
         from ocelot.services import PSSM
         from ocelot.kernels.string import ProfileKernel
 
-        reader = PSSM(targets = ["residue", "nlog_condp"])
+        reader = PSSM(targets=["residue", "nlog_condp"])
         kernel = ProfileKernel([reader.read(path) for path in paths],
-                               k = 4, threshold = 6.0)
+                               k=4, threshold=6.0)
         matrix = kernel.compute()
 
     Parameters
@@ -324,7 +324,7 @@ class PSSMKernel(ProfileKernel):
 
     All remaining options are passed to the underlying ``ProfileKernel``.
     """
-    def __init__(self, ps, p_to_seq, cache_path, num_iterations = 2, *args, **kwargs):
+    def __init__(self, ps, p_to_seq, cache_path, num_iterations=2, *args, **kwargs):
         self._p_to_seq = p_to_seq
         self._cache_path = cache_path
         super(PSSMKernel, self).__init__(ps, *args, **kwargs)
@@ -336,7 +336,7 @@ class PSSMKernel(ProfileKernel):
         pass
 
     def _compute_all(self):
-        reader = PSSM(targets = ("residue", "nlog_condp"))
+        reader = PSSM(targets=("residue", "nlog_condp"))
         pssms = []
         for p in self._entities:
             pssms.append(reader.read(self._get_pssm_path(p)))
@@ -348,29 +348,29 @@ class _TestRecursivePrefixStringKernel(object):
         import pytest
         strings = ("TEST", "TEST")
         with pytest.raises(ValueError):
-            kernel = _RecursivePrefixStringKernel(strings, k = 0)
+            kernel = _RecursivePrefixStringKernel(strings, k=0)
     def test_k_too_large(self):
         import pytest
         for k in xrange(10):
             string = "A" * k
             strings = (string, string)
             with pytest.raises(ValueError):
-                kernel = _RecursivePrefixStringKernel(strings, k = k + 1)
+                kernel = _RecursivePrefixStringKernel(strings, k=k + 1)
                 instances = kernel._get_instances()
     def test_alphabet(self):
         import pytest
         strings = ("TEST", "TEST")
         with pytest.raises(ValueError):
-            kernel = _RecursivePrefixStringKernel(strings, k = 0, alphabet = "")
+            kernel = _RecursivePrefixStringKernel(strings, k=0, alphabet="")
         with pytest.raises(ValueError):
-            kernel = _RecursivePrefixStringKernel(strings, k = 0, alphabet = "?")
+            kernel = _RecursivePrefixStringKernel(strings, k=0, alphabet="?")
     def test_num_instances(self):
         from ocelot.services import AMINOACIDS
         STRING = "".join(AMINOACIDS)
         for num_replicas in xrange(2, 5):
             strings = [STRING] * num_replicas
             for k in xrange(1, len(STRING)):
-                kernel = _RecursivePrefixStringKernel(strings, k = k)
+                kernel = _RecursivePrefixStringKernel(strings, k=k)
                 instances = kernel._get_instances()
                 assert len(instances) == num_replicas * (len(STRING) - k + 1)
 
@@ -390,7 +390,7 @@ class _TestSpectrumKernel(object):
             (("AY" * 5, "YA" * 5), 2, np.array([[41, 40], [40, 41]])),
         )
         for strings, k, expected in STRINGSETS:
-            kernel = SpectrumKernel(strings, k = k, do_normalize = False)
+            kernel = SpectrumKernel(strings, k=k, normalize=False)
             output = kernel.compute()
             assert (output == expected).all()
 
@@ -401,8 +401,8 @@ class _TestMismatchKernel(object):
             (("A", "Y"), 1, 1, np.array([[20, 20], [20, 20]])),
         )
         for strings, k, m, expected in STRINGSETS:
-            kernel = MismatchKernel(strings, k = k, m = m,
-                                    do_normalize = False)
+            kernel = MismatchKernel(strings, k=k, m=m,
+                                    normalize=False)
             output = kernel.compute()
             assert (output == expected).all()
 
@@ -416,8 +416,8 @@ class _TestProfileKernel(object):
             [ [[A], [Y]], 1, 1.0, np.array([[20, 20], [20, 20]]) ],
         )
         for pssms, k, tau, expected in PSSMSETS:
-            kernel = ProfileKernel(pssms, k = k, threshold = tau,
-                                   do_normalize = False)
+            kernel = ProfileKernel(pssms, k=k, threshold=tau,
+                                   normalize=False)
             output = kernel.compute()
             assert (output == expected).all()
 
