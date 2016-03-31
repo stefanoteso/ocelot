@@ -19,148 +19,132 @@
 \maketitle
 
 \begin{abstract}
-
 \section{Motivation:}
-We want to win obvious improvement of prediction accuracy so we can publish
-and get money!
-
 \section{Results:}
-Not my problem!
-
 \section{Availability:}
-Elsewhere!
-
-\section{Contact:} \href{Andrea Passerini}{passerini@disi.unitn.it}
+\section{Contact:}
 \end{abstract}
 
 
 
 \section{Introduction}
 
-Fix this dot:
-$$ \odot $$
+\begin{itemize}
+
+    \item Protein function and GO hierarchy
+
+    \item Protein--protein interactions
+
+    \item Importance of genome-wide prediction
+
+    \item Relationships between function and interactions
+
+    \item Statistical prediction methods for relational data with multiple
+    features
+
+    \item Structure of the genome-wide predictor (intro to SBR)
+
+    \item Performance highlights
+
+    \item Structure of the paper
+
+\end{itemize}
 
 
-
-\section{Approach}
-
-Fool you into fixing the dot, then run away with the money/girls/fast car.
-
-\section{Background}
-
-\paragraph{Function}
-
-\paragraph{Interactions}
-
-\paragraph{Hybrid competitors?}
 
 \begin{methods}
 
-
-
 \section{Methods}
 
-\subsection{Dataset}
+\subsection{Prediction Model}
+
+WRITEME
+
+\end{methods}
+
+
+
+\section{Results}
+
+\subsection{Dataset construction}
 
 \begin{itemize}
+
     \item Dataset taken from manually curated portions of the SGD database. We
     consider all validated ORFs at least 50 residues long.
 
     \item Sequences are filtered with CD-HIT with a threshold of 80.
 
-    \item GO annotations: taken from BioGRID, we keep manual annotations only.
+    \item GO annotations: taken from BioGRID, IEA annotations removed.
 
     \item Interactions: taken from BioGRID via SGD. Extracted from the
     literature.
+
+    \item We compute the normalized average of:
+
+    \begin{itemize}
+
+        \item Genetic context (colocalization) kernel
+
+        \item Coexpression kernel
+
+        \item Complex kernel
+
+        \item Domain kernel
+
+        \item Complex kernel
+
+        \item Profile kernel
+
+    \end{itemize}
+
+    \item We compute the pairwise (tensor product) kernel
+
+\end{itemize}
+
+\subsection{Evaluation setting}
+
+\begin{itemize}
+
+    \item Negative functions XXX
 
     \item Negative interactions sampled from the complement of the known
     positive interactions, minus the STRING database to avoid possible
     positives.
 
-\end{itemize}
-
-
-
-\section{Experimental analysis}
-
-\begin{itemize}
-
-    \item Two comparisons with GOstrut:
-
-    \begin{itemize}
-
-        \item Compare GOstrut and SBR with our kernel
-
-        \item Compare GOstrut and SBR with their kernel
-
-        \item Potentially figure out the best combination of kernels
-
-    \end{itemize}
-
-    \item Genome-wide experiment
+    \item PF and PPI balanced fold construction (each test protein has
+    at least one unknown interaction that we aim at predicting)
 
 \end{itemize}
 
-
-
-\section{Empirical Analysis}
-
-\subsection{Versus GOstrut: our kernels}
+\paragraph{Protein function prediction}
 
 \begin{itemize}
 
-    \item Genetic context (colocalization) kernel
+    \item Competitors: BLAST sequence transfer and nearest neighbor, as in
+    CAFA2; plus GoFDR and possibly other high-rank CAFA2 methods
 
-    \item Coexpression kernel
-
-    \item Complex kernel
-
-    \item Domain kernel
-
-    \item Complex kernel
-
-    \item Profile kernel
-
-    \item Average kernel
-
-\end{methods}
-
-\subsection{Versus GOstrut: their kernels}
-
-\begin{itemize}
-
-    \item All-vs-all blast linear kernel
-
-    \item Localization kernel with Wolf PSort
-
-    \item Transmembrane helices linear kernel
-
-    \item N- and C- termini composition kernel
-
-    \item Low-complexity segment kernel
-
-    \item PPI kernel XXX
-
-    \item Gene expression kernel XXX
-
-    \item Co-mention kernel XXX
-
-\end{methods}
-
-\subsection{Genome-wide experiment on yeast}
-
-\begin{itemize}
-
-    \item Huge number of possible interactions; we can not possibly hope
-    to compute the full pairwise Gram matrix
-
-    \item As long as we do not have rules between interactions, we only need
-    the train-train and train-test portion of the Gram matrix.
+    \item Performance metrics: as in CAFA2, protein-centric (Fmax and Smin)
+    and term-centric (AUC).
 
 \end{itemize}
+
+\paragraph{Protein--protein interaction prediction}
+
+\begin{itemize}
+
+    \item Competitors: ?
+
+    \item Performance metrics: ?
+
+\end{itemize}
+
 
 
 \section{Discussion}
+
+Make sure to mention that our method is tailored towards genome-wide
+prediction, so CAFA2 is out of scope.
 
 WRITEME
 
