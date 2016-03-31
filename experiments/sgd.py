@@ -60,10 +60,9 @@ class SGDExperiment(Experiment):
                   ['filtered_ps', 'pp_pos_hq', 'pp_pos_lq'],
                   ['pp_neg']),
 
-            Stage(self._dump_raw_data,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_neg', ],
-                  ['__dump_raw']),
+            Stage(self._compute_p_pp_order,
+                  ['filtered_ps', 'pp_pos_hq', 'pp_neg'],
+                  ['filtered_p_to_i', 'pp_indices']),
 
             Stage(lambda *args: compute_p_folds(*args, rng=self._rng),
                   ['filtered_ps', 'filtered_p_to_term_ids'],
@@ -72,11 +71,6 @@ class SGDExperiment(Experiment):
             Stage(lambda *args: (compute_pp_folds(*args, rng=self._rng),),
                   ['p_folds', 'pp_pos_hq', 'pp_neg'],
                   ['pp_folds']),
-
-            Stage(self._dump_stats,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'p_folds', 'pp_folds'],
-                  ['__dummy_stats']),
 
             Stage(self._compute_p_colocalization_kernel,
                   ['filtered_ps'],
@@ -112,6 +106,10 @@ class SGDExperiment(Experiment):
                   ],
                   ['p_average_kernel']),
 
+            Stage(self._compute_pp_kernel,
+                  ['filtered_ps', 'pp_indices', 'p_average_kernel'],
+                  ['pp_average_kernel']),
+
             Stage(PHONY,
                   [
                     'p_colocalization_kernel',
@@ -121,20 +119,19 @@ class SGDExperiment(Experiment):
                     'p_interpro_count_kernel',
                     'p_pssm_kernel',
                     'p_average_kernel',
+                    'pp_average_kernel',
                   ],
-                  ['__dummy_p_kernels']),
+                  ['__dummy_kernels']),
 
-            Stage(self._compute_p_pp_order,
-                  ['filtered_ps', 'pp_pos_hq', 'pp_neg'],
-                  ['filtered_p_to_i', 'pp_indices']),
+            Stage(self._dump_raw_data,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'pp_pos_hq', 'pp_neg', ],
+                  ['__dummy_dump']),
 
-            Stage(self._compute_pp_kernel,
-                  ['filtered_ps', 'pp_indices', 'p_average_kernel'],
-                  ['pp_average_kernel']),
-
-            Stage(PHONY,
-                  ['pp_average_kernel'],
-                  ['__dummy_pp_kernels']),
+            Stage(self._dump_stats,
+                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
+                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'p_folds', 'pp_folds'],
+                  ['__dummy_stats']),
 
             Stage(self._write_sbr_dataset,
                   ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
@@ -143,8 +140,7 @@ class SGDExperiment(Experiment):
                   ['__dummy_sbr']),
 
             Stage(PHONY,
-                  ['__dump_raw', '__dummy_stats',
-                   '__dummy_sbr'],
+                  ['__dummy_stats', '__dummy_kernels', '__dummy_sbr'],
                   ['__all']),
         ]
 
@@ -218,29 +214,29 @@ class SGDExperiment(Experiment):
             # an in silico analysis of the gene sequence and/or other data as
             # described in the cited reference.  The evidence codes in this
             # category also indicate a varying degree of curatorial input.
-        #    "ISS",  # Inferred from Sequence or structural Similarity (ISS)
-        #    "ISO",  # Inferred from Sequence Orthology (ISO)
-        #    "ISA",  # Inferred from Sequence Alignment (ISA)
-        #    "ISM",  # Inferred from Sequence Model (ISM)
-        #    "IGC",  # Inferred from Genomic Context (IGC)
-        #    "IBA",  # Inferred from Biological aspect of Ancestor (IBA)
-        #    "IBD",  # Inferred from Biological aspect of Descendant (IBD)
-        #    "IKR",  # Inferred from Key Residues (IKR)
-        #    "IRD",  # Inferred from Rapid Divergence(IRD)
-        #    "RCA",  # Inferred from Reviewed Computational Analysis (RCA)
+            "ISS",  # Inferred from Sequence or structural Similarity (ISS)
+            "ISO",  # Inferred from Sequence Orthology (ISO)
+            "ISA",  # Inferred from Sequence Alignment (ISA)
+            "ISM",  # Inferred from Sequence Model (ISM)
+            "IGC",  # Inferred from Genomic Context (IGC)
+            "IBA",  # Inferred from Biological aspect of Ancestor (IBA)
+            "IBD",  # Inferred from Biological aspect of Descendant (IBD)
+            "IKR",  # Inferred from Key Residues (IKR)
+            "IRD",  # Inferred from Rapid Divergence(IRD)
+            "RCA",  # Inferred from Reviewed Computational Analysis (RCA)
 
             # Author statement codes. Author statement codes indicate that the
             # annotation was made on the basis of a statement made by the
             # author(s) in the reference cited.
             "TAS",  # Traceable Author Statement (TAS)
-        #    "NAS",  # Non-traceable Author Statement (NAS)
+            "NAS",  # Non-traceable Author Statement (NAS)
 
             # Curatorial evidence codes. Use of the curatorial statement
             # evidence codes indicates an annotation made on the basis of a
             # curatorial judgement that does not fit into one of the other
             # evidence code classifications.
             "IC",   # Inferred by Curator (IC)
-        #    "ND",   # No biological Data available (ND) evidence code
+            "ND",   # No biological Data available (ND) evidence code
 
             # Automatically-assigned evidence code. Assigned by automated
             # methods, without curatorial judgement
@@ -426,8 +422,6 @@ class SGDExperiment(Experiment):
             pp_pos = filtered_pp_pos
         return pp_pos
 
-
-
     def _filter_ps(self, ps, p_to_seq, min_sequence_len, cdhit_threshold):
         """Filter out short sequences and cluster them with CD-HIT."""
 
@@ -447,8 +441,6 @@ class SGDExperiment(Experiment):
         print "there are {} filtered proteins".format(len(filtered_ps))
 
         return sorted(filtered_ps),
-
-
 
     def _print_go_stats(self, dag, message):
         p_to_ids = dag.get_p_to_term_ids()
@@ -532,8 +524,6 @@ class SGDExperiment(Experiment):
 
         return pp_pos_hq, pp_pos_lq | pp_pos_string
 
-
-
     def _get_negative_pin(self, ps, pp_pos_hq, pp_pos_lq):
         """Computes the network of negative protein interactions.
 
@@ -554,6 +544,70 @@ class SGDExperiment(Experiment):
 
         self._check_ps_pps(ps, pp_neg)
         return pp_neg,
+
+    def _compute_p_pp_order(self, ps, pp_pos, pp_neg):
+        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
+
+        pps = set()
+        pps.update(pp_pos)
+        pps.update(pp_neg)
+        pp_indices = sorted([(p_to_i[p], p_to_i[q]) for p, q in sorted(pps)])
+
+        return p_to_i, pp_indices
+
+    def _compute_p_colocalization_kernel(self, ps):
+        p_to_context = self._get_sgd_id_to_context()
+        contexts = []
+        for p in ps:
+            assert p in p_to_context
+            chromosome, strand, start, stop = p_to_context[p]
+            middle = min(start, stop) + 0.5 * abs(start - stop)
+            contexts.append((chromosome, middle))
+        return self.compute_kernel(ColocalizationKernel,
+                                   "p_colocalization_kernel",
+                                   contexts, gamma=1.0,
+                                   normalize=True, dtype=np.float32)
+
+    def _compute_p_gene_expression_kernel(self, ps, p_to_feat):
+        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
+        return self.compute_kernel(SGDGeneExprKernel,
+                                   "p_gene_expression_kernel",
+                                   feat_to_i, self.src,
+                                   ["Gasch_2000_PMID_11102521",
+                                    "Spellman_1998_PMID_9843569"],
+                                   normalize=True, dtype=np.float32)
+
+    def _compute_p_complex_kernel(self, ps, p_to_feat):
+        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
+        return self.compute_kernel(YeastProteinComplexKernel,
+                                   "p_complex_kernel",
+                                   feat_to_i, self.src,
+                                   normalize=True, dtype=np.float32)
+
+    def _compute_p_interpro_kernel(self, ps):
+        return self.compute_kernel(InterProKernel, "p_interpro_match_kernel",
+                                   ps, join(self.src, "interpro"), mode="match",
+                                   normalize=True, dtype=np.float32)
+
+    def _compute_p_interpro_count_kernel(self, ps):
+        return self.compute_kernel(InterProKernel, "p_interpro_count_kernel",
+                                   ps, join(self.src, "interpro"), mode="count",
+                                   normalize=True, dtype=np.float32)
+
+    def _compute_p_pssm_kernel(self, ps, p_to_seq):
+        return self.compute_kernel(PSSMKernel, "p_pssm_kernel", ps, p_to_seq,
+                                   join(self.src, "pssm"), k=4, threshold=6.0,
+                                   normalize=True, dtype=np.float32)
+
+    def _compute_average_kernel(self, *matrices):
+        matrix = sum(matrices) / len(matrices)
+        kernel = DummyKernel(matrix, normalize=True)
+        return kernel.compute(),
+
+    def _compute_pp_kernel(self, pp_indices, submatrix):
+        return self.compute_kernel(PairwiseKernel, "pp_average_kernel",
+                                   pp_indices, submatrix),
+
 
 
     def _term_to_predicate(self, term):
@@ -629,6 +683,8 @@ class SGDExperiment(Experiment):
                                      pps, with_in=False)
         return None,
 
+
+
     def _dump_stats(self, ps, dag, p_to_term_ids, pp_pos_hq, pp_pos_lq, pp_neg,
                     p_folds, pp_folds):
         print "DATASET STATISTICS"
@@ -683,63 +739,6 @@ class SGDExperiment(Experiment):
 
         return None,
 
-
-
-    def _compute_p_colocalization_kernel(self, ps):
-        p_to_context = self._get_sgd_id_to_context()
-        contexts = []
-        for p in ps:
-            assert p in p_to_context
-            chromosome, strand, start, stop = p_to_context[p]
-            middle = min(start, stop) + 0.5 * abs(start - stop)
-            contexts.append((chromosome, middle))
-        return self.compute_kernel(ColocalizationKernel,
-                                    "p_colocalization_kernel",
-                                    contexts, gamma=1.0)
-
-    def _compute_p_gene_expression_kernel(self, ps, p_to_feat):
-        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
-        return self.compute_kernel(SGDGeneExprKernel,
-                                    "p_gene_expression_kernel",
-                                    feat_to_i, self.src,
-                                    ["Gasch_2000_PMID_11102521",
-                                     "Spellman_1998_PMID_9843569"],
-                                    do_normalize=True)
-
-    def _compute_p_complex_kernel(self, ps, p_to_feat):
-        feat_to_i = {p_to_feat[p]: i for i, p in enumerate(ps)}
-        return self.compute_kernel(YeastProteinComplexKernel,
-                                    "p_complex_kernel",
-                                    feat_to_i, self.src)
-
-    def _compute_p_interpro_kernel(self, ps):
-        return self.compute_kernel(InterProKernel, "p_interpro_match_kernel",
-                                    ps, join(self.src, "interpro"), mode="match")
-
-    def _compute_p_interpro_count_kernel(self, ps):
-        return self.compute_kernel(InterProKernel, "p_interpro_count_kernel",
-                                    ps, join(self.src, "interpro"), mode="count")
-
-    def _compute_p_pssm_kernel(self, ps, p_to_seq):
-        return self.compute_kernel(PSSMKernel, "p_pssm_kernel", ps, p_to_seq,
-                                    join(self.src, "pssm"), k=4, threshold=6.0)
-
-    def _compute_average_kernel(self, *matrices):
-        return sum(matrices) / len(matrices),
-
-    def _compute_p_pp_order(self, ps, pp_pos, pp_neg):
-        p_to_i = {p: i for i, p in enumerate(sorted(ps))}
-
-        pps = set()
-        pps.update(pp_pos)
-        pps.update(pp_neg)
-        pp_indices = sorted([(p_to_i[p], p_to_i[q]) for p, q in sorted(pps)])
-
-        return p_to_i, pp_indices
-
-    def _compute_pp_kernel(self, pp_indices, submatrix):
-        return self.compute_kernel(PairwiseKernel, "pp_average_kernel",
-                                   pp_indices, submatrix),
 
 
     def _write_sbr_datapoints(self, p_to_i, pp_indices):
