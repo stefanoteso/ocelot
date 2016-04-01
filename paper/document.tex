@@ -4,6 +4,20 @@
 
 \usepackage{hyperref}
 
+\usepackage[usenames,dvipsnames]{xcolor}
+\definecolor{azure}{rgb}{0.0, 0.5, 1.0}
+\newcommand{\andrea}[1]{{\bf \textcolor{azure}{Andrea: #1}}}
+\definecolor{alizarin}{rgb}{0.82, 0.1, 0.26}
+\newcommand{\stefano}[1]{{\bf \textcolor{alizarin}{{Stefano: #1}}}}
+\definecolor{antiquefuchsia}{rgb}{0.57, 0.36, 0.51}
+\newcommand{\luca}[1]{{\bf \textcolor{antiquefuchsia}{Luca: #1}}}
+\definecolor{applegreen}{rgb}{0.55, 0.71, 0.0}
+\newcommand{\michleangelo}[1]{{\bf \textcolor{applegreen}{Michelangelo: #1}}}
+\definecolor{munsell}{rgb}{0.0, 0.5, 0.69}
+\newcommand{\claudio}[1]{{\bf \textcolor{munsell}{{Claudio: #1}}}}
+
+
+
 \begin{document}
 \firstpage{1}
 
@@ -18,6 +32,8 @@
 
 \maketitle
 
+
+
 \begin{abstract}
 \section{Motivation:}
 \section{Results:}
@@ -31,11 +47,11 @@
 
 \begin{itemize}
 
-    \item Protein function and GO hierarchy
+    \item Importance of genome-wide prediction of interactions and function
 
-    \item Protein--protein interactions
+    \item Brief recap on protein function and GO hierarchy
 
-    \item Importance of genome-wide prediction
+    \item Brief recap on protein--protein interactions
 
     \item Relationships between function and interactions
 
@@ -44,7 +60,7 @@
 
     \item Structure of the genome-wide predictor (intro to SBR)
 
-    \item Performance highlights
+    \item Results highlights
 
     \item Structure of the paper
 
@@ -58,6 +74,23 @@
 
 \subsection{Prediction Model}
 
+\begin{itemize}
+
+    \item High-level overview of joint function-interaction prediction at
+    the genome scale
+
+    \item We expand on the approach of Sacc\`a and colleagues~\cite{sacca2014ppisbr}
+
+    \item Kernel-based predictions
+
+    \item Constraints for function and interaction prediction
+
+    \item Pairwise kernels
+
+\end{itemize}
+
+\subsection{Mathematical Formulation}
+
 WRITEME
 
 \end{methods}
@@ -68,39 +101,81 @@ WRITEME
 
 \subsection{Dataset construction}
 
-\begin{itemize}
+In order to evaluate our proposed method, we built a comprehensive genome-wide
+dataset. All data was retrieved in August 2014.
 
-    \item Dataset taken from manually curated portions of the SGD database. We
-    consider all validated ORFs at least 50 residues long.
+\paragraph{Annotations.}
 
-    \item Sequences are filtered with CD-HIT with a threshold of 80.
+The protein sequences and their GO annotations were taken from the
+Saccharomyces Genome Database (SGD)~\cite{cherry2012sgd}. The GO hierarchy
+definition was taken from the Gene Ontology Consortium website\footnote{
+\url{http://geneontology.org/page/download-ontology}}. Only validated ORFs at
+least 50 residues long were retained. The sequences were redundancy reduced
+with CD-HIT~\cite{fu2012cdhit}, using a threshold of 80, producing a set of
+4865 proteins. Following common practice~\cite{gong2016gofdr} \stefano{more
+references}, we removed automatically assigned (IEA) GO annotations.
 
-    \item GO annotations: taken from BioGRID, IEA annotations removed.
+\stefano{add annotation statistics here}
 
-    \item Interactions: taken from BioGRID via SGD. Extracted from the
-    literature.
+Physical protein--protein interactions were taken from
+BioGRID~\cite{chatr2015biogrid} (via SGD) and symmetrized, for a total of 34611
+interactions. Due to the lack of shared repositories of known non-interacting
+protein pairs, we resorted to a sampling procedure to produce high-quality
+putative non-interactions, as follows.  \stefano{reference papers that justify
+the procedure}.  First, we computed the complement of the positive PIN. In
+order to minimize the chance of sampling subtracted the full set of functional
+interactions (either physical or functional) in
+STRING~\cite{franceschini2013string91,szklarczyk2014string10} (version 9.1)
+from the complement. Finally, we sampled 34611 negative interactions from the
+remaining candidate pairs. The full set of interaction annotations is taken to
+be the union of the above positive and negative sets.
 
-    \item We compute the normalized average of:
+\paragraph{Kernels.}
 
-    \begin{itemize}
+In order to drive our learning procedure, we computed a number of kernels
+between proteins and protein--protein pairs. We focused on protein features
+that were shown to contribute useful information in several studies, including
+genetic context, gene coexpression, known protein complexes, inferred
+protein domains, and sequence profiles. We illustrate the computational
+procedure in the following.
 
-        \item Genetic context (colocalization) kernel
+The genetic context of two proteins plays an important role in determining the
+likelihood of them having physical interactions. We included this information
+in the colocalization kernel, defined as follows:
+%
+$$ k_{ij} := \exp\left( - \gamma | x_i - x_j | \right) $$
+%
+Here the $x_i$ and $x_j$ are the position of the genes encoding proteins $p_i$
+and $p_j$, taken to be the center of the two genes. Proteins encoded by
+different chromosomes have zero similarity.
 
-        \item Coexpression kernel
+Gene expression levels in cell-cycle and environmental response were also shown
+to provide invaluable information. We computed a correlation kernel over the
+expression levels measured in two different experiments
+(\cite{spellman1998comprehensive} and \cite{gasch2000genomic}).
 
-        \item Complex kernel
+We computed a diffusion kernel~\cite{kondor2002diffusion} over
+the yeast protein complex catalogue of~\cite{pu2009up}. It determines the
+correlation between proteins through a diffusion process over the protein
+complex network.
 
-        \item Domain kernel
+We computed a set/sparse kernel \stefano{only keep the better one} over
+inferred protein domains, derived using InterPro~\cite{mitchell2015interpro}.
 
-        \item Complex kernel
+We computed a profile kernel~\cite{kuang2005profile,hamp2013accelerating} over
+all the proteins. The PSSMs were obtained with PSI-BLAST (default parameters,
+two iterations) over NCBI's NR database. Please see \cite{kuang2005profile}
+for additional details.
 
-        \item Profile kernel
+All kernels were normalized prior to use, by applying the transformation
+$\hat{k}_{ij} := k_{ij}/\sqrt{k_{ii} k_{jj}}$.
 
-    \end{itemize}
+\stefano{describe pairwise (tensor product) kernel, add references}
+%
+$$ k_{(i,j),(n,m)} := k_{in}k_{jm} + k_{im}k_{jn} $$
 
-    \item We compute the pairwise (tensor product) kernel
-
-\end{itemize}
+The source code of the data processing pipeline, as well as the resulting
+dataset, are available at \url{WRITEME}.
 
 \subsection{Evaluation setting}
 
@@ -115,6 +190,8 @@ WRITEME
     \item PF and PPI balanced fold construction (each test protein has
     at least one unknown interaction that we aim at predicting)
 
+    \item The results are available at \url{WRITEME}.
+
 \end{itemize}
 
 \paragraph{Protein function prediction}
@@ -122,10 +199,10 @@ WRITEME
 \begin{itemize}
 
     \item Competitors: BLAST sequence transfer and nearest neighbor, as in
-    CAFA2; plus GoFDR and possibly other high-rank CAFA2 methods
+    CAFA2~\cite{jiang2016cafa2}; GoFDR~\cite{gong2016gofdr}; possibly other high-rank CAFA2 methods.
 
-    \item Performance metrics: as in CAFA2, protein-centric (Fmax and Smin)
-    and term-centric (AUC).
+    \item Performance metrics: as in CAFA2, protein-centric ($F_\text{max}$ and $S_\text{min}$)
+    and term-centric (AUC)~\cite{jiang2016cafa2}.
 
 \end{itemize}
 
