@@ -140,7 +140,7 @@ class SGDExperiment(Experiment):
                   ['__dummy_sbr']),
 
             Stage(PHONY,
-                  ['__dummy_stats', '__dummy_kernels', '__dummy_sbr'],
+                  ['__dummy_sbr'],
                   ['__all']),
         ]
 
@@ -608,7 +608,17 @@ class SGDExperiment(Experiment):
         return self.compute_kernel(PairwiseKernel, "pp_average_kernel",
                                    pp_indices, submatrix),
 
+    def _write_sbr_datapoints(self, p_to_i, pp_indices):
+        i_to_p = {i: p for p, i in p_to_i.iteritems()}
 
+        lines = []
+        for p, i in sorted(p_to_i.items(), key=lambda p_i: p_i[-1]):
+            lines.append("{};PROTEIN".format(p))
+        for i, j in pp_indices:
+            lines.append("{}-{};PPAIR".format(i_to_p[i], i_to_p[j]))
+
+        with open(join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
+            fp.write("\n".join(lines))
 
     def _term_to_predicate(self, term):
         assert len(term.namespace)
@@ -621,57 +631,6 @@ class SGDExperiment(Experiment):
         }
         return "{namespace}-lvl{level}-{id}-{name}".format(**d)
 
-    def _write_sbr_functions(self, path, ps, dag, p_to_term_ids):
-        aspect_to_term_ids = defaultdict(set)
-        for term in dag._id_to_term.itervalues():
-            aspect_to_term_ids[term.namespace].add(term.id)
-
-        lines = []
-        for p in ps:
-
-            # Skip proteins with no function
-            if not p in p_to_term_ids:
-                print "{} has no annotations".format(p)
-                continue
-            assert len(p_to_term_ids[p]) > 0
-
-            # Write out the individual aspects
-            for aspect in aspect_to_term_ids:
-
-                annotations = {term_id for term_id in aspect_to_term_ids[aspect]
-                               if term_id in p_to_term_ids[p]}
-
-                # Skip aspects with no annotation
-                if not len(annotations):
-                    print "{} has not annotations in {}, skipping".format(p, aspect)
-                    continue
-
-                # Write out the protein per-aspect annotations
-                for term_id in annotations:
-                    pred = self._term_to_predicate(dag._id_to_term[term_id])
-                    lines.append("{}({})={}".format(pred, p, 1))
-
-                for term_id in set(aspect_to_term_ids[aspect]) - annotations:
-                    pred = self._term_to_predicate(dag._id_to_term[term_id])
-                    lines.append("{}({})={}".format(pred, p, 0))
-
-        with open(path, "wb") as fp:
-            fp.write("\n".join(lines))
-
-    def _write_sbr_interactions(self, path, fold, with_in=True):
-        _01 = {True:"1", False:"0"}
-
-        lines = []
-        for p, q, state in fold:
-            lines.append("BOUND({}-{})={}".format(p, q, _01[state]))
-
-        if with_in:
-            for p, q, _ in fold:
-                lines.append("IN({},{},{}-{})=1".format(p, q, p, q))
-
-        with open(path, "wb") as fp:
-            fp.write("\n".join(lines))
-
     def _dump_raw_data(self, ps, dag, p_to_term_ids, pp_pos, pp_neg):
         pps = set()
         pps.update((p, q, True) for p, q in pp_pos)
@@ -682,8 +641,6 @@ class SGDExperiment(Experiment):
         self._write_sbr_interactions(join(self.dst, "sbr-full-interactions.txt"),
                                      pps, with_in=False)
         return None,
-
-
 
     def _dump_stats(self, ps, dag, p_to_term_ids, pp_pos_hq, pp_pos_lq, pp_neg,
                     p_folds, pp_folds):
@@ -723,6 +680,8 @@ class SGDExperiment(Experiment):
 
         # XXX fold statistics
 
+        # XXX # interactions between different folds, per fold
+
         # XXX GO annotation cooccurrence
 
         # Save the PPI and folds as graphml
@@ -738,20 +697,6 @@ class SGDExperiment(Experiment):
         dag.write_graphml(join(self.dst, "go_annotations.graphml"))
 
         return None,
-
-
-
-    def _write_sbr_datapoints(self, p_to_i, pp_indices):
-        i_to_p = {i: p for p, i in p_to_i.iteritems()}
-
-        lines = []
-        for p, i in sorted(p_to_i.items(), key=lambda p_i: p_i[-1]):
-            lines.append("{};PROTEIN".format(p))
-        for i, j in pp_indices:
-            lines.append("{}-{};PPAIR".format(i_to_p[i], i_to_p[j]))
-
-        with open(join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
-            fp.write("\n".join(lines))
 
     def _write_sbr_predicates(self, dag):
         lines = []
@@ -812,40 +757,63 @@ class SGDExperiment(Experiment):
             with open(join(self.dst, "sbr-rules-interaction_implies_same_{}_levelwise.txt".format(aspect)), "wb") as fp:
                 fp.write("\n".join(lines))
 
+    def _write_sbr_functions(self, path, ps, dag, p_to_term_ids):
+        aspect_to_term_ids = defaultdict(set)
+        for term in dag._id_to_term.itervalues():
+            aspect_to_term_ids[term.namespace].add(term.id)
+
+        lines = []
+        for p in ps:
+            # Skip proteins with no function
+            if not p in p_to_term_ids:
+                print "{} has no annotations".format(p)
+                continue
+            assert len(p_to_term_ids[p]) > 0
+
+            # Write out the individual aspects
+            for aspect in aspect_to_term_ids:
+                annotations = {term_id for term_id in aspect_to_term_ids[aspect]
+                               if term_id in p_to_term_ids[p]}
+
+                # Skip aspects with no annotation
+                if not len(annotations):
+                    print "{} has no annotations in {}, skipping".format(p, aspect)
+                    continue
+
+                # Write out the protein per-aspect annotations
+                for term_id in annotations:
+                    pred = self._term_to_predicate(dag._id_to_term[term_id])
+                    lines.append("{}({})={}".format(pred, p, 1))
+
+                for term_id in set(aspect_to_term_ids[aspect]) - annotations:
+                    pred = self._term_to_predicate(dag._id_to_term[term_id])
+                    lines.append("{}({})={}".format(pred, p, 0))
+
+        with open(path, "wb") as fp:
+            fp.write("\n".join(lines))
+
+    @staticmethod
+    def _write_sbr_interactions(path, interactions, with_in=True):
+        _01 = {True:"1", False:"0"}
+
+        lines = []
+        for p, q, state in interactions:
+            lines.append("BOUND({}-{})={}".format(p, q, _01[state]))
+
+        if with_in:
+            for p, q, _ in interactions:
+                lines.append("IN({},{},{}-{})=1".format(p, q, p, q))
+
+        with open(path, "wb") as fp:
+            fp.write("\n".join(lines))
+
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, pp_pos, pp_neg,
                            p_to_i, pp_indices, p_folds, pp_folds):
-        """Writes the SBR dataset."""
-
         self._write_sbr_datapoints(p_to_i, pp_indices)
         self._write_sbr_predicates(dag)
         self._write_sbr_rules(dag)
 
-        def write_functions(path, ps, dag, p_to_term_ids):
-            """Writes GO term predicates for each protein in the fold."""
-            lines = []
-            for p in ps:
-                if not p in p_to_term_ids:
-                    continue
-                assert len(p_to_term_ids) > 0
-                for term in dag._id_to_term.itervalues():
-                    state = {True: "1", False: "0"}[term.id in p_to_term_ids[p]]
-                    lines.append("{}({})={}".format(self._term_to_predicate(term), p, state))
-            with open(path, "wb") as fp:
-                fp.write("\n".join(lines))
-
-        def write_interactions(path, interactions):
-            """Writes IN/3 and BOUND/2 predicates for all (p, q, state) tuples
-            in the fold."""
-            lines = []
-            for p, q, state in interactions:
-                lines.append("IN({},{},{}-{})=1".format(p, q, p, q))
-                lines.append("BOUND({}-{})={}".format(p, q, {True:1, False:0}[state]))
-            with open(path, "wb") as fp:
-                fp.write("\n".join(lines))
-
         p_to_term_ids = dag.get_p_to_term_ids()
-
-        # Write the examples for each fold
         for k, (test_ps, test_pps) in enumerate(zip(p_folds, pp_folds)):
 
             l = (k + 1) % len(pp_folds)
@@ -861,18 +829,18 @@ class SGDExperiment(Experiment):
                     .format(k, len(test_ps), len(test_pps), len(valid_ps),
                             len(valid_pps), len(train_ps), len(train_pps))
 
-            write_functions(join(self.dst, "sbr-fold{}-testset-fun.txt".format(k)),
-                            test_ps, dag, p_to_term_ids)
-            write_functions(join(self.dst, "sbr-fold{}-validset-fun.txt".format(k)),
-                            valid_ps, dag, p_to_term_ids)
-            write_functions(join(self.dst, "sbr-fold{}-trainset-fun.txt".format(k)),
-                            train_ps, dag, p_to_term_ids)
+            self._write_sbr_functions(join(self.dst, "sbr-fold{}-testset-fun.txt".format(k)),
+                                      test_ps, dag, p_to_term_ids)
+            self._write_sbr_functions(join(self.dst, "sbr-fold{}-validset-fun.txt".format(k)),
+                                      valid_ps, dag, p_to_term_ids)
+            self._write_sbr_functions(join(self.dst, "sbr-fold{}-trainset-fun.txt".format(k)),
+                                      train_ps, dag, p_to_term_ids)
 
-            write_interactions(join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
-                               test_pps)
-            write_interactions(join(self.dst, "sbr-fold{}-validset-int.txt".format(k)),
-                               valid_pps)
-            write_interactions(join(self.dst, "sbr-fold{}-trainset-int.txt".format(k)),
-                               train_pps)
+            self._write_sbr_interactions(join(self.dst, "sbr-fold{}-testset-int.txt".format(k)),
+                                         test_pps)
+            self._write_sbr_interactions(join(self.dst, "sbr-fold{}-validset-int.txt".format(k)),
+                                         valid_pps)
+            self._write_sbr_interactions(join(self.dst, "sbr-fold{}-trainset-int.txt".format(k)),
+                                         train_pps)
 
         return True,
