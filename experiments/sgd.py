@@ -9,7 +9,7 @@ from textwrap import dedent
 from ocelot.go import GODag
 from ocelot.kernels import *
 from ocelot.sequences import cdhit
-from ocelot.utils import permute
+from ocelot.utils import permute, dump
 from ocelot import Experiment, Stage, PHONY, compute_p_folds, compute_pp_folds
 from .yeast import *
 
@@ -123,14 +123,13 @@ class SGDExperiment(Experiment):
                   ],
                   ['__dummy_kernels']),
 
-            Stage(self._dump_raw_data,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_neg', ],
-                  ['__dummy_dump']),
-
-            Stage(self._dump_stats,
-                  ['filtered_ps', 'filtered_dag', 'filtered_p_to_term_ids',
-                   'pp_pos_hq', 'pp_pos_lq', 'pp_neg', 'p_folds', 'pp_folds'],
+            Stage(self._dump_and_analyze,
+                  [
+                    'filtered_ps', 'filtered_p_to_i', 'pp_indices',
+                    'filtered_dag', 'filtered_p_to_term_ids',
+                    'pp_pos_hq', 'pp_pos_lq', 'pp_neg',
+                    'p_folds', 'pp_folds'
+                  ],
                   ['__dummy_stats']),
 
             Stage(self._write_sbr_dataset,
@@ -620,7 +619,8 @@ class SGDExperiment(Experiment):
         with open(join(self.dst, "sbr-datapoints.txt"), "wb") as fp:
             fp.write("\n".join(lines))
 
-    def _term_to_predicate(self, term):
+    @staticmethod
+    def _term_to_predicate(term):
         assert len(term.namespace)
         assert term.level >= 0
         d = {
@@ -630,73 +630,6 @@ class SGDExperiment(Experiment):
             "name": term.name.replace(" ", "-").replace(":", "-").replace(",", "")
         }
         return "{namespace}-lvl{level}-{id}-{name}".format(**d)
-
-    def _dump_raw_data(self, ps, dag, p_to_term_ids, pp_pos, pp_neg):
-        pps = set()
-        pps.update((p, q, True) for p, q in pp_pos)
-        pps.update((p, q, False) for p, q in pp_neg)
-
-        self._write_sbr_functions(join(self.dst, "sbr-full-functions.txt"),
-                                  ps, dag, p_to_term_ids)
-        self._write_sbr_interactions(join(self.dst, "sbr-full-interactions.txt"),
-                                     pps, with_in=False)
-        return None,
-
-    def _dump_stats(self, ps, dag, p_to_term_ids, pp_pos_hq, pp_pos_lq, pp_neg,
-                    p_folds, pp_folds):
-        print "DATASET STATISTICS"
-
-        print "# proteins =", len(ps)
-        print "# hi-quality interactions =", len(pp_pos_hq)
-        print "# lo-quality interactions =", len(pp_pos_lq)
-        print "# negative interactions =", len(pp_neg)
-
-        term_ids = set()
-        for ids in p_to_term_ids.values():
-            term_ids.update(ids)
-        print "# annotated GO terms =", len(term_ids)
-
-        print "GO DAG STATISTICS"
-
-        level_to_term_ids = defaultdict(set)
-        level_to_annots = defaultdict(list)
-        level_to_ps = defaultdict(set)
-        for id_ in term_ids:
-            term = dag._id_to_term[id_]
-            assert len(term.proteins)
-            level_to_term_ids[term.level].add(id_)
-            level_to_annots[term.level].extend(list(term.proteins))
-            level_to_ps[term.level].update(term.proteins)
-
-        # XXX per-aspect GO stats
-
-        for level in level_to_annots:
-            num_terms = len(level_to_term_ids[level])
-            num_bins = len([id_ for id_ in level_to_term_ids[level] if id_.startswith("BN")])
-            num_annots = len(level_to_annots[level])
-            num_ps = len(level_to_ps[level])
-            print "level {} has {} terms (of which {} bins) with {} annotations over {} proteins".format(
-                level, num_terms, num_bins, num_annots, num_ps)
-
-        # XXX fold statistics
-
-        # XXX # interactions between different folds, per fold
-
-        # XXX GO annotation cooccurrence
-
-        # Save the PPI and folds as graphml
-        graph = nx.Graph()
-        for k, fold in enumerate(pp_folds):
-            for p, q, state in fold:
-                if not state:
-                    continue
-                graph.add_edge(p, q, fold=k)
-        nx.write_graphml(graph, join(self.dst, "pos_pin.graphml"))
-
-        # Save the GO annotations as graphml
-        dag.write_graphml(join(self.dst, "go_annotations.graphml"))
-
-        return None,
 
     def _write_sbr_predicates(self, dag):
         lines = []
@@ -806,6 +739,73 @@ class SGDExperiment(Experiment):
 
         with open(path, "wb") as fp:
             fp.write("\n".join(lines))
+
+    def _dump_and_analyze(self, ps, p_to_i, pp_indices, dag, p_to_term_ids,
+                          pp_pos_hq, pp_pos_lq, pp_neg, p_folds, pp_folds):
+
+        # Dump all function annotations
+        self._write_sbr_functions(join(self.dst, "sbr-full-functions.txt"),
+                                  ps, dag, p_to_term_ids)
+
+        # Dump all interactions
+        pps = set()
+        pps.update((p, q, True)  for p, q in pp_pos)
+        pps.update((p, q, False) for p, q in pp_neg)
+        self._write_sbr_interactions(join(self.dst, "sbr-full-interactions.txt"),
+                                     pps, with_in=False)
+
+        # Compute global statistics
+        print "# proteins =", len(ps)
+        print "# hi-quality interactions =", len(pp_pos_hq)
+        print "# lo-quality interactions =", len(pp_pos_lq)
+        print "# negative interactions =", len(pp_neg)
+
+        term_ids = set()
+        for ids in p_to_term_ids.values():
+            term_ids.update(ids)
+        print "# annotated GO terms =", len(term_ids)
+
+        print "GO DAG STATISTICS"
+
+        level_to_term_ids = defaultdict(set)
+        level_to_annots = defaultdict(list)
+        level_to_ps = defaultdict(set)
+        for id_ in term_ids:
+            term = dag._id_to_term[id_]
+            assert len(term.proteins)
+            level_to_term_ids[term.level].add(id_)
+            level_to_annots[term.level].extend(list(term.proteins))
+            level_to_ps[term.level].update(term.proteins)
+
+        # XXX per-aspect GO stats
+
+        for level in level_to_annots:
+            num_terms = len(level_to_term_ids[level])
+            num_bins = len([id_ for id_ in level_to_term_ids[level] if id_.startswith("BN")])
+            num_annots = len(level_to_annots[level])
+            num_ps = len(level_to_ps[level])
+            print "level {} has {} terms (of which {} bins) with {} annotations over {} proteins".format(
+                level, num_terms, num_bins, num_annots, num_ps)
+
+        # XXX fold statistics
+
+        # XXX # interactions between different folds, per fold
+
+        # XXX GO annotation cooccurrence
+
+        # Save the PPI and folds as graphml
+        graph = nx.Graph()
+        for k, fold in enumerate(pp_folds):
+            for p, q, state in fold:
+                if not state:
+                    continue
+                graph.add_edge(p, q, fold=k)
+        nx.write_graphml(graph, join(self.dst, "pos_pin.graphml"))
+
+        # Save the GO annotations as graphml
+        dag.write_graphml(join(self.dst, "go_annotations.graphml"))
+
+        return None,
 
     def _write_sbr_dataset(self, ps, dag, p_to_term_ids, pp_pos, pp_neg,
                            p_to_i, pp_indices, p_folds, pp_folds):
