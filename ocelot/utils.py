@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import subprocess
+import cPickle as pickle
 import numpy as np
 from os import makedirs
 from os.path import isdir, abspath
@@ -16,6 +17,20 @@ def quietmkdir(path):
         if e.errno != errno.EEXIST:
             raise RuntimeError("can not create cache directory '{}': {}" \
                                 .format(cache, e))
+
+def dump(path, what, protocol=2):
+    with open(path, "wb") as fp:
+        pickle.dump(what, fp, protocol=protocol)
+
+def load(path, dtype=None):
+    try:
+        with open(path, "rb") as fp:
+            data = pickle.load(fp)
+            if dtype is not None:
+                data = data.astype(dtype)
+            return data
+    except IOError:
+        return None
 
 def validate(valid, values):
     if values is None:
