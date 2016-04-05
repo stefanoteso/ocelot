@@ -267,20 +267,11 @@ class ProfileKernel(_RecursivePrefixStringKernel):
         transition-probability) pairs). The ``PSSM`` class be instructed take
         care of this automatically, as in the following example.
 
-    Example usage::
-
-        from ocelot.services import PSSM
-        from ocelot.kernels.string import ProfileKernel
-
-        reader = PSSM(targets=["residue", "nlog_condp"])
-        kernel = ProfileKernel([reader.read(path) for path in paths],
-                               k=4, threshold=6.0)
-        matrix = kernel.compute()
-
     Parameters
     ----------
     pssms : collection
-        List of PSSMs of the form [(residue, transition-score)+].
+        List of pandas.DataFrame PSSMs with residue and transition-score
+        columns.
     threshold : float, optional
         Threshold mutation probability to count as a hit, defaults to 6.
     All remaining options are passed to the underlying ``_RecursivePrefixStringKernel``.
@@ -333,14 +324,11 @@ class PSSMKernel(ProfileKernel):
     def _get_pssm_path(self, p):
         return os.path.join(self._cache_path, "{}.ascii-pssm".format(p))
 
-    def _compute_pssms(self):
-        pass
-
     def _compute_all(self):
-        reader = PSSM(targets=("residue", "nlog_condp"))
         pssms = []
         for p in self._entities:
-            pssms.append(reader.read(self._get_pssm_path(p)))
+            pssms.append(read_pssm(self._get_pssm_path(p)),
+                         columns=("residue", "nlog_condp"))
         self._entities = pssms
         return super(PSSMKernel, self)._compute_all()
 
