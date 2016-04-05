@@ -16,18 +16,3 @@ def iterate_csv(path, num_skip = 0, **kwargs):
                 num_skip -= 1
                 continue
             yield row_as_dict
-
-class Binary(object):
-    """A simple wrapper around binary executables."""
-    def __init__(self, path):
-        self.path = path
-
-    def run(self, args, shell = True):
-        import subprocess
-        pipe = subprocess.Popen(self.path + " " + " ".join(args),
-                                stdout = subprocess.PIPE,
-                                stderr = subprocess.PIPE,
-                                shell = shell)
-        out, err = pipe.communicate()
-        ret = pipe.wait()
-        return ret, out, err
