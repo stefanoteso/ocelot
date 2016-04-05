@@ -40,40 +40,6 @@ def iterate_csv(path, num_skip = 0, **kwargs):
                 continue
             yield row_as_dict
 
-class InterProTSV(object):
-    """Reader for `InterPro <http://www.ebi.ac.uk/interpro/>`_ tab-separated values files.
-
-    The TSV files can be obtained with ``iprscan5_*.py`` or similar tools,
-    which can be found `here <http://www.ebi.ac.uk/Tools/webservices/services/pfa/iprscan5_rest>`_.
-
-    .. todo::
-
-        We should really integrate the ``iprscan5_*.py`` functionality here.
-    """
-    def read(self, path, allowed_sources = None):
-        """
-        :param path: path to the InterPro TSV file.
-        :param allowed_sources: list of allowed domain sources (default: all).
-
-        :returns: a list of ``(domain_id, evalue)`` pairs.
-
-        Note that some domains may have ``evalue`` set to ``None``; this
-        happens whenever InterPro does not provide a value.
-        """
-        FIELDS = ("QUERY_ID", "?2", "?3", "SOURCE_DB", "SOURCE_FAMILY",
-                  "DESCRIPTION", "START", "STOP", "EVALUE", "?10", "DATE",
-                  "IPR_FAMILY", "SHORT_DESCRIPTION", "GO_TERMS", "PATHWAYS")
-        hits = {}
-        for row in iterate_csv(path, delimiter="\t", fieldnames = FIELDS):
-            if allowed_sources and not row["SOURCE_DB"] in allowed_sources:
-                continue
-            try:
-                evalue = float(row["EVALUE"])
-            except ValueError:
-                evalue = None
-            hits[row["SOURCE_DB"] + ":" + row["SOURCE_FAMILY"]] = evalue
-        return hits
-
 class Binary(object):
     """A simple wrapper around binary executables."""
     def __init__(self, path):
