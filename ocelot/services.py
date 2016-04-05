@@ -4,11 +4,7 @@ import os, errno, hashlib
 import numpy as np
 import multiprocessing as mp
 import itertools as it
-from ocelot.sequences import read_fasta, write_fasta
-
-# The amino acid alphabet (sorted lexicographically).
-AMINOACIDS = ("A", "C", "D", "E", "F", "G", "H", "I", "K", "L", "M", "N", "P",
-              "Q", "R", "S", "T", "V", "W", "Y")
+from ocelot.sequences import read_fasta, write_fasta, AMINOACIDS
 
 # Taken from the string kernels package
 BACKGROUND_AA_FREQ = (

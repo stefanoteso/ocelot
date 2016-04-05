@@ -24,7 +24,10 @@ AA1_TO_AA3 = {
 AA3_TO_AA1 = {aa3: aa1 for aa1, aa3 in AA1_TO_AA3.iteritems()}
 
 AMINOACIDS = list(AA_INFO.index)
+"""The amino acids alphabet, sorted lexicographically, one-letter format."""
+
 AMINOACIDS3 = [AA1_TO_AA3[aa] for aa in AMINOACIDS]
+"""The amino acids alphabet, sorted lexicographically, three-letter format."""
 
 AA_INFO.loc["?"] = AA_INFO.mean()
 
