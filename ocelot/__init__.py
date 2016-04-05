@@ -2,9 +2,10 @@ from experiment import *
 from services import *
 from sequences import *
 from microarray import *
-from converters import *
-from kernels import *
+from interactions import *
 from go import *
+from kernels import *
+from converters import *
 from utils import *
 
 __version__ = "0.0-dontuse"
