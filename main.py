@@ -5,6 +5,7 @@ from os.path import join, abspath
 import numpy as np
 from collections import namedtuple
 import ocelot
+from ocelot.utils import run_binary
 import experiments
 
 def _make_rdf(args):
@@ -56,9 +57,9 @@ def _make_rdf(args):
 def _start_virtuoso(args):
     """Starts a Virtuoso instance"""
     section = ocelot.config["virtuoso"]
-    virtuoso, ini = ocelot.services.Binary(section[u"virtuoso"]), section[u"ini"]
+    virtuoso, ini = section[u"virtuoso"], section[u"ini"]
     print "About to start virtuoso (with '{}')".format(ini)
-    ret, out, err = virtuoso.run(["+configfile {}".format(ini)])
+    ret, out, err = run_binary(virtuoso,["+configfile {}".format(ini)])
     if ret != 0:
         raise RuntimeError("virtuoso-t exited with error code '{}'".format(ret))
 
@@ -93,8 +94,7 @@ def _upload_rdf(args):
     with open("ocelot.isql", "wt") as fp:
         fp.write(isql_command)
 
-    isql = ocelot.services.Binary("isql")
-    ret, out, err = isql.run([ "-U dba -P dba < ocelot.isql" ])
+    ret, out, err = run_binary("isql", [ "-U dba -P dba < ocelot.isql" ])
     if ret != 0:
         raise RuntimeError("upload-rdf failed, isql exited with '{}':\n{}\n{}\n".format(ret, out, err))
 
@@ -109,8 +109,7 @@ def _clear_graph(args):
     with open("ocelot.isql", "wt") as fp:
         fp.write("SPARQL CLEAR GRAPH <{}>;".format(args.default_graph))
 
-    isql = ocelot.services.Binary("isql")
-    ret, out, err = isql.run([ "-U dba -P dba < ocelot.isql" ])
+    ret, out, err = run_binary("isql", [ "-U dba -P dba < ocelot.isql" ])
     if ret != 0:
         raise RuntimeError("clear-rdf failed, isql exited with '{}':\n{}\n{}\n".format(ret, out, err))
 
