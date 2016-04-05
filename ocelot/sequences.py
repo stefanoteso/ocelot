@@ -6,7 +6,7 @@ from scipy.stats import entropy
 from os.path import join
 import multiprocessing as mp
 import hashlib
-from ocelot.utils import quietmkdir, run_binary
+from ocelot.utils import quietmkdir, validate, run_binary
 
 
 # TODO add B (Asparagine or Aspartic Acid), Z (Glutamine or Glutamic Acid), J
@@ -29,8 +29,38 @@ AMINOACIDS = list(AA_INFO.index)
 AMINOACIDS3 = [AA1_TO_AA3[aa] for aa in AMINOACIDS]
 """The amino acids alphabet, sorted lexicographically, three-letter format."""
 
+AMINOACIDS_PSSM = ["A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K",
+                   "M", "F", "P", "S", "T", "W", "Y", "V"]
+"""The amino acids alphabet, sorted as in PSSM files."""
+
+_PSSM_TO_LEX = {
+    i: AMINOACIDS.index(s) for i, s in enumerate(AMINOACIDS_PSSM)
+}
+
 AA_INFO.loc["?"] = AA_INFO.mean()
 
+BACKGROUND_AA_FREQ = [
+    0.0799912015849807, # A
+    0.0171846021407367, # C
+    0.0578891399707563, # D
+    0.0638169929675978, # E
+    0.0396348024787477, # F
+    0.0760659374742852, # G
+    0.0223465499452473, # H
+    0.0550905793661343, # I
+    0.060458245507428,  # K
+    0.0866897071203864, # L
+    0.0215379186368154, # M
+    0.044293531582512,  # N
+    0.0465746314476874, # P
+    0.0380578923048682, # Q
+    0.0484482507611578, # R
+    0.0630028230885602, # S
+    0.0580394726014824, # T
+    0.0700241481678408, # V
+    0.0144991866213453, # W
+    0.03635438623143,   # Y
+)
 
 def read_fasta(path):
     """Reads a FASTA file (generator).
@@ -228,6 +258,70 @@ def cdhit(pairs, threshold=0.8, cdhit_path="/usr/bin/cdhit"):
         raise RuntimeError("cdhit exited with errno '{}'".format(ret))
 
     return _read_cdhit_results("temp.cdhit")
+
+def read_pssm(path, columns=None, priors=None):
+    """Reads a PSSM (position-specific scoring matrix) file.
+
+    Parameters
+    ----------
+    path : str
+        Path to the PSSM file.
+    columns : list or None. (defaults to None)
+        List of columns to keep.
+    priors : numpy.ndarray of shape (20,) or None. (defaults to None)
+        Amino acid background frequencies. None means BACKGROUND_AA_FREQ.
+    gamma : float. (defaults to 0.8)
+        Amount of smoothing.
+
+    Returns
+    -------
+    pssm : pandas.DataFrame
+        A DataFrame representing the PSSM data.
+    """
+    NAMES = ["residue", "score", "condprob", "nlog_condprob"]
+
+    columns = validate(NAMES, columns)
+    if priors is None:
+        priors = BACKGROUND_AA_FREQ
+    if len(priors) != 20:
+        raise ValueError("len(priors) must be 20")
+    if not all(0.0 <= prior <= 1.0 for prior in priors):
+        raise ValueError("priors must be in [0,1]")
+    if not 0.0 <= gamma <= 1.0:
+        raise ValueError("gamma must be in [0,1]")
+
+    with open(path, "rt") as fp:
+        lines = fp.readlines()[3:-6]
+
+    infos, old_position = [], None
+    for line in lines:
+        position = int(line[0:5].strip()) - 1
+        if old_position is not None:
+            assert position == (old_position + 1), "watch your PSSMs"
+        old_position = position
+
+        residue = line[5:7].strip()
+
+        scores, condps, nlog_condps = \
+            [ 0. ] * 20, [ 0. ] * 20, [ 0. ] * 20
+        for i in xrange(20):
+            score = float(line[9+i*3:9+i*3+3].strip())
+            condp = float(line[70+i*4:70+i*4+4].strip()) / 100.0
+            condp = self._gamma * condp + (1-self._gamma) * self._priors[i]
+            assert 0.0 <= condp <= 1.0
+            if condp == 0.0:
+                print "Warning: zero conditional probability found in PSSM"
+                nlog_condp = 1e13 # supposedly a **huge** value
+            else:
+                nlog_condp = -np.log(condp)
+            assert nlog_condp >= 0.0
+            scores[_PSSM_TO_LEX[i]] = score
+            condps[_PSSM_TO_LEX[i]] = condp
+            nlog_condps[_PSSM_TO_LEX[i]] = nlog_condp
+
+        infos.append([residue, scores, condps, nlog_condps])
+
+    return pd.DataFrame(infos, columns=NAMES)[columns]
 
 def run_psiblast(sequence, db="nr", evalue=10.0, matrix="BLOSUM62",
                  num_iters=2, num_threads=0, cache="/tmp/psiblast",
