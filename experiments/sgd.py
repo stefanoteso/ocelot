@@ -623,11 +623,15 @@ class SGDExperiment(Experiment):
     def _term_to_predicate(term):
         assert len(term.namespace)
         assert term.level >= 0
+
+        def onlyalnum(s):
+            return "".join([c for c in s if c.isalnum()])
+
         d = {
             "namespace": term.namespace,
             "level": term.level,
             "id": term.id.replace(":", "-"),
-            "name": term.name.replace(" ", "-").replace(":", "-").replace(",", "")
+            "name": onlyalnum(term.name)
         }
         return "{namespace}-lvl{level}-{id}-{name}".format(**d)
 
