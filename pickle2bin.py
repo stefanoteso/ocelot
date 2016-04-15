@@ -19,8 +19,9 @@ with open(sys.argv[1], "rb") as fp:
     except:
         matrix = pickle.load(fp, encoding='latin1')
 
-print("storing...")
+print("storing upper triangle...")
 with open(sys.argv[2], "wb") as fp:
-    info = np.array(matrix.shape)
-    info.astype(np.int32).tofile(fp)
-    matrix.astype(np.float32).tofile(fp)
+    info = np.array([matrix.shape[0]], dtype=np.int32)
+    info.tofile(fp)
+    for i, row in enumerate(matrix):
+        row[i:].astype(np.float32).tofile(fp)
