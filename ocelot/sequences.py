@@ -60,7 +60,7 @@ BACKGROUND_AA_FREQ = [
     0.0700241481678408, # V
     0.0144991866213453, # W
     0.03635438623143,   # Y
-)
+]
 
 def read_fasta(path):
     """Reads a FASTA file (generator).
