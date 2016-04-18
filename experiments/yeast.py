@@ -9,7 +9,6 @@ from glob import glob
 
 from ocelot.kernels import *
 from ocelot.microarray import read_pcl, GeneExprKernel
-from ocelot.services import InterProTSV
 
 class SGDGeneExprKernel(GeneExprKernel):
     """A yeast-specific gene expression kernel.
@@ -81,64 +80,3 @@ class YeastProteinComplexKernel(Kernel):
             matrix[np.ix_(indices, indices)] = 1
 
         return DiffusionKernel(matrix, beta=self._beta).compute()
-
-class InterProKernel(Kernel):
-    """A simple domain kernel built around InterPro.
-
-    Parameters
-    ----------
-    ps : collection
-        Ordered list of protein IDs.
-    path : str
-        Path to the directory holding the InterPro files.
-    mode : str, optional
-        One of "match", "count", "evalue", defaults to "match".
-    allowed_sources : collection or None, optional
-        List of allowed domain providers, defaults to all of them.
-    default_score : float
-        Score to use when no E-value is provided, defaults to 1.0.
-    """
-    def __init__(self, ps, path, mode="match", allowed_sources=None,
-                 default_score=1.0, *args, **kwargs):
-        if not mode in ("match", "count", "evalue"):
-            raise ValueError("invalid mode '{}'".format(mode))
-        self._path = path
-        self._mode = mode
-        self._allowed_sources = allowed_sources
-        self._default_score = default_score
-        super(InterProKernel, self).__init__(ps, *args, **kwargs)
-
-    def _to_score(self, evalue):
-        if evalue is None or evalue <= 0.0:
-            return self._default_score
-        return -np.log(evalue)
-
-    def _compute_all(self):
-        parser = InterProTSV()
-
-        all_hits, num_missing = [], 0
-        for p in self._entities:
-            try:
-                path = join(self._path, "{}.tsv.txt".format(p))
-                domain_to_evalue = parser.read(path, self._allowed_sources)
-            except IOError, e:
-                domain_to_evalue = {}
-                num_missing += 1
-
-            if self._mode == "match":
-                hits = set(domain_to_evalue.keys())
-            elif self._mode == "count":
-                hits = dict(Counter(domain_to_evalue.keys()))
-            elif self._mode == "evalue":
-                hits = {domain: self._to_score(evalue)
-                        for domain, evalue in domain_to_evalue.iteritems()}
-            all_hits.append(hits)
-
-        if num_missing > 0:
-            print "no interpro domains for '{}/{}' proteins" \
-                    .format(num_missing, len(self))
-
-        if self._mode == "match":
-            return SetKernel(all_hits).compute()
-        else:
-            return SparseLinearKernel(all_hits).compute()

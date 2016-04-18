@@ -3,6 +3,7 @@ from services import *
 from sequences import *
 from microarray import *
 from interactions import *
+from domains import *
 from go import *
 from kernels import *
 from converters import *
