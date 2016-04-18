@@ -3,8 +3,7 @@
 import os
 import numpy as np
 from scipy import sparse
-from ocelot.sequences import AMINOACIDS
-from ocelot.services import PSSM
+from ocelot.sequences import AMINOACIDS, read_pssm
 
 from . import Kernel
 
