@@ -111,9 +111,9 @@ WRITEME
 \subsection{Dataset construction}
 
 In order to evaluate our proposed method, we built a comprehensive genome-wide
-dataset. All data was retrieved in August 2014.  The source code of the data
-processing pipeline, as well as the resulting dataset, are available at
-\url{WRITEME}.
+yeast dataset. All data was retrieved in August 2014. The source code of the
+data processing pipeline, as well as the resulting dataset, are available at
+\url{https://github.com/stefanoteso/ocelot}.
 
 \paragraph{Annotations.} Protein sequences were taken from the Saccharomyces
 Genome Database (SGD)~\cite{cherry2012sgd}. Only validated ORFs at least 50
@@ -124,33 +124,32 @@ proteins.
 Functional annotations were also taken from SGD, while the GO hierarchy
 definition was taken from the Gene Ontology Consortium website\footnote{
 \url{http://geneontology.org/page/download-ontology}}. Following common
-practice~\cite{gong2016gofdr} \stefano{more references}, we removed
-automatically assigned (IEA) GO annotations. Obsolete GO annotations (resulting
-from mismatches between SGD and the GO hierarchy) were removed as well. All
-annotations were propagated to the root.
+practice~\cite{gong2016gofdr} \stefano{more references}, automatically assigned
+(IEA) GO annotations and annotations to obsolete terms (resulting from
+mismatches between SGD annotations and the GO hierarchy) were discarded.  The
+resulting annotations were propagated to the root terms.
 
 \stefano{Negative annotations were computed using the SNOB algorithm~\cite{youngs2014negative}.}
 
-\stefano{add annotation statistics here}
+\stefano{add annotation statistics}
 
 The protein--protein interaction network (PIN) was taken from
 BioGRID~\cite{chatr2015biogrid}. Only manually curated physical interactions
-were kept. After symmetrizing the interactions, the resulting network accounted
-for a total of 34611 known interacting protein pairs. Due to the general lack
-of shared repositories of known non-interacting protein pairs in
-yeast\footnote{Unfortunately, resources such as the
+were kept. \stefano{what about self-loops?} After symmetrizing the
+interactions, the resulting network accounted for a total of 34611 interacting
+protein pairs. Due to the lack of large repositories of known non-interacting
+protein pairs in yeast\footnote{Unfortunately, resources such as the
 Negatome~\cite{blohm2013negatome} do not yet provide enough negative annotation
-for our goals.}, we resorted to sampling candidate non-interactions from the
-complement of the positive PIN.  This procedure is well-justified by the
-overwhelming proportion of true non-interactions in the
-complement~\cite{park2011revisiting}. The procedure was as follows. First, we
-computed the complement of the positive PIN. To minimize the chance of sampling
-false non-interactions, we subtracted from the complement all the known
-(physical or functional) interactions annotated in either BioGRID or
-STRING~\cite{franceschini2013string91,szklarczyk2014string10} (version 9.1).
-Finally, we sampled 34611 non-interactions from the remaining candidate pairs
-uniformly at random. The full set of interaction annotations is taken to be the
-union of the above positive and negative sets.
+for our goals.}, we sampled the candidate non-interactions from the
+complement of the positive PIN; this procedure is justified by the overwhelming
+proportion of true non-interactions in the
+complement~\cite{park2011revisiting}. To minimize the chance of sampling false
+non-interactions, all known (physical and functional) interactions annotated in
+STRING 9.1~\cite{franceschini2013string91} were removed
+from the complement prior to sampling.  A total of 34611 non-interactions from
+the remaining candidate pairs were sampled uniformly at
+random. The full set of interaction annotations is taken to be the union of the
+above positive and negative sets.
 
 \paragraph{Kernels.} In order to drive our learning procedure, we computed a
 number of kernels between proteins and protein--protein pairs. We focused on
@@ -161,7 +160,7 @@ individual kernels.
 
 Gene co-localization is known to influence the likelihood of proteins having an
 interaction. The correlation is especially noticeable in prokaryote organisms,
-but it is still significant in eukaryotes, such as yeast \stefano{add ref}.
+but it is still significant in eukaryotes \stefano{add ref}.
 This information is captured through the {\em co-localization} kernel, defined
 as follows: the kernel $k_{ij}$ between proteins $i$ and $j$ is given by
 %
