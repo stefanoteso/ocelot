@@ -231,7 +231,7 @@ def cdhit(pairs, threshold=0.8, cdhit_path="/usr/bin/cdhit"):
         List of pairs of the form (id, sequence)
     threshold : float, optional. (defaults to 0.8)
         CD-HIT clustering threshold.
-    " ".cdhit_path : str, optional. (defaults to ``/usr/bin/cdhit``)
+    cdhit_path : str, optional. (defaults to ``/usr/bin/cdhit``)
         Path to the cdhit binary.
 
     Returns
@@ -248,10 +248,22 @@ def cdhit(pairs, threshold=0.8, cdhit_path="/usr/bin/cdhit"):
     # TODO use tempfile, get rid of it
     write_fasta("temp.fasta", pairs)
 
+    if 0.7 <= threshold < 1.0:
+        word_size = 5
+    elif 0.6 <= threshold < 0.7:
+        word_size = 4
+    elif 0.5 <= threshold < 0.6:
+        word_size = 3
+    elif 0.4 <= threshold < 0.5:
+        word_size = 2
+    else:
+        raise ValueError("invalid threshold")
+
     # TODO add support for the other options
     args = [ "-i {}".format("temp.fasta"),
              "-o {}".format("temp.cdhit"),
-             "-c {}".format(threshold) ]
+             "-c {}".format(threshold),
+             "-n {}".format(word_size) ]
 
     ret, out, err = run_binary(cdhit_path, args)
     if ret != 0:
