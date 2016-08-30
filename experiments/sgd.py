@@ -148,7 +148,7 @@ class SGDExperiment(Experiment):
         self._min_go_annot = kwargs.pop("min_go_annot", None)
         super(SGDExperiment, self).__init__(STAGES, *args, **kwargs)
 
-    def run(self, min_sequence_len=50, cdhit_threshold=0.75, *args, **kwargs):
+    def run(self, min_sequence_len=50, cdhit_threshold=0.6, *args, **kwargs):
         """Run the yeast prediction experiment.
 
         Parameters
