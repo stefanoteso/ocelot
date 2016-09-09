@@ -59,7 +59,7 @@ def _start_virtuoso(args):
     section = ocelot.config["virtuoso"]
     virtuoso, ini = section[u"virtuoso"], section[u"ini"]
     print "About to start virtuoso (with '{}')".format(ini)
-    ret, out, err = run_binary(virtuoso,["+configfile {}".format(ini)])
+    ret, out, err = run_binary(virtuoso,["+configfile {}".format(ini), "+wait"])
     if ret != 0:
         raise RuntimeError("virtuoso-t exited with error code '{}'".format(ret))
 
