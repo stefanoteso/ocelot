@@ -1,7 +1,5 @@
 # Ocelot
 
-![Ocelot Icon](https://upload.wikimedia.org/wikipedia/commons/2/27/Salvador_Dali_NYWTS.jpg=240x)
-
 ## What is it?
 
 Ocelot is a collection of Python classes and methods for processing biological
